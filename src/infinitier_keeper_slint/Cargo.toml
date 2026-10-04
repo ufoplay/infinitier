@@ -1,0 +1,35 @@
+[package]
+name = "infinitier_keeper_slint"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Slint reimplementation of the Infinitier Keeper save-game editor GUI"
+publish = false
+
+[dependencies]
+infinitier_core = { workspace = true }
+
+clap = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+# Software renderer + winit: no GL dev-lib dependency. Text needs the
+# fontconfig runtime lib (Slint's text stack); the dev package is only a
+# build-time linker requirement (see readme.md).
+slint = { version = "1.17", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-software",
+] }
+
+[build-dependencies]
+slint-build = "1.17"
+
+[features]
+# Opt-in embedded MCP test server (dev only): build with `--features mcp`,
+# run with `SLINT_MCP_PORT=8080` to expose http://localhost:8080/mcp so an
+# AI agent can inspect the accessibility tree, click/type, and screenshot.
+mcp = ["slint/mcp"]

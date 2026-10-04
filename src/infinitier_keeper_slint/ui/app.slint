@@ -1,0 +1,805 @@
+// Vanilla Slint UI for the Infinitier Keeper (Slint edition).
+// Kept deliberately plain: only std-widgets, no custom theming.
+
+import { VerticalBox, HorizontalBox, ListView, ScrollView, LineEdit, Button, GroupBox, ComboBox, CheckBox } from "std-widgets.slint";
+
+// One editable / read-only row inside a character card. `id` is the index
+// into the active tab's field table, routed back on commit; `-1` marks a
+// derived read-only row. `is-attacks` swaps the text input for the Attacks
+// dropdown; `is-check` renders a disabled checkbox (label + `checked`).
+export struct FieldRow {
+    id: int,
+    label: string,
+    value: string,
+    bonus: string,
+    editable: bool,
+    is-attacks: bool,
+    is-check: bool,
+    checked: bool,
+}
+
+// One titled card (e.g. "Ability scores") holding a set of rows, assigned
+// to a display column (0..2) so the tab can lay cards out like the egui
+// keeper's three-column grid.
+export struct FieldCard {
+    title: string,
+    column: int,
+    rows: [FieldRow],
+}
+
+// One party-list entry: display name + portrait thumbnail.
+export struct PartyMember {
+    name: string,
+    portrait: image,
+}
+
+// One row of a read-only Name · Value table (Local / Global Variables).
+export struct VarRow {
+    name: string,
+    value: string,
+}
+
+// One row of a wide multi-column read-only grid (Effects). `cells` aligns
+// positionally to the `grid-headers` / `grid-widths` columns.
+export struct GridRow {
+    cells: [string],
+}
+
+// One labelled colour swatch (Appearance tab): a slot name and a small
+// pre-rendered gradient image.
+export struct ColorSwatch {
+    label: string,
+    image: image,
+}
+
+// One spell row (Spells tab). `ref-id` is the display-order row index routed
+// back on memorize / delete.
+export struct SpellRowUi {
+    ref-id: int,
+    level: string,
+    memorized: string,
+    name: string,
+    resref: string,
+}
+
+// One inventory slot row (Inventory tab). `slot` is the slot index routed
+// back on select / quantity-edit / delete.
+export struct InvRow {
+    slot: int,
+    icon: image,
+    position: string,
+    filled: bool,
+    q1: string,
+    q2: string,
+    q3: string,
+    name: string,
+    resref: string,
+    selected: bool,
+}
+
+// One row of the Item/Spell Browser list.
+export struct BrowserRow {
+    resref: string,
+    name: string,
+    category: string,
+    selected: bool,
+}
+
+// A modal overlay listing browsable resources (items or spells) with a
+// search box and an "Add" button. Fills the window and dims what's behind.
+component BrowserOverlay {
+    in property <string> title;
+    in property <[BrowserRow]> rows;
+    in property <bool> add-enabled;
+    in property <string> add-label;
+    callback search(string);
+    callback select(string);
+    callback add();
+    callback close();
+
+    // Dim backdrop (also swallows clicks to what's behind).
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000066;
+        TouchArea { }
+        Rectangle {
+            width: min(760px, parent.width - 40px);
+            height: min(600px, parent.height - 40px);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: white;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: #cccccc;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: root.title;
+                        font-size: 16px;
+                        font-weight: 700;
+                        color: black;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                    }
+                    Button { text: "Close"; clicked => { root.close(); } }
+                }
+                LineEdit {
+                    placeholder-text: "Search by name, type or resref…";
+                    edited(t) => { root.search(t); }
+                }
+                HorizontalLayout {
+                    padding-left: 6px;
+                    spacing: 8px;
+                    Text { text: "Type"; width: 150px; font-weight: 700; color: black; }
+                    Text { text: "Name"; horizontal-stretch: 1; font-weight: 700; color: black; }
+                    Text { text: "Resource"; width: 110px; font-weight: 700; color: black; }
+                }
+                ListView {
+                    vertical-stretch: 1;
+                    for r in root.rows: Rectangle {
+                        height: 26px;
+                        background: r.selected ? #3b82f6 : transparent;
+                        TouchArea { clicked => { root.select(r.resref); } }
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 8px;
+                            Text { text: r.category; width: 150px; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
+                            Text { text: r.name; horizontal-stretch: 1; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
+                            Text { text: r.resref; width: 110px; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    Button {
+                        text: root.add-label;
+                        enabled: root.add-enabled;
+                        clicked => { root.add(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A titled card rendering its rows: a label on the left, an optional
+// "(effective: …)" bonus hint, and on the right either the Attacks
+// dropdown, an editable input, or a read-only value.
+component CharacterCard {
+    in property <FieldCard> card;
+    in property <[string]> attacks-options;
+    in property <int> attacks-index;
+    callback commit-field(int, string);
+    callback commit-attacks(int);
+
+    GroupBox {
+        title: root.card.title;
+        VerticalBox {
+            spacing: 6px;
+            for row in root.card.rows: HorizontalBox {
+                alignment: start;
+                spacing: 8px;
+
+                // Checkbox row: label lives in the box. Editable (toggles
+                // commit-field with "1"/"0") when the row carries a real id;
+                // read-only (disabled) for derived rows (id == -1).
+                if row.is-check: CheckBox {
+                    text: row.label;
+                    checked: row.checked;
+                    enabled: row.id >= 0;
+                    toggled => {
+                        if (row.id >= 0) {
+                            root.commit-field(row.id, self.checked ? "1" : "0");
+                        }
+                    }
+                }
+
+                // Everything else: label + optional bonus + editor/value.
+                if !row.is-check: HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    // Label flexes and elides (like the egui keeper's
+                    // truncating label) so the editor on the right is never
+                    // pushed off the column edge.
+                    Text {
+                        text: row.label;
+                        horizontal-stretch: 1;
+                        min-width: 40px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    if row.bonus != "": Text {
+                        text: row.bonus;
+                        color: gray;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+
+                    if row.is-attacks: ComboBox {
+                        width: 96px;
+                        model: root.attacks-options;
+                        current-index: root.attacks-index;
+                        selected => { root.commit-attacks(self.current-index); }
+                    }
+
+                    if row.editable && !row.is-attacks: LineEdit {
+                        width: 96px;
+                        text: row.value;
+                        // Commit on Enter and on focus loss (clamp-on-blur),
+                        // mirroring the egui keeper.
+                        accepted(t) => { root.commit-field(row.id, t); }
+                        changed has-focus => {
+                            if (!self.has-focus) {
+                                root.commit-field(row.id, self.text);
+                            }
+                        }
+                    }
+
+                    if !row.editable && !row.is-attacks: Text {
+                        width: 96px;
+                        text: row.value;
+                        font-weight: 700;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title <=> root.game-title;
+    preferred-width: 1100px;
+    preferred-height: 760px;
+    min-width: 820px;
+    min-height: 520px;
+
+    // ── inputs from Rust ──────────────────────────────────────────────
+    in property <string> game-title: "Infinitier Keeper (Slint)";
+    in property <[PartyMember]> party-members;
+    in property <string> character-name;
+    in property <bool> has-character: false;
+    in property <[string]> tab-names;
+    in property <[FieldCard]> cards-col0;
+    in property <[FieldCard]> cards-col1;
+    in property <[FieldCard]> cards-col2;
+    in property <[string]> attacks-options;
+    in property <int> attacks-index;
+    // Read-only Name · Value table (Local / Global Variables). Shown in
+    // place of the card grid when `show-table` is set.
+    in property <[VarRow]> table-rows;
+    in property <bool> show-table: false;
+    // Wide multi-column read-only grid (Effects). Shown when `show-grid` is
+    // set. `grid-widths` are per-column logical-px widths, parallel to
+    // `grid-headers` and each row's `cells`.
+    in property <[string]> grid-headers;
+    in property <[length]> grid-widths;
+    in property <[GridRow]> grid-rows;
+    in property <bool> show-grid: false;
+    // When set, grid cells wrap to multiple lines (rows grow to fit) instead
+    // of eliding — used by the Journal Entries tab's full entry text.
+    in property <bool> grid-wrap: false;
+    // Appearance tab: animation name + colour swatches. Shown when
+    // `show-appearance` is set.
+    in property <string> animation-name;
+    in property <[ColorSwatch]> color-swatches;
+    in property <bool> show-appearance: false;
+    // Inventory tab: slot rows. Shown when `show-inventory` is set.
+    in property <[InvRow]> inv-rows;
+    in property <bool> show-inventory: false;
+    // Spells tab: inner tab strip + spell rows. Shown when `show-spells` set.
+    in property <[string]> spell-tabs;
+    in property <int> spell-tab;
+    in property <[SpellRowUi]> spell-rows;
+    in property <bool> show-spells: false;
+    // Item / Spell Browser overlays.
+    in property <bool> item-browser-open: false;
+    in property <[BrowserRow]> item-browser-rows;
+    in property <bool> item-add-enabled: false;
+    in property <string> item-add-label: "Add to inventory";
+    in property <bool> spell-browser-open: false;
+    in property <[BrowserRow]> spell-browser-rows;
+    in property <bool> spell-add-enabled: false;
+    in property <string> spell-add-label: "Add to character";
+    // Multi-save tab strip + Load dialog.
+    in property <[string]> save-tab-names;
+    in property <int> active-save-tab;
+    in property <bool> load-open: false;
+    in property <[BrowserRow]> load-rows;
+    in property <bool> load-add-enabled: false;
+    // Non-empty when the active tab isn't ported yet: shown in place of
+    // the card grid.
+    in property <string> placeholder;
+    in property <string> status;
+    // ── two-way selection ─────────────────────────────────────────────
+    in-out property <int> selected-party: 0;
+    in-out property <int> selected-tab: 0;
+
+    // ── events to Rust ────────────────────────────────────────────────
+    callback select-party(int);
+    callback select-tab(int);
+    callback commit-field(int /* id */, string /* value */);
+    callback commit-attacks(int /* option index */);
+    // Inventory interactions.
+    callback inv-select(int /* slot */);
+    callback inv-quantity(int /* slot */, int /* which 0..2 */, string /* value */);
+    callback inv-delete(int /* slot */);
+    // Spells interactions.
+    callback spell-select-tab(int /* inner tab */);
+    callback spell-memorize(int /* ref-id */, string /* value */);
+    callback spell-delete(int /* ref-id */);
+    // Browser overlays.
+    callback items-clicked();
+    callback item-search(string);
+    callback item-select(string /* resref */);
+    callback item-add();
+    callback item-close();
+    callback spells-clicked();
+    callback spell-browser-search(string);
+    callback spell-browser-select(string /* resref */);
+    callback spell-browser-add();
+    callback spell-browser-close();
+    // Multi-save + Load.
+    callback select-save-tab(int);
+    callback close-save-tab(int);
+    callback load-clicked();
+    callback load-search(string);
+    callback load-select(string /* index */);
+    callback load-add();
+    callback load-close();
+    callback save();
+
+    VerticalBox {
+        padding: 8px;
+        spacing: 8px;
+
+        // Header bar: Save + status.
+        HorizontalBox {
+            spacing: 8px;
+            Text {
+                text: root.character-name != "" ? root.character-name : "Infinitier Keeper";
+                font-size: 18px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.status;
+                color: gray;
+                font-size: 12px;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Button {
+                text: "Load";
+                clicked => { root.load-clicked(); }
+            }
+            Button {
+                text: "Items";
+                clicked => { root.items-clicked(); }
+            }
+            Button {
+                text: "Spells";
+                clicked => { root.spells-clicked(); }
+            }
+            Button {
+                text: "Save (copy)";
+                clicked => { root.save(); }
+            }
+        }
+
+        // Save-tab strip: one chip per open save, each with a × close.
+        if root.save-tab-names.length > 1: ScrollView {
+            height: 36px;
+            viewport-height: 32px;
+            HorizontalLayout {
+                alignment: start;
+                spacing: 4px;
+                for name[i] in root.save-tab-names: Rectangle {
+                    border-radius: 4px;
+                    background: i == root.active-save-tab ? #3b82f6 : #e5e7eb;
+                    // Behind: whole-chip select. On top: the × close area.
+                    TouchArea { clicked => { root.select-save-tab(i); } }
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 6px;
+                        spacing: 6px;
+                        Text {
+                            text: name;
+                            vertical-alignment: center;
+                            color: i == root.active-save-tab ? white : black;
+                            overflow: elide;
+                        }
+                        Rectangle {
+                            width: 16px;
+                            Text {
+                                text: "×";
+                                vertical-alignment: center;
+                                horizontal-alignment: center;
+                                color: i == root.active-save-tab ? white : #666666;
+                            }
+                            TouchArea { clicked => { root.close-save-tab(i); } }
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+
+            // Left rail: party members.
+            VerticalBox {
+                width: 220px;
+                spacing: 8px;
+                Text {
+                    text: "Party";
+                    font-size: 16px;
+                    font-weight: 700;
+                }
+                ListView {
+                    vertical-stretch: 1;
+                    for member[i] in root.party-members: Rectangle {
+                        height: 44px;
+                        background: i == root.selected-party ? #3b82f6 : transparent;
+                        TouchArea {
+                            clicked => {
+                                root.selected-party = i;
+                                root.select-party(i);
+                            }
+                        }
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 8px;
+                            Image {
+                                width: 30px;
+                                height: 38px;
+                                source: member.portrait;
+                                image-fit: contain;
+                            }
+                            Text {
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                text: member.name;
+                                color: i == root.selected-party ? white : black;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Right panel: tab strip + active tab content.
+            VerticalBox {
+                horizontal-stretch: 1;
+                spacing: 8px;
+
+                // Tab strip (horizontally scrollable).
+                ScrollView {
+                    height: 40px;
+                    viewport-height: 36px;
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 4px;
+                        for name[i] in root.tab-names: Rectangle {
+                            border-radius: 4px;
+                            background: i == root.selected-tab ? #3b82f6 : #e5e7eb;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text {
+                                    text: name;
+                                    vertical-alignment: center;
+                                    color: i == root.selected-tab ? white : black;
+                                }
+                            }
+                            TouchArea {
+                                clicked => {
+                                    root.selected-tab = i;
+                                    root.select-tab(i);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Content area.
+                if !root.has-character: Text {
+                    text: "No character selected.";
+                    color: gray;
+                }
+
+                // Read-only Name · Value table (virtualised ListView).
+                if root.has-character && root.show-table: VerticalBox {
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        spacing: 12px;
+                        Text { text: "Name"; width: 300px; font-weight: 700; }
+                        Text { text: "Value"; font-weight: 700; }
+                    }
+                    ListView {
+                        vertical-stretch: 1;
+                        for r in root.table-rows: HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            padding-top: 3px;
+                            padding-bottom: 3px;
+                            spacing: 12px;
+                            Text { text: r.name; width: 300px; overflow: elide; vertical-alignment: center; }
+                            Text { text: r.value; horizontal-stretch: 1; vertical-alignment: center; }
+                        }
+                    }
+                }
+
+                // Wide read-only grid (Effects): horizontally + vertically
+                // scrollable; effect lists are short so rows aren't virtualised.
+                if root.has-character && root.show-grid: ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        alignment: start;
+                        HorizontalLayout {
+                            padding: 6px;
+                            spacing: 12px;
+                            for h[i] in root.grid-headers: Text {
+                                text: h;
+                                width: root.grid-widths[i];
+                                font-weight: 700;
+                            }
+                        }
+                        for row in root.grid-rows: HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            padding-top: 2px;
+                            padding-bottom: 2px;
+                            spacing: 12px;
+                            for cell[i] in row.cells: Text {
+                                text: cell;
+                                width: root.grid-widths[i];
+                                overflow: root.grid-wrap ? clip : elide;
+                                wrap: root.grid-wrap ? word-wrap : no-wrap;
+                                vertical-alignment: top;
+                            }
+                        }
+                    }
+                }
+
+                // Appearance: animation name + colour swatches.
+                if root.has-character && root.show-appearance: VerticalLayout {
+                    vertical-stretch: 1;
+                    alignment: start;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        padding: 6px;
+                        spacing: 10px;
+                        Text { text: "Appearance"; width: 130px; vertical-alignment: center; }
+                        Text { text: root.animation-name; font-weight: 700; vertical-alignment: center; }
+                    }
+                    GroupBox {
+                        title: "Colors";
+                        vertical-stretch: 0;
+                        VerticalLayout {
+                            alignment: start;
+                            spacing: 6px;
+                            for s in root.color-swatches: HorizontalLayout {
+                                spacing: 10px;
+                                Text { text: s.label; width: 130px; vertical-alignment: center; }
+                                Image {
+                                    source: s.image;
+                                    width: 24px;
+                                    height: 24px;
+                                    image-rendering: pixelated;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Spells: an inner tab strip + a table of the selected book's
+                // spells (Level / Memorized / Spell / Resource / Delete).
+                if root.has-character && root.show-spells: VerticalBox {
+                    vertical-stretch: 1;
+                    // Inner tab strip.
+                    ScrollView {
+                        height: 40px;
+                        viewport-height: 36px;
+                        HorizontalLayout {
+                            alignment: start;
+                            spacing: 4px;
+                            for name[i] in root.spell-tabs: Rectangle {
+                                border-radius: 4px;
+                                background: i == root.spell-tab ? #3b82f6 : #e5e7eb;
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    Text {
+                                        text: name;
+                                        vertical-alignment: center;
+                                        color: i == root.spell-tab ? white : black;
+                                    }
+                                }
+                                TouchArea { clicked => { root.spell-select-tab(i); } }
+                            }
+                        }
+                    }
+                    // Header.
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        spacing: 8px;
+                        Text { text: "Level"; width: 60px; font-weight: 700; }
+                        Text { text: "Memorized"; width: 90px; font-weight: 700; }
+                        Text { text: "Spell"; horizontal-stretch: 1; font-weight: 700; }
+                        Text { text: "Resource"; width: 96px; font-weight: 700; }
+                        Text { text: ""; width: 72px; }
+                    }
+                    ListView {
+                        vertical-stretch: 1;
+                        for row in root.spell-rows: HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            padding-top: 3px;
+                            padding-bottom: 3px;
+                            spacing: 8px;
+                            Text { text: row.level; width: 60px; vertical-alignment: center; }
+                            LineEdit {
+                                width: 90px;
+                                text: row.memorized;
+                                accepted(t) => { root.spell-memorize(row.ref-id, t); }
+                                changed has-focus => { if (!self.has-focus) { root.spell-memorize(row.ref-id, self.text); } }
+                            }
+                            Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                            Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                            Button {
+                                width: 72px;
+                                text: "Delete";
+                                clicked => { root.spell-delete(row.ref-id); }
+                            }
+                        }
+                    }
+                }
+
+                // Inventory: selectable slot rows with icon, editable
+                // quantities, name, resref and a delete action.
+                if root.has-character && root.show-inventory: VerticalBox {
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        spacing: 8px;
+                        Text { text: ""; width: 40px; }
+                        Text { text: "Position"; width: 120px; font-weight: 700; }
+                        Text { text: "Quantity"; width: 150px; font-weight: 700; }
+                        Text { text: "Item"; horizontal-stretch: 1; font-weight: 700; }
+                        Text { text: "Resource"; width: 96px; font-weight: 700; }
+                        Text { text: ""; width: 72px; }
+                    }
+                    ListView {
+                        vertical-stretch: 1;
+                        for row in root.inv-rows: Rectangle {
+                            height: 44px;
+                            background: row.selected ? #dbeafe : transparent;
+                            TouchArea { clicked => { root.inv-select(row.slot); } }
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 8px;
+                                Image {
+                                    width: 40px;
+                                    height: 40px;
+                                    source: row.icon;
+                                    image-fit: contain;
+                                }
+                                Text { text: row.position; width: 120px; vertical-alignment: center; overflow: elide; }
+                                HorizontalLayout {
+                                    width: 150px;
+                                    spacing: 3px;
+                                    if row.filled: LineEdit {
+                                        width: 46px;
+                                        text: row.q1;
+                                        accepted(t) => { root.inv-quantity(row.slot, 0, t); }
+                                        changed has-focus => { if (!self.has-focus) { root.inv-quantity(row.slot, 0, self.text); } }
+                                    }
+                                    if row.filled: LineEdit {
+                                        width: 46px;
+                                        text: row.q2;
+                                        accepted(t) => { root.inv-quantity(row.slot, 1, t); }
+                                        changed has-focus => { if (!self.has-focus) { root.inv-quantity(row.slot, 1, self.text); } }
+                                    }
+                                    if row.filled: LineEdit {
+                                        width: 46px;
+                                        text: row.q3;
+                                        accepted(t) => { root.inv-quantity(row.slot, 2, t); }
+                                        changed has-focus => { if (!self.has-focus) { root.inv-quantity(row.slot, 2, self.text); } }
+                                    }
+                                }
+                                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                                if row.filled: Button {
+                                    width: 72px;
+                                    text: "Delete";
+                                    clicked => { root.inv-delete(row.slot); }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if root.has-character && !root.show-table && !root.show-grid && !root.show-appearance && !root.show-inventory && !root.show-spells && root.placeholder != "": VerticalBox {
+                    Text {
+                        text: root.placeholder;
+                        color: gray;
+                        font-size: 14px;
+                    }
+                    Rectangle { vertical-stretch: 1; }
+                }
+
+                if root.has-character && !root.show-table && !root.show-grid && !root.show-appearance && !root.show-inventory && !root.show-spells && root.placeholder == "": ScrollView {
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        for col in 3: VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: start;
+                            spacing: 8px;
+                            for card in (col == 0 ? root.cards-col0 : col == 1 ? root.cards-col1 : root.cards-col2): CharacterCard {
+                                card: card;
+                                attacks-options: root.attacks-options;
+                                attacks-index: root.attacks-index;
+                                commit-field(id, v) => { root.commit-field(id, v); }
+                                commit-attacks(i) => { root.commit-attacks(i); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal browser overlays (on top of everything).
+    if root.item-browser-open: BrowserOverlay {
+        width: root.width;
+        height: root.height;
+        title: "Item Browser";
+        rows: root.item-browser-rows;
+        add-enabled: root.item-add-enabled;
+        add-label: root.item-add-label;
+        search(t) => { root.item-search(t); }
+        select(r) => { root.item-select(r); }
+        add() => { root.item-add(); }
+        close() => { root.item-close(); }
+    }
+    if root.spell-browser-open: BrowserOverlay {
+        width: root.width;
+        height: root.height;
+        title: "Spell Browser";
+        rows: root.spell-browser-rows;
+        add-enabled: root.spell-add-enabled;
+        add-label: root.spell-add-label;
+        search(t) => { root.spell-browser-search(t); }
+        select(r) => { root.spell-browser-select(r); }
+        add() => { root.spell-browser-add(); }
+        close() => { root.spell-browser-close(); }
+    }
+    if root.load-open: BrowserOverlay {
+        width: root.width;
+        height: root.height;
+        title: "Open Saved Game";
+        rows: root.load-rows;
+        add-enabled: root.load-add-enabled;
+        add-label: "Load";
+        search(t) => { root.load-search(t); }
+        select(r) => { root.load-select(r); }
+        add() => { root.load-add(); }
+        close() => { root.load-close(); }
+    }
+}

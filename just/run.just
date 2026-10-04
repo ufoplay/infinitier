@@ -61,7 +61,7 @@ run_bgee_keeper:
 # Run Infinitier Keeper with local Baldur's Gate 2
 [group('run_keeper')]
 run_bg2_keeper:
-  cargo run -p infinitier_keeper -- --savegame 0 --game-path "{{GAMES_FOLDER}}/Baldur's Gate 2/"
+  cargo run -p infinitier_keeper_slint -- --savegame 0 --game-path "{{GAMES_FOLDER}}/Baldur's Gate 2/"
 
 # Run Infinitier Keeper with local Baldur's Gate 2 - Enhanced Edition
 [group('run_keeper')]

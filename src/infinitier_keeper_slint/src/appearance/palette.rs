@@ -1,0 +1,76 @@
+//! Colour-gradient swatches, built from the game's palette BMP.
+//!
+//! Duplicated from the egui keeper's `ui/tabs/appearance/palette.rs`, but
+//! producing raw RGBA bytes instead of an `egui::ColorImage` (the Slint side
+//! wraps them in a `SharedPixelBuffer`). Each appearance colour index selects
+//! a gradient ramp — one row of `RANGES12.BMP` (falling back to
+//! `MPALETTE.BMP`), 12 shades wide, brightest first — painted as a
+//! centre-bright, edge-dark bevel by Chebyshev distance, matching EEKeeper.
+
+use std::borrow::Cow;
+
+use infinitier_core::game::GameData;
+use infinitier_core::imported_resource::ImportedResource;
+use infinitier_core::resource::ResourceType;
+
+/// Side length, in pixels, of a rendered swatch.
+pub const SWATCH_PX: usize = 24;
+
+/// The palette as up-to-256 gradient ramps, each a list of RGB shades
+/// ordered brightest-first.
+pub struct Palette {
+    ramps: Vec<Vec<[u8; 3]>>,
+}
+
+impl Palette {
+    /// Load the gradient palette BMP. Prefers `RANGES12`, falling back to
+    /// `MPALETTE`.
+    pub fn load(game_data: &GameData) -> Option<Palette> {
+        let img = ["RANGES12", "MPALETTE"].into_iter().find_map(|name| {
+            match game_data.import_by_name_and_type(name, ResourceType::Bmp) {
+                Ok(Cow::Borrowed(ImportedResource::Image(img))) => Some(Cow::Borrowed(img)),
+                Ok(Cow::Owned(ImportedResource::Image(img))) => Some(Cow::Owned(img)),
+                _ => None,
+            }
+        })?;
+
+        let ramps = (0..img.height())
+            .map(|y| {
+                (0..img.width())
+                    .map(|x| {
+                        let p = img.image.get_pixel(x, y);
+                        [p[0], p[1], p[2]]
+                    })
+                    .collect()
+            })
+            .collect();
+        Some(Palette { ramps })
+    }
+
+    /// Build a swatch as `SWATCH_PX × SWATCH_PX` RGBA bytes: a centre-bright,
+    /// edge-dark bevel walking the ramp outward by Chebyshev distance. An
+    /// unknown index renders as a flat black square.
+    pub fn swatch_rgba(&self, index: u8) -> Vec<u8> {
+        let ramp = self.ramps.get(index as usize).filter(|r| !r.is_empty());
+        let n = SWATCH_PX;
+        let center = (n - 1) as f32 / 2.0;
+        let mut pixels = vec![0u8; n * n * 4];
+
+        for y in 0..n {
+            for x in 0..n {
+                let d = (x as f32 - center).abs().max((y as f32 - center).abs());
+                let rgb = match ramp {
+                    Some(shades) => {
+                        let t = if center > 0.0 { d / center } else { 0.0 };
+                        let idx = ((t * shades.len() as f32) as usize).min(shades.len() - 1);
+                        shades[idx]
+                    }
+                    None => [0, 0, 0],
+                };
+                let i = (y * n + x) * 4;
+                pixels[i..i + 4].copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+            }
+        }
+        pixels
+    }
+}

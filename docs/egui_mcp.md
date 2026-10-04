@@ -69,7 +69,7 @@ get_node {"id":"<id>"}                          → assert the value
 
 - **Text injection needs the app window to have OS focus.** Tree reads and clicks work while the
   app is in the background, but injected `type_text` / `press_key` silently do nothing if the
-  window isn't focused. Activate it first (`xdotool windowactivate --sync <win>`), and do the
+  window isn't focused. Activate it firspointt (`xdotool windowactivate --sync <win>`), and do the
   whole scenario in **one** tool call — anything that steals focus in between (a terminal, a
   permission prompt) breaks the next keystroke.
 - **Screenshots need a visible window** — a fully-occluded/minimised window can't render a frame,
