@@ -40,14 +40,6 @@ fn main() {
     let settings_action = SettingsAction::load(args.config);
     let title = app_title();
 
-    // Force the wgpu GL backend. On Linux the default would be
-    // Vulkan, which has shown rendering glitches during window
-    // resize on some setups; GL is steadier across drivers.
-    let mut wgpu_options = eframe::egui_wgpu::WgpuConfiguration::default();
-    if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut wgpu_options.wgpu_setup {
-        setup.instance_descriptor.backends = eframe::wgpu::Backends::GL;
-    }
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(&title)
@@ -55,7 +47,6 @@ fn main() {
             .with_inner_size(egui::vec2(1400.0, 1050.0))
             .with_min_inner_size(egui::vec2(900.0, 540.0)),
         renderer: eframe::Renderer::Wgpu,
-        wgpu_options,
         ..Default::default()
     };
 
