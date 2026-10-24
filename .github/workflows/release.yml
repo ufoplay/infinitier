@@ -1,14 +1,39 @@
 name: Release
 
+# Pushing a `v*` tag creates a GitHub release for it and attaches the apps,
+# built for every platform below, as downloadable archives.
+#
+# Running the workflow by hand (Actions → Release → Run workflow) does the
+# same builds as a dry run: nothing is uploaded and no release is created.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
-  contents: write   # required to create the Release and upload assets
+  contents: write   # required to create the release and upload its assets
 
 jobs:
-  release:
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      # The upload action only attaches files to an existing release, so it
+      # has to be created first. Skipped if it already exists, so a re-run of
+      # the workflow doesn't fail here.
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" --generate-notes --verify-tag
+
+  upload-assets:
+    needs: create-release
+    # Also run when create-release was skipped (the manual dry run).
+    if: ${{ !failure() && !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -19,11 +44,11 @@ jobs:
             target: x86_64-pc-windows-msvc
           - os: macos-latest
             target: aarch64-apple-darwin   # Apple Silicon
-          - os: macos-13
-            target: x86_64-apple-darwin     # Intel
+          - os: macos-latest
+            target: x86_64-apple-darwin    # Intel, cross-compiled on Apple Silicon
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # full history + tags so `git describe` resolves the release tag
 
@@ -38,13 +63,31 @@ jobs:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
-
-      - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: infinitier_explorer,infinitier_keeper
+          key: ${{ matrix.target }}
+
+      # One archive per app, e.g. infinitier_keeper-v0.0.2-x86_64-pc-windows-msvc.zip,
+      # each with a .sha256 checksum file.
+      - name: Build and upload infinitier_keeper
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: infinitier_keeper
           target: ${{ matrix.target }}
           archive: $bin-$tag-$target
           tar: unix       # .tar.gz on Linux/macOS
           zip: windows    # .zip on Windows
           checksum: sha256
-          token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          dry-run-intended: true
+
+      - name: Build and upload infinitier_explorer
+        uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: infinitier_explorer
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+          tar: unix
+          zip: windows
+          checksum: sha256
+          dry-run: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          dry-run-intended: true
