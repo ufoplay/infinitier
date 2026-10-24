@@ -1,13 +1,15 @@
-//! App-wide state for the Slint keeper.
+//! Game and save state for the Slint keeper.
 //!
-//! A trimmed analogue of the egui keeper's `state.rs`: for now the Slint
-//! keeper opens a single save from the CLI (no multi-tab strip yet), so the
-//! per-save fields live directly on [`Model`] rather than in a `Vec<SaveTab>`.
-//! The [`CharacterTab`] enum is duplicated from the egui keeper's
-//! `ui/tabs/mod.rs`.
+//! A trimmed analogue of the egui keeper's `state.rs`. [`LoadedGame`] is a
+//! game with no save open; [`Model`] is a game with at least one open save,
+//! whose active save's fields live directly on it (other open saves are
+//! parked) so every tab module can read them flat. The [`CharacterTab`] enum
+//! is duplicated from the egui keeper's `ui/tabs/mod.rs`.
+
+use std::path::{Path, PathBuf};
 
 use infinitier_core::engine_caps::EngineCaps;
-use infinitier_core::game::GameData;
+use infinitier_core::game::{GameData, GameDataBuilder};
 use infinitier_core::imported_resource::cre::ImportedCre;
 use infinitier_core::imported_resource::gam::{ImportedGam, ImportedGamNpc, NpcCre};
 use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, SpellType};
@@ -127,7 +129,31 @@ impl CharacterTab {
     }
 }
 
-/// App-wide mutable state, shared across the Slint callbacks.
+/// A loaded game with no save open: its indexed resources and engine caps.
+pub struct LoadedGame {
+    pub game_data: GameData,
+    pub engine_caps: EngineCaps,
+}
+
+impl LoadedGame {
+    /// Index the game install spread over `roots` (the install first, then
+    /// overlays such as the save folder) and derive its engine caps.
+    /// `game_type: None` autodetects the game from the install.
+    pub fn load(roots: &[PathBuf], game_type: Option<Game>) -> Result<Self, String> {
+        let game_data = GameDataBuilder::new(roots, game_type)
+            .and_then(|b| b.build())
+            .map_err(|e| format!("couldn't load the game data: {e}"))?;
+        let engine_caps = EngineCaps::new(&game_data)
+            .map_err(|e| format!("couldn't read the engine tables: {e}"))?;
+        Ok(Self {
+            game_data,
+            engine_caps,
+        })
+    }
+}
+
+/// A loaded game with at least one open save, shared across the Slint
+/// callbacks.
 pub struct Model {
     pub game_data: GameData,
     pub engine_caps: EngineCaps,
@@ -163,10 +189,6 @@ pub struct Model {
     pub parked: Vec<Option<SaveState>>,
     /// Index of the active save in the tab strip (`parked[active_tab]` is None).
     pub active_tab: usize,
-    /// Load dialog overlay: open flag, search query, selected save index.
-    pub load_open: bool,
-    pub load_query: String,
-    pub load_selected: Option<usize>,
 }
 
 /// The per-save state parked when a save isn't the active tab (mirrors the
@@ -182,6 +204,52 @@ pub struct SaveState {
 }
 
 impl Model {
+    /// Open `gam` (the save in `save_game`) on `game`, as the only tab.
+    pub fn new(game: LoadedGame, save_game: SaveGame, gam: Box<ImportedGam>) -> Self {
+        let selected = (!gam.party_npcs.is_empty()).then_some(0);
+        Self {
+            game_data: game.game_data,
+            engine_caps: game.engine_caps,
+            gam,
+            save_game,
+            selected,
+            selected_tab: CharacterTab::Abilities,
+            inventory_selected: None,
+            spell_tab: SPELL_TAB_AUTO,
+            spell_refs: Vec::new(),
+            item_browser_open: false,
+            item_index: Vec::new(),
+            item_query: String::new(),
+            item_selected: None,
+            spell_browser_open: false,
+            spell_index: Vec::new(),
+            spell_query: String::new(),
+            spell_selected: None,
+            parked: vec![None],
+            active_tab: 0,
+        }
+    }
+
+    /// Close every save, keeping the game loaded.
+    pub fn into_game(self) -> LoadedGame {
+        LoadedGame {
+            game_data: self.game_data,
+            engine_caps: self.engine_caps,
+        }
+    }
+
+    /// Tab index of the open save stored in `folder`, if any.
+    pub fn tab_of(&self, folder: &Path) -> Option<usize> {
+        self.parked.iter().enumerate().position(|(i, parked)| {
+            let open = if i == self.active_tab {
+                Some(&self.save_game)
+            } else {
+                parked.as_ref().map(|p| &p.save_game)
+            };
+            open.is_some_and(|s| s.folder_path == folder)
+        })
+    }
+
     /// Tabs visible for the loaded game, in display order.
     pub fn visible_tabs(&self) -> Vec<CharacterTab> {
         let game = self.game_data.game();

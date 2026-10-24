@@ -14,7 +14,11 @@ infinitier_core = { workspace = true }
 
 clap = { workspace = true }
 env_logger = { workspace = true }
+jiff = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
 # Software renderer + winit: no GL dev-lib dependency. Text needs the
 # fontconfig runtime lib (Slint's text stack); the dev package is only a
 # build-time linker requirement (see readme.md).
@@ -24,6 +28,9 @@ slint = { version = "1.17", default-features = false, features = [
     "backend-winit",
     "renderer-software",
 ] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [build-dependencies]
 slint-build = "1.17"

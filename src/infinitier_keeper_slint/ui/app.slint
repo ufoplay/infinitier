@@ -1,7 +1,11 @@
 // Vanilla Slint UI for the Infinitier Keeper (Slint edition).
-// Kept deliberately plain: only std-widgets, no custom theming.
+// Kept deliberately plain: only std-widgets, coloured from their Palette so
+// the dark / light theme applies everywhere.
 
-import { VerticalBox, HorizontalBox, ListView, ScrollView, LineEdit, Button, GroupBox, ComboBox, CheckBox } from "std-widgets.slint";
+import { VerticalBox, HorizontalBox, ListView, ScrollView, LineEdit, Button, GroupBox, ComboBox, CheckBox, Palette } from "std-widgets.slint";
+import { SettingsDialog, LoadDialog, SaveDialog, ConfirmDialog, LoadingOverlay, GameRowUi, LoadRowUi } from "dialogs.slint";
+
+export { GameRowUi, LoadRowUi }
 
 // One editable / read-only row inside a character card. `id` is the index
 // into the active tab's field table, routed back on commit; `-1` marks a
@@ -108,10 +112,10 @@ component BrowserOverlay {
             height: min(600px, parent.height - 40px);
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            background: white;
+            background: Palette.background;
             border-radius: 6px;
             border-width: 1px;
-            border-color: #cccccc;
+            border-color: Palette.border;
             VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
@@ -121,7 +125,7 @@ component BrowserOverlay {
                         text: root.title;
                         font-size: 16px;
                         font-weight: 700;
-                        color: black;
+                        color: Palette.foreground;
                         horizontal-stretch: 1;
                         vertical-alignment: center;
                     }
@@ -134,23 +138,23 @@ component BrowserOverlay {
                 HorizontalLayout {
                     padding-left: 6px;
                     spacing: 8px;
-                    Text { text: "Type"; width: 150px; font-weight: 700; color: black; }
-                    Text { text: "Name"; horizontal-stretch: 1; font-weight: 700; color: black; }
-                    Text { text: "Resource"; width: 110px; font-weight: 700; color: black; }
+                    Text { text: "Type"; width: 150px; font-weight: 700; color: Palette.foreground; }
+                    Text { text: "Name"; horizontal-stretch: 1; font-weight: 700; color: Palette.foreground; }
+                    Text { text: "Resource"; width: 110px; font-weight: 700; color: Palette.foreground; }
                 }
                 ListView {
                     vertical-stretch: 1;
                     for r in root.rows: Rectangle {
                         height: 26px;
-                        background: r.selected ? #3b82f6 : transparent;
+                        background: r.selected ? Palette.accent-background : transparent;
                         TouchArea { clicked => { root.select(r.resref); } }
                         HorizontalLayout {
                             padding-left: 6px;
                             padding-right: 6px;
                             spacing: 8px;
-                            Text { text: r.category; width: 150px; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
-                            Text { text: r.name; horizontal-stretch: 1; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
-                            Text { text: r.resref; width: 110px; overflow: elide; vertical-alignment: center; color: r.selected ? white : black; }
+                            Text { text: r.category; width: 150px; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
+                            Text { text: r.name; horizontal-stretch: 1; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
+                            Text { text: r.resref; width: 110px; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
                         }
                     }
                 }
@@ -256,6 +260,7 @@ component CharacterCard {
 
 export component AppWindow inherits Window {
     title <=> root.game-title;
+    background: Palette.background;
     preferred-width: 1100px;
     preferred-height: 760px;
     min-width: 820px;
@@ -263,6 +268,14 @@ export component AppWindow inherits Window {
 
     // ── inputs from Rust ──────────────────────────────────────────────
     in property <string> game-title: "Infinitier Keeper (Slint)";
+    // What's open: a game (else "No game loaded") and a save (else "No save
+    // loaded"); gates the header buttons.
+    in property <bool> has-game: false;
+    in property <bool> has-save: false;
+    // The colour theme; applied to the std-widgets Palette.
+    in property <bool> dark-theme: false;
+    changed dark-theme => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
+    init => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
     in property <[PartyMember]> party-members;
     in property <string> character-name;
     in property <bool> has-character: false;
@@ -308,12 +321,35 @@ export component AppWindow inherits Window {
     in property <[BrowserRow]> spell-browser-rows;
     in property <bool> spell-add-enabled: false;
     in property <string> spell-add-label: "Add to character";
-    // Multi-save tab strip + Load dialog.
+    // Multi-save tab strip.
     in property <[string]> save-tab-names;
     in property <int> active-save-tab;
+    // Settings dialog: games list + add form.
+    in property <bool> settings-open: false;
+    in property <[GameRowUi]> settings-rows;
+    in property <int> settings-selected: -1;
+    in property <string> settings-file-error;
+    in property <string> settings-error;
+    in property <[string]> settings-game-types;
+    in-out property <string> settings-form-game-path;
+    in-out property <string> settings-form-save-path;
+    in-out property <int> settings-form-game-type: 0;
+    // Load dialog: saves (newest first) + preview, and the delete prompt.
     in property <bool> load-open: false;
-    in property <[BrowserRow]> load-rows;
-    in property <bool> load-add-enabled: false;
+    in property <[LoadRowUi]> load-rows;
+    in property <int> load-selected: -1;
+    in property <image> load-screenshot;
+    in property <[image]> load-portraits;
+    in property <string> load-error;
+    in property <bool> load-confirm-delete: false;
+    in property <string> load-delete-name;
+    // Save dialog.
+    in property <bool> save-open: false;
+    in-out property <string> save-folder-name;
+    in property <string> save-error;
+    // Loading overlay (blocks the UI while a game loads).
+    in property <bool> loading: false;
+    in property <string> loading-text;
     // Non-empty when the active tab isn't ported yet: shown in place of
     // the card grid.
     in property <string> placeholder;
@@ -346,57 +382,88 @@ export component AppWindow inherits Window {
     callback spell-browser-select(string /* resref */);
     callback spell-browser-add();
     callback spell-browser-close();
-    // Multi-save + Load.
+    // Multi-save tab strip.
     callback select-save-tab(int);
     callback close-save-tab(int);
+    // Load dialog.
     callback load-clicked();
-    callback load-search(string);
-    callback load-select(string /* index */);
-    callback load-add();
-    callback load-close();
-    callback save();
+    callback load-select(int /* row */);
+    callback load-pick(int /* row, double-clicked */);
+    callback load-open-save();
+    callback load-cancel();
+    callback load-delete();
+    callback load-delete-confirm();
+    callback load-delete-cancel();
+    // Save dialog.
+    callback save-clicked();
+    callback save-confirm(string /* folder name */);
+    callback save-cancel();
+    // Settings dialog + theme.
+    callback settings-clicked();
+    callback settings-select(int /* row */);
+    callback settings-pick(int /* row, double-clicked */);
+    callback settings-remove();
+    callback settings-add(string /* game path */, string /* save path */, int /* game type */);
+    callback settings-close();
+    callback theme-toggle();
 
     VerticalBox {
         padding: 8px;
         spacing: 8px;
 
-        // Header bar: Save + status.
+        // Header bar: the save / browser actions, status, theme + Settings.
         HorizontalBox {
             spacing: 8px;
-            Text {
-                text: root.character-name != "" ? root.character-name : "Infinitier Keeper";
-                font-size: 18px;
-                font-weight: 700;
-                vertical-alignment: center;
-            }
-            Rectangle { horizontal-stretch: 1; }
-            Text {
-                text: root.status;
-                color: gray;
-                font-size: 12px;
-                vertical-alignment: center;
-                overflow: elide;
-            }
             Button {
                 text: "Load";
+                enabled: root.has-game;
                 clicked => { root.load-clicked(); }
             }
             Button {
+                text: "Save";
+                enabled: root.has-save;
+                clicked => { root.save-clicked(); }
+            }
+            Button {
                 text: "Items";
+                enabled: root.has-save;
                 clicked => { root.items-clicked(); }
             }
             Button {
                 text: "Spells";
+                enabled: root.has-save;
                 clicked => { root.spells-clicked(); }
             }
+            Text {
+                text: root.character-name;
+                font-size: 18px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            // Takes only the space left over, so it never squeezes the name.
+            Text {
+                text: root.status;
+                color: gray;
+                font-size: 12px;
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            // Labelled with the theme it switches to.
             Button {
-                text: "Save (copy)";
-                clicked => { root.save(); }
+                text: root.dark-theme ? "Light" : "Dark";
+                clicked => { root.theme-toggle(); }
+            }
+            Button {
+                text: "Settings";
+                clicked => { root.settings-clicked(); }
             }
         }
 
         // Save-tab strip: one chip per open save, each with a × close.
-        if root.save-tab-names.length > 1: ScrollView {
+        if root.save-tab-names.length > 0: ScrollView {
             height: 36px;
             viewport-height: 32px;
             HorizontalLayout {
@@ -404,7 +471,7 @@ export component AppWindow inherits Window {
                 spacing: 4px;
                 for name[i] in root.save-tab-names: Rectangle {
                     border-radius: 4px;
-                    background: i == root.active-save-tab ? #3b82f6 : #e5e7eb;
+                    background: i == root.active-save-tab ? Palette.accent-background : Palette.alternate-background;
                     // Behind: whole-chip select. On top: the × close area.
                     TouchArea { clicked => { root.select-save-tab(i); } }
                     HorizontalLayout {
@@ -414,7 +481,7 @@ export component AppWindow inherits Window {
                         Text {
                             text: name;
                             vertical-alignment: center;
-                            color: i == root.active-save-tab ? white : black;
+                            color: i == root.active-save-tab ? Palette.accent-foreground : Palette.foreground;
                             overflow: elide;
                         }
                         Rectangle {
@@ -423,7 +490,7 @@ export component AppWindow inherits Window {
                                 text: "×";
                                 vertical-alignment: center;
                                 horizontal-alignment: center;
-                                color: i == root.active-save-tab ? white : #666666;
+                                color: i == root.active-save-tab ? Palette.accent-foreground : gray;
                             }
                             TouchArea { clicked => { root.close-save-tab(i); } }
                         }
@@ -432,7 +499,26 @@ export component AppWindow inherits Window {
             }
         }
 
-        HorizontalBox {
+        // Nothing to edit yet: say what to do next.
+        if !root.has-save: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: start;
+            padding-top: 48px;
+            spacing: 6px;
+            Text {
+                text: root.has-game ? "No save loaded" : "No game loaded";
+                font-size: 20px;
+                horizontal-alignment: center;
+                color: Palette.foreground;
+            }
+            Text {
+                text: root.has-game ? "Use the Load button above to open a saved game." : "Open Settings to add a game, then select it and close the dialog to load it.";
+                horizontal-alignment: center;
+                color: gray;
+            }
+        }
+
+        if root.has-save: HorizontalBox {
             spacing: 8px;
 
             // Left rail: party members.
@@ -448,7 +534,7 @@ export component AppWindow inherits Window {
                     vertical-stretch: 1;
                     for member[i] in root.party-members: Rectangle {
                         height: 44px;
-                        background: i == root.selected-party ? #3b82f6 : transparent;
+                        background: i == root.selected-party ? Palette.accent-background : transparent;
                         TouchArea {
                             clicked => {
                                 root.selected-party = i;
@@ -469,7 +555,7 @@ export component AppWindow inherits Window {
                                 vertical-alignment: center;
                                 horizontal-stretch: 1;
                                 text: member.name;
-                                color: i == root.selected-party ? white : black;
+                                color: i == root.selected-party ? Palette.accent-foreground : Palette.foreground;
                                 overflow: elide;
                             }
                         }
@@ -491,14 +577,14 @@ export component AppWindow inherits Window {
                         spacing: 4px;
                         for name[i] in root.tab-names: Rectangle {
                             border-radius: 4px;
-                            background: i == root.selected-tab ? #3b82f6 : #e5e7eb;
+                            background: i == root.selected-tab ? Palette.accent-background : Palette.alternate-background;
                             HorizontalLayout {
                                 padding-left: 10px;
                                 padding-right: 10px;
                                 Text {
                                     text: name;
                                     vertical-alignment: center;
-                                    color: i == root.selected-tab ? white : black;
+                                    color: i == root.selected-tab ? Palette.accent-foreground : Palette.foreground;
                                 }
                             }
                             TouchArea {
@@ -617,14 +703,14 @@ export component AppWindow inherits Window {
                             spacing: 4px;
                             for name[i] in root.spell-tabs: Rectangle {
                                 border-radius: 4px;
-                                background: i == root.spell-tab ? #3b82f6 : #e5e7eb;
+                                background: i == root.spell-tab ? Palette.accent-background : Palette.alternate-background;
                                 HorizontalLayout {
                                     padding-left: 10px;
                                     padding-right: 10px;
                                     Text {
                                         text: name;
                                         vertical-alignment: center;
-                                        color: i == root.spell-tab ? white : black;
+                                        color: i == root.spell-tab ? Palette.accent-foreground : Palette.foreground;
                                     }
                                 }
                                 TouchArea { clicked => { root.spell-select-tab(i); } }
@@ -685,7 +771,7 @@ export component AppWindow inherits Window {
                         vertical-stretch: 1;
                         for row in root.inv-rows: Rectangle {
                             height: 44px;
-                            background: row.selected ? #dbeafe : transparent;
+                            background: row.selected ? Palette.accent-background.transparentize(0.75) : transparent;
                             TouchArea { clicked => { root.inv-select(row.slot); } }
                             HorizontalLayout {
                                 padding-left: 6px;
@@ -790,16 +876,58 @@ export component AppWindow inherits Window {
         add() => { root.spell-browser-add(); }
         close() => { root.spell-browser-close(); }
     }
-    if root.load-open: BrowserOverlay {
+    if root.load-open: LoadDialog {
         width: root.width;
         height: root.height;
-        title: "Open Saved Game";
         rows: root.load-rows;
-        add-enabled: root.load-add-enabled;
-        add-label: "Load";
-        search(t) => { root.load-search(t); }
-        select(r) => { root.load-select(r); }
-        add() => { root.load-add(); }
-        close() => { root.load-close(); }
+        selected: root.load-selected;
+        screenshot: root.load-screenshot;
+        portraits: root.load-portraits;
+        error: root.load-error;
+        select(i) => { root.load-select(i); }
+        pick(i) => { root.load-pick(i); }
+        open() => { root.load-open-save(); }
+        cancel() => { root.load-cancel(); }
+        delete() => { root.load-delete(); }
+    }
+    if root.load-open && root.load-confirm-delete: ConfirmDialog {
+        width: root.width;
+        height: root.height;
+        title: "Delete saved game";
+        message: "Permanently delete \"" + root.load-delete-name + "\"? This removes the save folder from disk and cannot be undone.";
+        confirm-label: "Delete";
+        confirm() => { root.load-delete-confirm(); }
+        cancel() => { root.load-delete-cancel(); }
+    }
+    if root.save-open: SaveDialog {
+        width: root.width;
+        height: root.height;
+        folder-name <=> root.save-folder-name;
+        error: root.save-error;
+        confirm(name) => { root.save-confirm(name); }
+        cancel() => { root.save-cancel(); }
+    }
+    if root.settings-open: SettingsDialog {
+        width: root.width;
+        height: root.height;
+        rows: root.settings-rows;
+        selected: root.settings-selected;
+        file-error: root.settings-file-error;
+        error: root.settings-error;
+        game-types: root.settings-game-types;
+        form-game-path <=> root.settings-form-game-path;
+        form-save-path <=> root.settings-form-save-path;
+        form-game-type <=> root.settings-form-game-type;
+        select(i) => { root.settings-select(i); }
+        pick(i) => { root.settings-pick(i); }
+        remove() => { root.settings-remove(); }
+        add(path, save, game-type) => { root.settings-add(path, save, game-type); }
+        close() => { root.settings-close(); }
+    }
+    // Last, so it covers everything (including an open dialog).
+    if root.loading: LoadingOverlay {
+        width: root.width;
+        height: root.height;
+        text: root.loading-text;
     }
 }

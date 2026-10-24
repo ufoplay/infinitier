@@ -1,0 +1,417 @@
+// Modal dialogs of the Slint keeper's shell: Settings (games list), Load
+// (save picker with preview), Save (folder name), a confirmation prompt and
+// the loading overlay. Colours come from the std-widgets Palette so they
+// follow the dark / light theme.
+
+import { Button, ComboBox, LineEdit, ListView, Palette, Spinner } from "std-widgets.slint";
+
+// One row of the Settings dialog's games list.
+export struct GameRowUi {
+    type-label: string,
+    game-path: string,
+    save-path: string,
+}
+
+// One row of the Load dialog's saves list.
+export struct LoadRowUi {
+    name: string,
+    time: string,
+}
+
+global DialogStyle {
+    out property <color> error: #e54a4a;
+}
+
+// A centred panel over a dimmed backdrop that swallows clicks to what's
+// behind. Children go inside the panel.
+component ModalFrame inherits Rectangle {
+    in property <length> panel-width: 640px;
+    in property <length> panel-height: 480px;
+    background: #00000066;
+    TouchArea { }
+    Rectangle {
+        width: min(root.panel-width, root.width - 40px);
+        height: min(root.panel-height, root.height - 40px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        background: Palette.background;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: Palette.border;
+        @children
+    }
+}
+
+component DialogTitle inherits Text {
+    font-size: 18px;
+    font-weight: 700;
+    color: Palette.foreground;
+}
+
+component ErrorText inherits Text {
+    color: DialogStyle.error;
+    wrap: word-wrap;
+}
+
+component HeaderCell inherits Text {
+    font-weight: 700;
+    color: Palette.foreground;
+    vertical-alignment: center;
+}
+
+// A selectable list row: alternating background, accent when selected.
+component SelectableRow inherits Rectangle {
+    in property <int> index;
+    in property <bool> selected;
+    callback clicked();
+    callback double-clicked();
+    height: 30px;
+    background: root.selected ? Palette.accent-background : (Math.mod(root.index, 2) == 1 ? Palette.alternate-background : transparent);
+    TouchArea {
+        clicked => { root.clicked(); }
+        double-clicked => { root.double-clicked(); }
+    }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        @children
+    }
+}
+
+component RowText inherits Text {
+    in property <bool> selected;
+    color: root.selected ? Palette.accent-foreground : Palette.foreground;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+// The games list + add form.
+export component SettingsDialog inherits ModalFrame {
+    in property <[GameRowUi]> rows;
+    in property <int> selected: -1;
+    in property <string> file-error;
+    in property <string> error;
+    in property <[string]> game-types;
+    in-out property <string> form-game-path;
+    in-out property <string> form-save-path;
+    in-out property <int> form-game-type;
+    callback select(int);
+    callback pick(int);
+    callback remove();
+    callback add(string, string, int);
+    callback close();
+
+    panel-width: 760px;
+    panel-height: 620px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: "Settings"; }
+        if root.file-error != "": ErrorText { text: root.file-error; }
+
+        HeaderCell { text: "Games"; }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 8px;
+            HeaderCell { text: "Game type"; width: 200px; }
+            HeaderCell { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
+            HeaderCell { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 120px;
+            border-width: 1px;
+            border-color: Palette.border;
+            if root.rows.length == 0: Text {
+                text: "No games configured yet — add one below.";
+                color: gray;
+            }
+            ListView {
+                for row[i] in root.rows: SelectableRow {
+                    index: i;
+                    selected: i == root.selected;
+                    clicked => { root.select(i); }
+                    double-clicked => { root.pick(i); }
+                    RowText { text: row.type-label; width: 200px; selected: i == root.selected; }
+                    RowText { text: row.game-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == root.selected; }
+                    RowText { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == root.selected; }
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: 8px;
+            Button {
+                text: "Remove";
+                enabled: root.selected >= 0;
+                clicked => { root.remove(); }
+            }
+            Text {
+                text: "Select a game and close this dialog to load it.";
+                color: gray;
+                vertical-alignment: center;
+            }
+        }
+
+        HeaderCell { text: "Add a game"; }
+        GridLayout {
+            spacing: 8px;
+            Row {
+                Text { text: "Game path"; width: 130px; vertical-alignment: center; color: Palette.foreground; }
+                LineEdit {
+                    text <=> root.form-game-path;
+                    placeholder-text: "Folder containing CHITIN.KEY";
+                }
+            }
+            Row {
+                Text { text: "Savegame path"; vertical-alignment: center; color: Palette.foreground; }
+                LineEdit {
+                    text <=> root.form-save-path;
+                    placeholder-text: "Optional — folder containing save/, if outside the game folder";
+                }
+            }
+            Row {
+                Text { text: "Game type"; vertical-alignment: center; color: Palette.foreground; }
+                ComboBox {
+                    model: root.game-types;
+                    current-index <=> root.form-game-type;
+                }
+            }
+            Row {
+                Rectangle { }
+                HorizontalLayout {
+                    alignment: start;
+                    Button {
+                        text: "Add";
+                        clicked => { root.add(root.form-game-path, root.form-save-path, root.form-game-type); }
+                    }
+                }
+            }
+        }
+        if root.error != "": ErrorText { text: root.error; }
+
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: "Close";
+                primary: true;
+                clicked => { root.close(); }
+            }
+        }
+    }
+}
+
+// The save picker: list (newest first) + screenshot / portrait preview.
+export component LoadDialog inherits ModalFrame {
+    in property <[LoadRowUi]> rows;
+    in property <int> selected: -1;
+    in property <image> screenshot;
+    in property <[image]> portraits;
+    in property <string> error;
+    callback select(int);
+    callback pick(int);
+    callback open();
+    callback cancel();
+    callback delete();
+
+    panel-width: 820px;
+    panel-height: 560px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: "Open Single Player Saved Game"; }
+        HorizontalLayout {
+            spacing: 12px;
+            vertical-stretch: 1;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 4px;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 8px;
+                    HeaderCell { text: "Game Name"; width: 220px; }
+                    HeaderCell { text: "Time Saved"; horizontal-stretch: 1; }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                    border-width: 1px;
+                    border-color: Palette.border;
+                    if root.rows.length == 0: Text {
+                        text: "No saved games found.";
+                        color: gray;
+                    }
+                    ListView {
+                        for row[i] in root.rows: SelectableRow {
+                            index: i;
+                            selected: i == root.selected;
+                            clicked => { root.select(i); }
+                            double-clicked => { root.pick(i); }
+                            RowText { text: row.name; width: 220px; selected: i == root.selected; }
+                            RowText { text: row.time; horizontal-stretch: 1; selected: i == root.selected; }
+                        }
+                    }
+                }
+            }
+            VerticalLayout {
+                width: 220px;
+                alignment: start;
+                spacing: 8px;
+                Image {
+                    source: root.screenshot;
+                    width: 220px;
+                    height: 165px;
+                    image-fit: contain;
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 3px;
+                    for portrait in root.portraits: Image {
+                        source: portrait;
+                        width: 30px;
+                        height: 46px;
+                        image-fit: contain;
+                    }
+                }
+            }
+        }
+        if root.error != "": ErrorText { text: root.error; }
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: "Delete";
+                enabled: root.selected >= 0;
+                clicked => { root.delete(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Button {
+                text: "Cancel";
+                clicked => { root.cancel(); }
+            }
+            Button {
+                text: "Load";
+                primary: true;
+                enabled: root.selected >= 0;
+                clicked => { root.open(); }
+            }
+        }
+    }
+}
+
+// The edited save's new folder name.
+export component SaveDialog inherits ModalFrame {
+    in-out property <string> folder-name;
+    in property <string> error;
+    callback confirm(string);
+    callback cancel();
+
+    panel-width: 520px;
+    panel-height: 240px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: "Save edited save game"; }
+        Text {
+            text: "Save the current save game (GAM, SAV, BMP, WMP) into a new sibling folder.";
+            color: Palette.foreground;
+            wrap: word-wrap;
+        }
+        Text { text: "Folder name:"; color: gray; }
+        LineEdit {
+            text <=> root.folder-name;
+            accepted(t) => { root.confirm(t); }
+        }
+        if root.error != "": ErrorText { text: root.error; }
+        Rectangle { vertical-stretch: 1; }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancel(); }
+            }
+            Button {
+                text: "Save";
+                primary: true;
+                clicked => { root.confirm(root.folder-name); }
+            }
+        }
+    }
+}
+
+// A yes / no prompt for a destructive action.
+export component ConfirmDialog inherits ModalFrame {
+    in property <string> title;
+    in property <string> message;
+    in property <string> confirm-label: "Confirm";
+    callback confirm();
+    callback cancel();
+
+    panel-width: 480px;
+    panel-height: 200px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: root.title; }
+        Text {
+            text: root.message;
+            color: Palette.foreground;
+            wrap: word-wrap;
+        }
+        Rectangle { vertical-stretch: 1; }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancel(); }
+            }
+            Button {
+                text: root.confirm-label;
+                primary: true;
+                clicked => { root.confirm(); }
+            }
+        }
+    }
+}
+
+// Shown while a game loads: a spinner, and the whole UI blocked — clicks by
+// the backdrop, keys by grabbing the focus.
+export component LoadingOverlay inherits ModalFrame {
+    in property <string> text;
+
+    panel-width: 600px;
+    panel-height: 120px;
+
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(event) => { accept }
+        key-released(event) => { accept }
+    }
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+        DialogTitle { text: "Loading game"; }
+        HorizontalLayout {
+            spacing: 12px;
+            Spinner {
+                indeterminate: true;
+                width: 28px;
+                height: 28px;
+            }
+            Text {
+                text: root.text;
+                color: Palette.foreground;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}

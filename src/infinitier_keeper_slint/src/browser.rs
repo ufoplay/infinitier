@@ -165,25 +165,6 @@ fn spell_type_label(spell_type: u16) -> &'static str {
     }
 }
 
-// ── Load dialog ───────────────────────────────────────────────────────
-
-/// Rows for the Load dialog: every discovered save game (filtered by the
-/// query), with `resref` carrying the save's discovery index as a string.
-pub fn load_rows(model: &Model) -> Vec<BrowserRow> {
-    let saves = model.game_data.save_games();
-    let q = model.load_query.trim().to_lowercase();
-    (0..saves.len())
-        .filter_map(|i| saves.by_index(i).map(|s| (i, s.folder_name().to_string())))
-        .filter(|(_, name)| q.is_empty() || name.to_lowercase().contains(&q))
-        .map(|(i, name)| BrowserRow {
-            resref: i.to_string().into(),
-            name: name.into(),
-            category: String::new().into(),
-            selected: model.load_selected == Some(i),
-        })
-        .collect()
-}
-
 // ── Shared filtering ──────────────────────────────────────────────────
 
 fn filter_rows(index: &[BrowserEntry], query: &str, selected: &Option<String>) -> Vec<BrowserRow> {

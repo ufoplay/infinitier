@@ -32,7 +32,7 @@ SLINT_EMIT_DEBUG_INFO=1 \
 SLINT_MCP_PORT=8080 \
 SLINT_BACKEND=headless \
 cargo run -p infinitier_keeper_slint --features mcp -- \
-    --savegame 0 --game-path "…"
+    --config config_test/infinitier_keeper.toml
 # serves Streamable HTTP at http://127.0.0.1:8080/mcp
 ```
 

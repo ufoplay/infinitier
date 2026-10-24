@@ -52,3 +52,8 @@ run_pstee:
 [group('run_keeper')]
 run_keeper:
   cargo run -p infinitier_keeper -- --config config_test/infinitier_keeper.toml
+
+# Run Infinitier Keeper Slint with the games listed in config_test/infinitier_keeper.toml
+[group('run_keeper')]
+run_keeper_slint:
+  cargo run -p infinitier_keeper_slint -- --config config_test/infinitier_keeper.toml

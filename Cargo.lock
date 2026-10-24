@@ -4252,9 +4252,14 @@ dependencies = [
  "clap",
  "env_logger",
  "infinitier_core",
+ "jiff",
  "log",
+ "serde",
  "slint",
  "slint-build",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml",
 ]
 
 [[package]]

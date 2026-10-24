@@ -154,10 +154,39 @@ browser, and item/spell icon+description detail panels.
   MCP-verified rendering.
 
 ## PORT COMPLETE ✅
-All 15 character tabs + Item/Spell Browsers + Save-copy + Load/multi-save/portraits. Clippy+fmt
-clean; egui keeper unaffected; nothing committed. Minor not-ported niceties: IWD2 spell-add
-(list-2DA path), double-click reveal-in-browser, browser icon/description detail panels, save-tab
-wrapping, and the Load dialog's screenshot/portrait preview + delete.
+All 15 character tabs + Item/Spell Browsers + Save + Load/multi-save/portraits, plus the shell
+below. Clippy+fmt clean; egui keeper unaffected.
+
+## DONE: shell parity with the egui keeper (2026-10-24)
+The egui keeper gained a settings-driven shell; ported here (logic duplicated, not shared):
+- **No CLI game**: args are `--config` (default `infinitier_keeper.toml`, same TOML format as the
+  egui keeper — `src/settings.rs` is a verbatim copy) and `--log`. Startup loads the settings'
+  `active` game.
+- **Top-level state** (`src/app.rs`): `Session::{NoGame, Game(LoadedGame), Saves(Model)}`.
+  `Model` is unchanged for the tab modules (a game + ≥1 open save); opening the first save turns
+  `Game` into `Saves` (`Model::new`), closing the last turns it back (`Model::into_game`).
+- **Game loading/switching** on a `game-load` thread, polled by a `slint::Timer`; a modal
+  `LoadingOverlay` with a `Spinner` blocks the UI (backdrop + key-swallowing FocusScope). A failed
+  load (or a loader panic) reopens Settings with the error.
+- **Settings dialog** (`src/settings_dialog.rs` + `ui/dialogs.slint`): games list with
+  autodetected short-name types (background detection), add form (validates CHITIN.KEY), Remove,
+  select + Close / double-click to switch; `active` + `theme` persisted.
+- **Dark/Light** toggle: `dark-theme` → `Palette.color-scheme`; hard-coded colours in app.slint
+  replaced by Palette brushes.
+- **Empty states** "No game loaded" / "No save loaded"; header buttons gated (Load needs a game;
+  Save/Items/Spells need a save); the last save tab can be closed.
+- **Save dialog** (`src/save_dialog.rs`): editable name pre-filled with the next free
+  `(Edited NNNN)`; the active tab follows the new folder.
+- **Load dialog** (`src/load_dialog.rs`): newest first with "Time Saved", screenshot + portrait
+  preview, double-click to open, Delete with a confirmation dialog.
+- `main.rs` split: `view.rs` (UI push), `callbacks/{character,browsers,shell}.rs` (wiring).
+- **Gotcha**: list properties are only replaced when their rows change (`view::rows_changed`) —
+  a new model rebuilds the rows and breaks double-click detection.
+
+## Still missing vs the egui keeper
+IWD2 spell-add (list-2DA path), double-click reveal-in-browser, browser icon/description detail
+panels + type filter checkboxes, Items/Spells browsers without an open save, a wrapping character
+tab strip, and the 3 Slint 1.18 `viewport-height` → `content-height` deprecations in app.slint.
 
 ## How to build/run/verify
 Build needs `libfontconfig1-dev`; on THIS box use the pkg-config shim:
@@ -167,7 +196,7 @@ export PKG_CONFIG_PATH="$SC/fcshim" SLINT_EMIT_DEBUG_INFO=1
 cargo clippy -p infinitier_keeper_slint --all-targets
 # run headless + MCP:
 export SLINT_MCP_PORT=8080 SLINT_BACKEND=headless
-nohup ./target/debug/infinitier_keeper_slint --game-path "/home/ufo/Temp/Games/Baldur's Gate" --savegame 0 --log warn > "$SC/slint2.log" 2>&1 & echo $! > "$SC/app.pid"
+nohup ./target/debug/infinitier_keeper_slint --config config_test/infinitier_keeper.toml --log warn > "$SC/slint2.log" 2>&1 & echo $! > "$SC/app.pid"
 # drive via MCP:
 python3 scripts/slint_mcp_client.py call list_windows '{}'
 python3 scripts/slint_mcp_client.py call take_screenshot '{"windowHandle":{"generation":"1","index":"1"}}'
