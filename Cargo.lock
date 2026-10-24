@@ -4411,7 +4411,10 @@ dependencies = [
  "infinitier_test_utils",
  "jiff",
  "log",
+ "serde",
  "tempfile",
+ "thiserror 2.0.18",
+ "toml",
  "ttf-inter",
  "vergen-gix",
 ]

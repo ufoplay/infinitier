@@ -71,8 +71,8 @@ struct SpellEntry {
 
 /// State for the Spell Browser window. Persisted across frames by the app.
 pub struct SpellBrowser {
-    /// Every spell in the game, built once on first open (`game_data` is
-    /// constant for the keeper's lifetime, so the index never goes stale).
+    /// Every spell in the game, built once on first open (a game switch
+    /// rebuilds the browser, so the index never goes stale).
     entries: Option<Vec<SpellEntry>>,
     /// Free-text filter (matched case-insensitively against type/name/resref/script).
     text: String,

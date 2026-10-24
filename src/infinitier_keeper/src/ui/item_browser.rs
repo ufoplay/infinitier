@@ -49,8 +49,8 @@ struct ItemEntry {
 
 /// State for the Item Browser window. Persisted across frames by the app.
 pub struct ItemBrowser {
-    /// Every item in the game, built once on first open (`game_data` is
-    /// constant for the keeper's lifetime, so the index never goes stale).
+    /// Every item in the game, built once on first open (a game switch
+    /// rebuilds the browser, so the index never goes stale).
     entries: Option<Vec<ItemEntry>>,
     /// Free-text filter (matched case-insensitively against type/name/resref).
     text: String,

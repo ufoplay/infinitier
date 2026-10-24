@@ -44,7 +44,10 @@ impl BiffParser {
 
         reader.set_position(files_offset)?;
 
-        let mut resources = Vec::with_capacity(files_number + tilesets_number);
+        // No preallocation from the header counts: a corrupt header can claim
+        // billions of entries, and reserving for them aborts the process. A
+        // bogus count instead ends in an EOF error below.
+        let mut resources = Vec::new();
         for _ in 0..files_number {
             resources.push(parse_bif_embedded_file(reader)?);
         }
@@ -98,6 +101,18 @@ mod tests {
                 r#type: ResourceType::Bcs
             }
         );
+    }
+
+    #[test]
+    fn corrupt_entry_counts_are_an_error() {
+        // Header claiming u32::MAX files and tilesets, with no entries after it.
+        let mut bytes = BIFFV1_SIGNATURE.as_bytes().to_vec();
+        for field in [u32::MAX, u32::MAX, 20] {
+            // files, tilesets, files offset
+            bytes.extend_from_slice(&field.to_le_bytes());
+        }
+
+        assert!(BiffParser::import(&DataSource::new(bytes), "corrupt").is_err());
     }
 
     #[test]

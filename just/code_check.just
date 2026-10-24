@@ -4,12 +4,6 @@ fmt args="":
   cargo fmt --all {{args}}
 
 
-# Formats the code using the nightly version of rustfmt
-[group('code_check')]
-fmt_nightly:
-  cargo +nightly fmt --all
-
-
 # Runs clippy on the code
 [group('code_check')]
 clippy args="":

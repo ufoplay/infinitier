@@ -27,9 +27,11 @@ to read the app's **AccessKit widget tree**, **inject input**, and **capture scr
 ## Running the app with inspection on
 
 ```sh
-EGUI_INSPECTION=1 cargo run -p infinitier_keeper -- --savegame 0 --game-path "…"
+EGUI_INSPECTION=1 cargo run -p infinitier_keeper -- --config config_test/infinitier_keeper.toml
 # binds 127.0.0.1:5719
 ```
+At startup the keeper loads the config's `active` game (none if unset); pick another in Settings
+(select it and close the dialog), then use Load to open a save.
 `EGUI_INSPECTION=0.0.0.0:5719` exposes it on the network — **no authentication**, so prefer
 loopback. Unset/`0`/`false` = fully off.
 

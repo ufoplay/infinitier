@@ -584,7 +584,9 @@ impl GameDataBuilder {
         // Load unhardcoded resources with low priority.
         self.add_unhardcoded_fallbacks(&mut game_data);
 
-        // preload all bif files
+        // preload all bif files. One that can't be read is treated like a
+        // missing one: its resources are indexed as missing rather than
+        // failing the whole game.
         let mut bif_all = vec![];
         for bif_entry in key.bif_entries {
             if let Some(bif_path) = self.fs.search_path_opt(&bif_entry.file_name) {
@@ -592,8 +594,9 @@ impl GameDataBuilder {
                     name: &bif_entry.file_name,
                 }
                 .import(&DataSource::new(bif_path.path()))
-                .unwrap();
-                bif_all.push(Some(bif));
+                .inspect_err(|e| error!("Bif file {} can't be read: {e}", bif_entry.file_name))
+                .ok();
+                bif_all.push(bif);
             } else {
                 warn!("Bif file {} not found", bif_entry.file_name);
                 bif_all.push(None);
@@ -994,6 +997,30 @@ mod tests {
                 .any(|r| matches!(r.data_origin, DataOrigin::Unhardcoded { .. })),
             "expected embedded unhardcoded fallbacks to be present"
         );
+    }
+
+    #[test]
+    fn unreadable_bif_leaves_its_resources_missing() {
+        let temp = tempfile::tempdir().unwrap();
+        copy_dir_all(
+            &get_assets_path().join("KEY").join(BG2_RESOURCES_DIR.0),
+            temp.path(),
+        );
+        std::fs::write(
+            temp.path().join("data/Data/AREA070C.bif"),
+            b"not a bif file",
+        )
+        .unwrap();
+
+        let game_data = GameDataBuilder::new(temp.path(), Some(Game::Bg2))
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let resource = game_data
+            .get_by_name_and_type("AR0714", ResourceType::Wed)
+            .unwrap();
+        assert_eq!(resource.data_origin, DataOrigin::Missing);
     }
 
     #[test]

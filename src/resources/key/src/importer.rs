@@ -37,10 +37,14 @@ impl Importer for KeyImporter<'_> {
         // checking for BG1 Demo variant of KEY file format. The demo
         // heuristic inspects bytes at `bif_offset` so it requires at least
         // one BIF entry to be present — for an empty key (0 BIF entries)
-        // the layout is unambiguous and the demo flag doesn't matter.
+        // the layout is unambiguous and the demo flag doesn't matter. A value
+        // below `bif_offset` (corrupt file) can't be a string offset, so it
+        // never matches.
         let is_demo = bif_size > 0
-            && reader.read_u32_at(bif_offset)? as u64 - bif_offset == bif_size * 0x8
-            && reader.read_u32_at(bif_offset + 4)? as u64 - bif_offset != bif_size * 0xc;
+            && u64::from(reader.read_u32_at(bif_offset)?).checked_sub(bif_offset)
+                == Some(bif_size * 0x8)
+            && u64::from(reader.read_u32_at(bif_offset + 4)?).checked_sub(bif_offset)
+                != Some(bif_size * 0xc);
 
         // reading BIF entries
         let mut bif_entries = Vec::new();
@@ -89,8 +93,12 @@ fn read_bif_entry<R: BufRead + Seek>(
 
     let offset_position = reader.position()?;
 
+    // `string_length` counts the trailing NUL; a corrupt 0 reads nothing.
     let mut file_name = reader
-        .read_string_at(string_offset as u64, string_length as u64 - 1)?
+        .read_string_at(
+            string_offset as u64,
+            u64::from(string_length).saturating_sub(1),
+        )?
         .trim()
         .to_lowercase()
         .replace("\\", "/")
@@ -162,5 +170,25 @@ mod tests {
 
             assert_eq!(actual, expected, "key mismatch for {}", dir.display());
         }
+    }
+
+    #[test]
+    fn degenerate_bif_entry_is_read_without_panicking() {
+        // One BIF entry right after the 24-byte header whose fields are all
+        // zero: its first u32 (0) is below `bif_offset`, and its file name
+        // length (0) has no room for the trailing NUL.
+        let mut bytes = b"KEY V1  ".to_vec();
+        for field in [1u32, 0, 24, 36] {
+            // bif count, resource count, bif offset, resource offset
+            bytes.extend_from_slice(&field.to_le_bytes());
+        }
+        bytes.extend_from_slice(&[0; 12]);
+
+        let key = KeyImporter { name: "corrupt" }
+            .import(&DataSource::new(bytes))
+            .unwrap();
+
+        assert_eq!(key.bif_entries.len(), 1);
+        assert_eq!(key.bif_entries[0].file_name, "");
     }
 }

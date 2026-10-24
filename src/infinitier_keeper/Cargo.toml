@@ -21,6 +21,9 @@ env_logger = { workspace = true }
 jiff = { workspace = true }
 ttf-inter = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
 
 [dev-dependencies]
 infinitier_test_utils = { workspace = true }

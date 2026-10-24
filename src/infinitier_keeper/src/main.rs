@@ -1,6 +1,8 @@
 mod app;
 mod build_data;
 mod components;
+mod game_view;
+mod settings;
 mod state;
 mod ui;
 
@@ -8,46 +10,24 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use eframe::egui;
-use infinitier_core::engine_caps::EngineCaps;
-use infinitier_core::fs::Importer;
-use infinitier_core::game::GameDataBuilder;
-use infinitier_core::imported_resource::gam::ImportedGam;
-use infinitier_core::resource::gam::GamImporter;
 
 use crate::app::KeeperApp;
 use crate::build_data::build_version;
-use crate::state::{AppState, SaveTab};
+use crate::settings::SETTINGS_FILE;
+use crate::state::app_title;
+use crate::ui::{SettingsAction, install_theme};
 
 /// Infinitier Keeper — cross-engine Infinity Engine save-game editor.
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
-    /// Comma-separated list of game folders (must contain a `CHITIN.KEY`
-    /// file in at least one). When
-    /// multiple folders are given they are merged into a single
-    /// case-insensitive view in input order — later folders override
-    /// earlier ones on path conflicts (mod-overlay style).
-    #[arg(long, value_delimiter = ',', required = true, num_args = 1..)]
-    game_path: Vec<PathBuf>,
-    /// Which save game to open. Accepts either:
-    /// - a numeric index (alphabetical
-    ///   by save folder name, starting at 0), or
-    /// - the on-disk save folder name (e.g. `000000001-Quick-Save`).
-    #[arg(long)]
-    savegame: String,
+    /// Settings file holding the games listed in the Settings dialog.
+    /// Created on the first change if it doesn't exist.
+    #[arg(long, default_value = SETTINGS_FILE)]
+    config: PathBuf,
     /// Log filter, e.g. "warn", "debug", "infinitier=debug,warn".
     #[arg(long, default_value = "infinitier=debug,warn")]
     log: String,
-}
-
-/// Render a `Vec<PathBuf>` as a comma-separated string for log / window-title
-/// purposes.
-fn display_paths(paths: &[PathBuf]) -> String {
-    paths
-        .iter()
-        .map(|p| p.display().to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 fn main() {
@@ -56,74 +36,9 @@ fn main() {
 
     log::info!("Infinitier Keeper {}", build_version());
 
-    let game_data = GameDataBuilder::new(args.game_path.as_slice(), None)
-        .and_then(|b| b.build())
-        .unwrap_or_else(|e| {
-            log::error!(
-                "Failed to load game data from [{}]: {e}",
-                display_paths(&args.game_path),
-            );
-            std::process::exit(1);
-        });
-
-    let save_games = game_data.save_games();
-    let core_save = if let Ok(idx) = args.savegame.parse::<usize>() {
-        save_games.by_index(idx).cloned().unwrap_or_else(|| {
-            log::error!(
-                "savegame index {idx} out of range — {} save(s) discovered",
-                save_games.len(),
-            );
-            std::process::exit(1);
-        })
-    } else {
-        save_games
-            .by_name(&args.savegame)
-            .cloned()
-            .unwrap_or_else(|| {
-                log::error!(
-                    "savegame '{}' not found — {} save(s) discovered: {}",
-                    args.savegame,
-                    save_games.len(),
-                    save_games
-                        .saves()
-                        .iter()
-                        .map(|s| s.folder_name())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                );
-                std::process::exit(1);
-            })
-    };
-
-    let gam = GamImporter {
-        name: core_save.folder_name(),
-        engine: game_data.game().engine(),
-    }
-    .import(&core_save.gam)
-    .unwrap_or_else(|e| {
-        eprintln!(
-            "Failed to import GAM for '{}': {e}",
-            core_save.folder_name()
-        );
-        std::process::exit(1);
-    });
-    let imported_gam = ImportedGam::load(gam, &game_data).unwrap_or_else(|e| {
-        eprintln!("Failed to resolve save '{}': {e}", core_save.folder_name());
-        std::process::exit(1);
-    });
-
-    let engine_caps = EngineCaps::new(&game_data).unwrap_or_else(|e| {
-        log::error!(
-            "Failed to build EngineCaps from [{}]: {e}",
-            display_paths(&args.game_path),
-        );
-        std::process::exit(1);
-    });
-    let mut state = AppState::new(game_data, engine_caps);
-    state
-        .tabs
-        .push(SaveTab::new(core_save, Box::new(imported_gam)));
-    let title = state.window_title();
+    // No game is loaded at startup: the user picks one in Settings.
+    let settings_action = SettingsAction::load(args.config);
+    let title = app_title();
 
     // Force the wgpu GL backend. On Linux the default would be
     // Vulkan, which has shown rendering glitches during window
@@ -149,7 +64,7 @@ fn main() {
         options,
         Box::new(move |cc| {
             install_inter_font(&cc.egui_ctx);
-            egui_components::theme::Theme::light().install(&cc.egui_ctx);
+            install_theme(&cc.egui_ctx, settings_action.theme());
 
             // Same Linux/X11 DPI workaround as the explorer crate.
             #[cfg(target_os = "linux")]
@@ -170,7 +85,7 @@ fn main() {
                 }
             }
 
-            Ok(Box::new(KeeperApp::new(state)))
+            Ok(Box::new(KeeperApp::new(settings_action)))
         }),
     ) {
         log::error!("Failed to run keeper: {e}");

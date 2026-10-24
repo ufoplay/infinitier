@@ -16,8 +16,10 @@
 //! ```
 
 use infinitier_common::ResourceType;
+use infinitier_datasource::{DataSource, Importer};
 use infinitier_fs::CaseInsensitiveFS;
-use infinitier_key_resource::Key;
+use infinitier_fs::roots::Roots;
+use infinitier_key_resource::{Key, KeyImporter};
 
 pub use infinitier_common::{Engine, Game};
 use log::info;
@@ -77,6 +79,24 @@ pub fn detect_game(fs: &CaseInsensitiveFS, key: Option<&Key>) -> Option<Game> {
     info!("Detected game: {game:?}");
 
     game
+}
+
+/// Detects the game spread over `roots` (the install first, then overlays
+/// such as the save folder), as [`GameDataBuilder::build`] does — but
+/// without indexing any resources, so it is cheap enough to label a list of
+/// installs.
+///
+/// Returns `None` when the folders can't be read or hold no recognised game.
+///
+/// [`GameDataBuilder::build`]: crate::game::GameDataBuilder::build
+pub fn detect_game_at(roots: impl Roots) -> Option<Game> {
+    let fs = CaseInsensitiveFS::new(roots).ok()?;
+    let key = fs.get_path_opt("chitin.key").and_then(|path| {
+        KeyImporter { name: "chitin.key" }
+            .import(&DataSource::new(path.path()))
+            .ok()
+    });
+    detect_game(&fs, key.as_ref())
 }
 
 fn exists(fs: &CaseInsensitiveFS, path: &str) -> bool {
@@ -170,6 +190,13 @@ mod tests {
             expected,
             actual
         );
+    }
+
+    #[test]
+    fn detect_game_at_reads_the_folders() {
+        let root = get_assets_path().join("detect_game");
+        assert_eq!(detect_game_at(root.join("bg2_ee")), Some(Game::Bg2ee));
+        assert_eq!(detect_game_at(root.join("missing")), None);
     }
 
     #[test]

@@ -16,10 +16,15 @@
 //! can open additional saves into new tabs without restarting the
 //! keeper.
 
+use std::io;
+use std::path::PathBuf;
+
 use infinitier_core::engine_caps::EngineCaps;
-use infinitier_core::game::GameData;
+use infinitier_core::game::{GameData, GameDataBuilder};
 use infinitier_core::imported_resource::gam::ImportedGam;
+use infinitier_core::resource::Game;
 use infinitier_core::save_games::SaveGame;
+use thiserror::Error;
 
 use crate::ui::CharacterTab;
 
@@ -30,15 +35,13 @@ pub struct AppState {
     /// this keeper instance because they all came from the same
     /// game install.
     pub game_data: GameData,
-    /// Cap ranges + bonus tables for the active engine. Built once
-    /// at startup via [`EngineCaps::new`], which reads `STRMOD.2DA`
+    /// Cap ranges + bonus tables for the active engine. Built with
+    /// the game data via [`EngineCaps::new`], which reads `STRMOD.2DA`
     /// / `STRMODEX.2DA` / `DEXMOD.2DA` / `HPCONBON.2DA` so modded
     /// installs get their actual numbers instead of the vanilla
     /// distribution.
     pub engine_caps: EngineCaps,
-    /// One entry per opened save. Currently a single tab is opened
-    /// at startup (from the CLI args); the Load button will append
-    /// more once it's wired.
+    /// One entry per opened save, added by the Load button.
     pub tabs: Vec<SaveTab>,
     /// Index into [`Self::tabs`] of the tab whose content the rest
     /// of the UI is showing. Always in range — the constructors and
@@ -62,19 +65,42 @@ pub struct SaveTab {
     pub selected_tab: CharacterTab,
 }
 
+/// Why [`AppState::load`] couldn't open a game install.
+#[derive(Debug, Error)]
+pub enum GameLoadError {
+    #[error("couldn't load the game data: {0}")]
+    GameData(#[source] io::Error),
+    #[error("couldn't read the engine tables: {0}")]
+    EngineCaps(#[source] io::Error),
+}
+
+/// Window title while no game is loaded; [`AppState::window_title`]
+/// appends the game.
+pub fn app_title() -> String {
+    format!("Infinitier Keeper {}", crate::build_version())
+}
+
 impl AppState {
+    /// Index the game install spread over `roots` (the install first,
+    /// then overlays such as the save folder) and derive its engine
+    /// caps, with no save open yet. `game_type: None` autodetects the
+    /// game from the install.
+    pub fn load(roots: &[PathBuf], game_type: Option<Game>) -> Result<Self, GameLoadError> {
+        let game_data = GameDataBuilder::new(roots, game_type)
+            .and_then(|b| b.build())
+            .map_err(GameLoadError::GameData)?;
+        let engine_caps = EngineCaps::new(&game_data).map_err(GameLoadError::EngineCaps)?;
+        Ok(Self::new(game_data, engine_caps))
+    }
+
     /// Window title for the keeper. Carries the game type only —
     /// per-save data (save name) lives in the tab strip below the
     /// header.
     pub fn window_title(&self) -> String {
-        format!(
-            "Infinitier Keeper {} - {:?}",
-            crate::build_version(),
-            self.game_data.game()
-        )
+        format!("{} - {:?}", app_title(), self.game_data.game())
     }
 
-    pub fn new(game_data: GameData, engine_caps: EngineCaps) -> Self {
+    fn new(game_data: GameData, engine_caps: EngineCaps) -> Self {
         Self {
             game_data,
             engine_caps,

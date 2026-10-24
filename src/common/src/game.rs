@@ -59,10 +59,11 @@ impl std::fmt::Debug for Game {
                 totl,
             } => {
                 write!(f, "Icewind Dale")?;
-                if *heart_of_winter {
-                    write!(f, " + Heart of Winter")
-                } else if *totl {
+                // TotL builds on HoW, so a TotL install has both flags set.
+                if *totl {
                     write!(f, " + Trials of the Luremaster")
+                } else if *heart_of_winter {
+                    write!(f, " + Heart of Winter")
                 } else {
                     Ok(())
                 }
@@ -110,11 +111,51 @@ impl Game {
             Game::Pst => Engine::Pst,
         }
     }
+
+    /// Returns the game's common abbreviation, e.g. `BG2EE` or `IWD+HoW`,
+    /// for places too narrow for the full name its `Debug` prints.
+    pub fn short_name(self) -> &'static str {
+        match self {
+            Game::Bg => "BG",
+            Game::Bg2 => "BG2",
+            Game::Bgee => "BGEE",
+            Game::BgeeSod => "BGEE+SoD",
+            Game::Bg2ee => "BG2EE",
+            Game::Eet => "EET",
+            Game::Tutu => "Tutu",
+            // TotL builds on HoW, so a TotL install has both flags set.
+            Game::Iwd { totl: true, .. } => "IWD+TotL",
+            Game::Iwd {
+                heart_of_winter: true,
+                totl: false,
+            } => "IWD+HoW",
+            Game::Iwd {
+                heart_of_winter: false,
+                totl: false,
+            } => "IWD",
+            Game::Iwdee => "IWDEE",
+            Game::Iwd2 => "IWD2",
+            Game::Pst => "PST",
+            Game::Pstee => "PSTEE",
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_name_tells_the_iwd_expansions_apart() {
+        let iwd = |heart_of_winter, totl| Game::Iwd {
+            heart_of_winter,
+            totl,
+        };
+        assert_eq!(iwd(false, false).short_name(), "IWD");
+        assert_eq!(iwd(true, false).short_name(), "IWD+HoW");
+        assert_eq!(iwd(true, true).short_name(), "IWD+TotL");
+        assert_eq!(Game::Bg2ee.short_name(), "BG2EE");
+    }
 
     #[test]
     fn engine_per_game_grouping() {
