@@ -7,7 +7,7 @@ authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
 description = "Cross-engine save-game editor for Infinity Engine games (BG, BG:EE, BG2, BG2:EE, IWD, IWD:EE, IWD2, PST, PST:EE)"
-readme = "readme.md"
+readme = "README.md"
 keywords = ["save-game", "editor", "infinity-engine", "baldurs-gate", "gui"]
 publish = false
 

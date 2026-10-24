@@ -1,31 +1,9 @@
 # Infinitier Keeper
 
-## Tab editability by game
-
-RW = Read/Write
-R = Read
-
-|                  |  BG  | BG2  |  EE  | IWD  | IWD2 | PST  |
-| ---------------- | :--: | :--: | :--: | :--: | :--: | :--: |
-| Abilities        |  RW  |  RW  |  RW  |  RW  |  RW  |  RW  |
-| Levels & Kits    |  —   |  —   |  —   |  —   |  RW  |  —   |
-| Characteristics  |  R   |  R   |  R   |  R   |  R   |  R   |
-| Appearance       |  R   |  R   |  R   |  R   |  R   |  R   |
-| Inventory        |  RW  |  RW  |  RW  |  RW  |  RW  |  RW  |
-| Spells           |  RW  |  RW  |  RW  |  RW  |  RW  |  RW  |
-| Feats            |  —   |  —   |  —   |  —   |  RW  |  —   |
-| Memorization     |  RW  |  RW  |  RW  |  RW  |  —   |  RW  |
-| Proficiencies    |  RW  |  RW  |  RW  |  RW  |  —   |  RW  |
-| Resistances      |  RW  |  RW  |  RW  |  RW  |  RW  |  RW  |
-| Effects          |  R   |  R   |  R   |  R   |  R   |  R   |
-| Local Variables  |  R   |  R   |  R   |  R   |  R   |  R   |
-| Global Variables |  R   |  R   |  R   |  R   |  R   |  R   |
-| Journal Entries  |  R   |  R   |  R   |  R   |  R   |  R   |
-| Miscellaneous    |  R   |  R   |  R   |  R   |  R   |  R   |
-
-The **Spells** tab carries an inner tab strip selecting the spell type:
-Innate / Wizard / Cleric on the AD&D games, and the per-class categories
-(Bard, Cleric, Domain, … Wizard) on IWD2.
+A save-game editor for Baldur's Gate, Icewind Dale and Planescape: Torment,
+original and Enhanced Editions. See the
+[Infinitier Keeper README](src/infinitier_keeper/README.md) for the supported
+games and platforms, how to configure and use it, and what it can edit.
 
 
 # Infinitier Explorer
