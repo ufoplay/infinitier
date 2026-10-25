@@ -24,7 +24,7 @@ built the way `infinitier_keeper_slint` is:
 | egui explorer | Slint explorer |
 |---|---|
 | CLI: `game_path` (comma-separated, 1..n), `--log`; exit 1 if loading fails | same, duplicated `Args` |
-| Window title `Infinitier Explorer {version} - {game:?}`, 1400×800 | same (title says "(Slint)"), `Metrics.window-*` |
+| Window title `Infinitier Explorer {version} - {game:?}`, 1400×800 | same, `Metrics.window-*` |
 | Left panel, resizable (default 260): theme toggle ("Light"/"Dark") + "Resources" heading + separator + tree | `ResourcePanel` + themekit `Splitter` (new) |
 | Tree: one group per extension, `"{ext} ({n})"`, closed by default; leaves `NAME.ext`, `" (O)"` for override; selecting a leaf opens it | `ResourceTree` (duplicated grouping and tests) behind a custom `slint::Model`, rows are themekit `TreeItem`s (new) in a virtualized `ListView`; Up/Down/Left/Right keyboard navigation |
 | Bottom bar: `Resource: {name} - Source: {origin:?}` / `No file selected` | `StatusBar` |

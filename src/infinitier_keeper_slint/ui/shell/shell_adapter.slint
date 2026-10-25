@@ -2,7 +2,8 @@
 // its actions.
 
 export global ShellAdapter {
-    in property <string> title: "Infinitier Keeper (Slint)";
+    // "Infinitier Keeper {version}", then " - {game}" once one is loaded.
+    in property <string> title: "Infinitier Keeper";
     // What's open: a game (else "No game loaded") and a save (else "No save
     // loaded"); gates the header buttons.
     in property <bool> has-game;

@@ -59,7 +59,12 @@ pub fn build(model: &Model) -> EditTable {
                 r.type_name,
                 vec![
                     value_cell(&r.level.to_string()),
-                    editable_cell(i32::try_from(slot).unwrap_or(i32::MAX), &r.max.to_string()),
+                    editable_cell(
+                        i32::try_from(slot).unwrap_or(i32::MAX),
+                        r.max.into(),
+                        0,
+                        u16::MAX.into(),
+                    ),
                 ],
             )
         })

@@ -2,7 +2,7 @@
 // item name, resref and Delete. Clicking a slot selects it as the Item
 // Browser's add target; double-clicking a filled one reveals its item there.
 
-import { Button, ButtonKind, Icons, Label, ListItem, ListView, TextField, Theme } from "@themekit";
+import { Button, ButtonKind, Icons, Label, ListItem, ListView, NumberField, Theme, Tone } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
 import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
@@ -30,21 +30,22 @@ export global InventoryAdapter {
     callback delete(int /* slot */);
 }
 
-// A quantity / charges input, committed on Enter and on focus loss.
-component QuantityEdit inherits TextField {
-    callback commit(string);
+// A quantity / charges (a `u16`), dragged or typed; each change commits.
+component QuantityEdit inherits NumberField {
     width: Metrics.quantity-width;
-    accepted(t) => { root.commit(t); }
-    changed has-focus => {
-        if (!self.has-focus) {
-            root.commit(self.text);
-        }
-    }
+    maximum: 65535;
 }
 
 export component InventoryTab inherits VerticalLayout {
     spacing: Theme.spacing.xs;
-    TableHeader {
+    // A creature format without an inventory has no slots at all.
+    if InventoryAdapter.rows.length == 0: Label {
+        text: "Inventory is unavailable for this creature's format.";
+        tone: Tone.muted;
+        vertical-stretch: 1;
+        vertical-alignment: top;
+    }
+    if InventoryAdapter.rows.length > 0: TableHeader {
         Rectangle { width: Metrics.inventory-icon; }
         ColumnHeader { text: "Position"; width: Metrics.inventory-position-column; }
         ColumnHeader { text: "Quantity"; width: Metrics.inventory-quantity-column; }
@@ -52,7 +53,7 @@ export component InventoryTab inherits VerticalLayout {
         ColumnHeader { text: "Resource"; width: Metrics.inventory-resource-column; }
         Rectangle { width: Theme.sizes.control-height; }
     }
-    ListView {
+    if InventoryAdapter.rows.length > 0: ListView {
         for row[i] in InventoryAdapter.rows: ListItem {
             index: i;
             selected: row.slot == InventoryAdapter.selected;
@@ -77,16 +78,16 @@ export component InventoryTab inherits VerticalLayout {
                 width: Metrics.inventory-quantity-column;
                 spacing: Theme.spacing.xs;
                 if row.filled: QuantityEdit {
-                    text: row.q1;
-                    commit(t) => { InventoryAdapter.quantity(row.slot, 0, t); }
+                    value: row.q1.to-float();
+                    changed(value) => { InventoryAdapter.quantity(row.slot, 0, value); }
                 }
                 if row.filled: QuantityEdit {
-                    text: row.q2;
-                    commit(t) => { InventoryAdapter.quantity(row.slot, 1, t); }
+                    value: row.q2.to-float();
+                    changed(value) => { InventoryAdapter.quantity(row.slot, 1, value); }
                 }
                 if row.filled: QuantityEdit {
-                    text: row.q3;
-                    commit(t) => { InventoryAdapter.quantity(row.slot, 2, t); }
+                    value: row.q3.to-float();
+                    changed(value) => { InventoryAdapter.quantity(row.slot, 2, value); }
                 }
             }
             Label { text: row.name; horizontal-stretch: 1; overflow: elide; }

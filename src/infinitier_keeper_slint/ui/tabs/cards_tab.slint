@@ -2,7 +2,7 @@
 // Feats, Miscellaneous: field cards in three columns. The Rust side builds
 // the active tab's cards.
 
-import { ScrollArea, Theme } from "@themekit";
+import { Label, ScrollArea, Theme } from "@themekit";
 import { FieldCard, FieldCardView } from "../components/components.slint";
 
 export global CardsAdapter {
@@ -13,13 +13,17 @@ export global CardsAdapter {
     // The Attacks dropdown (Abilities' Combat card).
     in property <[string]> attacks-options;
     in property <int> attacks-index: -1;
+    // Instead of the cards: why the tab has none for this creature (Levels
+    // and Feats exist only for IWD2's).
+    in property <string> message;
     callback commit-field(int /* field id */, string /* value */);
     callback commit-attacks(int /* option index */);
 }
 
 // One ScrollArea for all three columns, so they scroll together.
 export component CardsTab inherits ScrollArea {
-    HorizontalLayout {
+    if CardsAdapter.message != "": Label { text: CardsAdapter.message; }
+    if CardsAdapter.message == "": HorizontalLayout {
         spacing: Theme.spacing.sm;
         for column in 3: VerticalLayout {
             horizontal-stretch: 1;

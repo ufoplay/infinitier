@@ -38,6 +38,8 @@ tempfile = { workspace = true }
 slint-build = "1.17"
 # Registers the themekit's `.slint` sources as the `@themekit` library.
 slint-themekit = { workspace = true }
+# Git version info for the window title, like the egui keeper.
+vergen-gix = { workspace = true }
 
 [features]
 # Opt-in embedded MCP test server (dev only): build with `--features mcp`,

@@ -237,9 +237,20 @@ The egui keeper gained a settings-driven shell; ported here (logic duplicated, n
   a new model rebuilds the rows and breaks double-click detection.
 
 ## Still missing vs the egui keeper
-Nothing functional. The character tab strip now wraps (themekit `TabBar`, see
-`THEMEKIT_MIGRATION.md`). Presentation differences remain: the egui party rail (large portrait,
-counter, slider), its empty-slot / external-CRE messages, and tooltips.
+Nothing functional. Since 2026-10-25 the keeper also has the egui keeper's empty-state messages
+(party, character slot, external CRE, spellbook, journal, inventory, Levels/Feats on a non-IWD2
+creature), its tooltips (a save tab's ×, Settings' full paths; themekit `TooltipText` in Slint's
+`Tooltip`) and its drag-to-change numbers (themekit `NumberField`: Resistances, Feats levels,
+Inventory quantities, Spells memorized, Memorization, Proficiencies; each change commits).
+
+Differences left: the egui party rail (large portrait, slot counter, slider) is a list here; the
+spellbook isn't remembered per character; Characteristics lacks the "Zero is normal speed." hint;
+the window title has no build version.
+
+**Rows update in place** (`view::sync_rows` / `sync_nested`): a number commits on every drag step,
+and a new model would rebuild the row mid-drag. Pages whose rows hold inputs (cards, the edit
+table, Inventory, Spells) sync their models row by row instead; a text field shows the committed
+(clamped) value again when it loses focus or its row changes.
 
 ## How to build/run/verify
 Build needs `libfontconfig1-dev`; on THIS box use the pkg-config shim:

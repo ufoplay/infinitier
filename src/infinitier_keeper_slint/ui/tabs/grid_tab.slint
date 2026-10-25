@@ -2,7 +2,7 @@
 // the others. Its columns are wider than the tab, so the rows scroll
 // sideways and the header follows them.
 
-import { Label, ListItem, ListView, Theme } from "@themekit";
+import { Label, ListItem, ListView, Theme, Tone } from "@themekit";
 import { ColumnHeader, TableHeader } from "../components/components.slint";
 
 // One grid row; `cells` line up with the adapter's headers / widths.
@@ -19,6 +19,8 @@ export global GridAdapter {
     // Wrap long cells onto more lines (rows grow to fit) instead of eliding
     // them — the Journal Entries tab's full entry text.
     in property <bool> wrap;
+    // Shown instead of the table when it has no rows ("" for none).
+    in property <string> empty-text;
 }
 
 export component GridTab inherits VerticalLayout {
@@ -29,6 +31,10 @@ export component GridTab inherits VerticalLayout {
 
     spacing: Theme.spacing.xs;
 
+    if GridAdapter.rows.length == 0 && GridAdapter.empty-text != "": Label {
+        text: GridAdapter.empty-text;
+        tone: Tone.muted;
+    }
     Rectangle {
         clip: true;
         height: header.preferred-height;

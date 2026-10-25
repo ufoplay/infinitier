@@ -39,6 +39,84 @@ fn rows_changed<T: Clone + PartialEq + 'static>(current: &ModelRc<T>, rows: &[T]
     current.row_count() != rows.len() || current.iter().zip(rows).any(|(old, new)| old != *new)
 }
 
+/// Show `rows` in a list property whose model is `current`, keeping its row
+/// elements where it can: with as many rows as before, the current model is
+/// updated row by row, so a row's input being typed in or dragged survives
+/// the refresh its own commit triggers (a new model would rebuild every row
+/// mid-edit). Returns the new model to set when the row count changed.
+#[must_use]
+fn sync_rows<T: Clone + PartialEq + 'static>(
+    current: &ModelRc<T>,
+    rows: Vec<T>,
+) -> Option<ModelRc<T>> {
+    let model = current
+        .as_any()
+        .downcast_ref::<VecModel<T>>()
+        .filter(|model| model.row_count() == rows.len());
+    let Some(model) = model else {
+        return Some(rows_model(rows));
+    };
+    for (i, row) in rows.into_iter().enumerate() {
+        if model.row_data(i).as_ref() != Some(&row) {
+            model.set_row_data(i, row);
+        }
+    }
+    None
+}
+
+/// A row holding a list of its own (a card's fields, a table row's cells),
+/// for [`sync_nested`].
+trait NestedRows: Clone + 'static {
+    type Item: Clone + PartialEq + 'static;
+    /// Whether `other` is the same row with other contents: then its nested
+    /// list is synced into this one's.
+    fn same_row(&self, other: &Self) -> bool;
+    fn nested(&self) -> &ModelRc<Self::Item>;
+}
+
+impl NestedRows for crate::FieldCard {
+    type Item = crate::FieldRow;
+    fn same_row(&self, other: &Self) -> bool {
+        self.title == other.title && self.column == other.column
+    }
+    fn nested(&self) -> &ModelRc<crate::FieldRow> {
+        &self.rows
+    }
+}
+
+impl NestedRows for crate::EditRow {
+    type Item = crate::EditCell;
+    fn same_row(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+    fn nested(&self) -> &ModelRc<crate::EditCell> {
+        &self.cells
+    }
+}
+
+/// [`sync_rows`] for rows holding lists: the same row keeps its nested
+/// model too, synced in place, so the inputs inside it survive as well.
+#[must_use]
+fn sync_nested<T: NestedRows>(current: &ModelRc<T>, rows: Vec<T>) -> Option<ModelRc<T>> {
+    let model = current
+        .as_any()
+        .downcast_ref::<VecModel<T>>()
+        .filter(|model| model.row_count() == rows.len());
+    let Some(model) = model else {
+        return Some(rows_model(rows));
+    };
+    for (i, row) in rows.into_iter().enumerate() {
+        let kept = model
+            .row_data(i)
+            .filter(|old| old.same_row(&row))
+            .is_some_and(|old| sync_rows(old.nested(), row.nested().iter().collect()).is_none());
+        if !kept {
+            model.set_row_data(i, row);
+        }
+    }
+    None
+}
+
 /// A Slint row index for `index`, `-1` for none.
 fn index_or_none(index: Option<usize>) -> i32 {
     index.and_then(|i| i32::try_from(i).ok()).unwrap_or(-1)

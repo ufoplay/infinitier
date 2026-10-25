@@ -1,6 +1,6 @@
 // The left rail: the active save's party, portrait and name each.
 
-import { Label, ListItem, ListView, TextRole, Theme } from "@themekit";
+import { Label, ListItem, ListView, TextRole, Theme, Tone } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 export struct PartyMember {
@@ -21,7 +21,14 @@ export component PartyList inherits VerticalLayout {
         text: "Party";
         role: TextRole.heading;
     }
-    ListView {
+    if PartyAdapter.members.length == 0: Label {
+        text: "No party members in this save.";
+        tone: Tone.muted;
+        wrap: word-wrap;
+        vertical-stretch: 1;
+        vertical-alignment: top;
+    }
+    if PartyAdapter.members.length > 0: ListView {
         for member[i] in PartyAdapter.members: ListItem {
             selected: i == PartyAdapter.selected;
             clicked => {

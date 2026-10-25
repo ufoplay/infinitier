@@ -8,6 +8,9 @@ export enum CharacterContent { none, cards, edit-table, table, grid, appearance,
 
 export global CharacterAdapter {
     in property <bool> has-character;
+    // Why there is none: no party member selected, an empty slot, a record
+    // kept outside the save.
+    in property <string> message;
     // The tabs shown for the loaded game.
     in property <[string]> tab-names;
     in-out property <int> selected-tab;
@@ -29,7 +32,7 @@ export component CharacterPanel inherits VerticalLayout {
         }
     }
     if !CharacterAdapter.has-character: Label {
-        text: "No character selected.";
+        text: CharacterAdapter.message;
         tone: Tone.muted;
         vertical-stretch: 1;
         vertical-alignment: top;

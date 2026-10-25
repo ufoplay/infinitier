@@ -3,7 +3,7 @@
 // Memorized (editable), Spell, Resource, Delete. Double-clicking a row
 // reveals its spell in the Spell Browser.
 
-import { Button, ButtonKind, Icons, Label, ListItem, ListView, Tab, TabBar, TextField, Theme } from "@themekit";
+import { Button, ButtonKind, Icons, Label, ListItem, ListView, NumberField, Tab, TabBar, Theme } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
 import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
@@ -37,7 +37,13 @@ export component SpellsTab inherits VerticalLayout {
             clicked => { SpellsAdapter.select-book(i); }
         }
     }
-    VerticalLayout {
+    if SpellsAdapter.rows.length == 0: Label {
+        text: "No spells of this type.";
+        font-weight: Theme.typography.strong-weight;
+        vertical-stretch: 1;
+        vertical-alignment: top;
+    }
+    if SpellsAdapter.rows.length > 0: VerticalLayout {
         vertical-stretch: 1;
         spacing: Theme.spacing.xs;
         TableHeader {
@@ -55,15 +61,12 @@ export component SpellsTab inherits VerticalLayout {
                     BrowsersAdapter.reveal(BrowserKind.spells, row.resref);
                 }
                 Label { text: row.level; width: Metrics.spell-level-column; }
-                TextField {
+                // Dragged or typed, 0 to 99; each change commits.
+                NumberField {
                     width: Metrics.spell-memorized-column;
-                    text: row.memorized;
-                    accepted(t) => { SpellsAdapter.memorize(row.ref-id, t); }
-                    changed has-focus => {
-                        if (!self.has-focus) {
-                            SpellsAdapter.memorize(row.ref-id, self.text);
-                        }
-                    }
+                    value: row.memorized.to-float();
+                    maximum: 99;
+                    changed(value) => { SpellsAdapter.memorize(row.ref-id, value); }
                 }
                 Label { text: row.name; horizontal-stretch: 1; overflow: elide; }
                 Label { text: row.resref; width: Metrics.spell-resource-column; overflow: elide; }

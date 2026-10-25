@@ -1,7 +1,7 @@
 // The Settings dialog: the configured games (select + close, or
 // double-click, to load one) and a form to add a game.
 
-import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Select, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
 import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
@@ -70,8 +70,25 @@ export component SettingsDialog inherits Dialog {
                     clicked => { SettingsAdapter.select(i); }
                     double-clicked => { SettingsAdapter.pick(i); }
                     Label { text: row.type-label; width: Metrics.settings-type-column; overflow: elide; }
-                    Label { text: row.game-path; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
-                    Label { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
+                    // The paths elide: hovering one shows it whole.
+                    Label {
+                        text: row.game-path;
+                        horizontal-stretch: 1;
+                        preferred-width: 0px;
+                        overflow: elide;
+                        if row.game-path != "": Tooltip {
+                            TooltipText { text: row.game-path; }
+                        }
+                    }
+                    Label {
+                        text: row.save-path;
+                        horizontal-stretch: 1;
+                        preferred-width: 0px;
+                        overflow: elide;
+                        if row.save-path != "": Tooltip {
+                            TooltipText { text: row.save-path; }
+                        }
+                    }
                 }
             }
             // The list's frame, drawn over the rows' stripes.

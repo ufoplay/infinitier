@@ -63,7 +63,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let args = Args::parse();
     env_logger::Builder::new().parse_filters(&args.log).init();
 
-    log::info!("Infinitier Explorer (Slint) {}", build_version());
+    log::info!("Infinitier Explorer {}", build_version());
 
     let game_data = match GameDataBuilder::new(args.game_path.as_slice(), None)
         .and_then(|builder| builder.build())
@@ -78,7 +78,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     };
     let title = format!(
-        "Infinitier Explorer (Slint) {} - {:?}",
+        "Infinitier Explorer {} - {:?}",
         build_version(),
         game_data.game()
     );

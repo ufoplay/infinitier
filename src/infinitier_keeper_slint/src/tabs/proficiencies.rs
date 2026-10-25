@@ -39,7 +39,9 @@ pub fn build(model: &Model) -> EditTable {
             let second = if cre.proficiency_has_second_class(p.stat) {
                 editable_cell(
                     i32::from(p.stat) + SECOND_SLOT_OFFSET,
-                    &points.second_class.to_string(),
+                    points.second_class.into(),
+                    0,
+                    MAX_POINTS.into(),
                 )
             } else {
                 // Matches EEKeeper, which leaves untrained slots empty.
@@ -48,7 +50,12 @@ pub fn build(model: &Model) -> EditTable {
             row(
                 &p.name,
                 vec![
-                    editable_cell(i32::from(p.stat), &points.first_class.to_string()),
+                    editable_cell(
+                        i32::from(p.stat),
+                        points.first_class.into(),
+                        0,
+                        MAX_POINTS.into(),
+                    ),
                     second,
                 ],
             )

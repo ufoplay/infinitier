@@ -16,7 +16,7 @@
 
 use infinitier_core::resource::cre::{Cre, CreHeader};
 
-use crate::components::field_card::{card, editable_row};
+use crate::components::field_card::{card, number_row};
 use crate::state::Model;
 use crate::{FieldCard, FieldRow};
 
@@ -202,6 +202,36 @@ impl RField {
             .unwrap_or(-1)
     }
 
+    /// The values the field's integer type holds: the number field's range
+    /// (the egui keeper's typed `DragValue` clamp).
+    fn range(self) -> (i32, i32) {
+        match self {
+            Self::Acid
+            | Self::Cold
+            | Self::Electricity
+            | Self::Fire
+            | Self::Crushing
+            | Self::Piercing
+            | Self::Slashing
+            | Self::Missile
+            | Self::Magic
+            | Self::MagicFire
+            | Self::MagicCold
+            | Self::MagicDamage => (i8::MIN.into(), i8::MAX.into()),
+            Self::SaveDeath
+            | Self::SaveWands
+            | Self::SavePolymorph
+            | Self::SaveBreath
+            | Self::SaveSpells
+            | Self::SaveFortitude
+            | Self::SaveReflex
+            | Self::SaveWill => (0, u8::MAX.into()),
+            Self::AcSlashing | Self::AcMissile | Self::AcCrushing | Self::AcPiercing => {
+                (i16::MIN.into(), i16::MAX.into())
+            }
+        }
+    }
+
     fn from_index(id: i32) -> Option<Self> {
         usize::try_from(id)
             .ok()
@@ -297,8 +327,9 @@ fn write_i16<F: FnOnce(i16)>(raw: &str, current: i16, write: F) {
 
 // ── Build + commit ───────────────────────────────────────────────────
 
-fn erow(field: RField, label: &str, value: impl ToString) -> FieldRow {
-    editable_row(field.index(), label, &value.to_string())
+fn erow(field: RField, label: &str, value: impl Into<i64>) -> FieldRow {
+    let (minimum, maximum) = field.range();
+    number_row(field.index(), label, value.into(), minimum, maximum)
 }
 
 /// Build the Resistances-tab cards for the selected creature.

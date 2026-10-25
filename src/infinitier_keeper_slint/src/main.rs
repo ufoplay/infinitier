@@ -14,6 +14,7 @@
 
 mod app;
 mod browser;
+mod build_data;
 mod callbacks;
 mod components;
 mod dialogs;
@@ -53,6 +54,7 @@ struct Args {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     env_logger::Builder::new().parse_filters(&args.log).init();
+    log::info!("Infinitier Keeper {}", build_data::build_version());
 
     let settings = SettingsDialog::load(args.config);
     let startup_game = settings.startup_game();

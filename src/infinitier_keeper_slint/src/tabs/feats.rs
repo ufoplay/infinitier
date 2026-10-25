@@ -16,7 +16,7 @@ use infinitier_core::resource::tlk::Tlk;
 use infinitier_core::resource::two_da::TwoDA;
 
 use crate::FieldCard;
-use crate::components::field_card::{card, editable_check_row, editable_row};
+use crate::components::field_card::{card, editable_check_row, number_row};
 use crate::state::Model;
 
 /// Level-input ids start here, clear of the feat-index space.
@@ -120,15 +120,15 @@ fn prettify(symbol: &str) -> String {
         .join(" ")
 }
 
-/// Build the Feats-tab cards for the selected IWD2 creature.
-pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
-    let Some(cre) = model.selected_cre() else {
-        return [Vec::new(), Vec::new(), Vec::new()];
-    };
+/// Shown instead of the cards for a creature that isn't IWD2's.
+pub const UNAVAILABLE: &str = "Feats are only available for IWD2 (CRE V2.2) creatures.";
+
+/// Build the Feats-tab cards for the selected IWD2 creature; `None` for any
+/// other.
+pub fn build(model: &Model) -> Option<[Vec<FieldCard>; 3]> {
+    let cre = model.selected_cre()?;
     // Not an IWD2 (V2.2) creature → no feats block.
-    if cre.iwd2_feat_known(0).is_none() {
-        return [Vec::new(), Vec::new(), Vec::new()];
-    }
+    cre.iwd2_feat_known(0)?;
     let feats = build_feat_list(&model.game_data);
     let mut rows = Vec::new();
     for f in &feats {
@@ -137,14 +137,16 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         // Level only exists for stackable feats, and only once known.
         if known && let Some(slot) = f.count_slot {
             let level = cre.iwd2_feat_count(slot).unwrap_or(0);
-            rows.push(editable_row(
+            rows.push(number_row(
                 LEVEL_ID_OFFSET + i32::from(slot),
                 &format!("{} (level)", f.name),
-                &level.to_string(),
+                level.into(),
+                0,
+                u8::MAX.into(),
             ));
         }
     }
-    [vec![card("Feats", 0, rows)], Vec::new(), Vec::new()]
+    Some([vec![card("Feats", 0, rows)], Vec::new(), Vec::new()])
 }
 
 /// Commit an edited feat cell: a Level input (id ≥ offset) or a Known toggle.

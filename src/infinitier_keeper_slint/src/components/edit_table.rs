@@ -33,13 +33,16 @@ pub fn row(name: &str, cells: Vec<EditCell>) -> EditRow {
     }
 }
 
-/// An editable cell. `id` is the tab-local cell id routed back on commit
-/// (dispatched to the active tab by `callbacks::character`).
-pub fn editable_cell(id: i32, text: &str) -> EditCell {
+/// An editable number cell, from `minimum` to `maximum`. `id` is the
+/// tab-local cell id routed back with each change (dispatched to the active
+/// tab by `callbacks::character`).
+pub fn editable_cell(id: i32, value: i64, minimum: i32, maximum: i32) -> EditCell {
     EditCell {
-        text: text.into(),
+        text: value.to_string().into(),
         editable: true,
         id,
+        minimum,
+        maximum,
     }
 }
 
@@ -49,5 +52,7 @@ pub fn value_cell(text: &str) -> EditCell {
         text: text.into(),
         editable: false,
         id: -1,
+        minimum: 0,
+        maximum: 0,
     }
 }

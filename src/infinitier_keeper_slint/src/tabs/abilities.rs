@@ -261,6 +261,10 @@ fn row(
         is_attacks: field == EditableField::Attacks,
         is_check: false,
         checked: false,
+        // Typed, like the egui keeper's ability fields.
+        numeric: false,
+        minimum: 0,
+        maximum: 0,
     }
 }
 

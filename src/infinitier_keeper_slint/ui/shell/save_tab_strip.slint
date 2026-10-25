@@ -15,7 +15,8 @@ export component SaveTabStrip inherits TabBar {
         text: name;
         selected: i == SaveTabsAdapter.active;
         closable: true;
-        close-label: "Close " + name;
+        // Also the ×'s tooltip, worded as the egui keeper's.
+        close-label: "Close this save";
         clicked => { SaveTabsAdapter.select(i); }
         close-requested => { SaveTabsAdapter.close(i); }
     }

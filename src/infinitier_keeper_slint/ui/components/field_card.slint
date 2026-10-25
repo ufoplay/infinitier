@@ -2,13 +2,15 @@
 // (Abilities, Characteristics, Resistances, …): each row a label, an
 // optional "(effective: …)" hint, and an editor or a read-only value.
 
-import { Card, Checkbox, Label, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Card, Checkbox, Label, NumberField, Select, TextField, TextRole, Theme, Tone } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 // One editable / read-only row inside a card. `id` is the index into the
 // active tab's field table, routed back on commit; `-1` marks a derived
 // read-only row. `is-attacks` swaps the text input for the Attacks
-// dropdown; `is-check` renders a checkbox (label + `checked`).
+// dropdown; `is-check` renders a checkbox (label + `checked`); `numeric`
+// edits the value with a number field (drag or type) from `minimum` to
+// `maximum`, committing each change.
 export struct FieldRow {
     id: int,
     label: string,
@@ -18,6 +20,9 @@ export struct FieldRow {
     is-attacks: bool,
     is-check: bool,
     checked: bool,
+    numeric: bool,
+    minimum: int,
+    maximum: int,
 }
 
 // One titled card (e.g. "Ability scores") holding a set of rows, assigned
@@ -88,15 +93,36 @@ export component FieldCardView inherits Card {
                 selected(index) => { root.commit-attacks(index); }
             }
 
-            if row.editable && !row.is-attacks: TextField {
+            if row.editable && row.numeric && !row.is-attacks: NumberField {
+                width: Metrics.field-input-width;
+                value: row.value.to-float();
+                minimum: row.minimum;
+                maximum: row.maximum;
+                changed(value) => { root.commit-field(row.id, value); }
+            }
+
+            if row.editable && !row.numeric && !row.is-attacks: TextField {
+                // The committed value, shown again once the edit is done:
+                // the row updates in place, and the commit may clamp it.
+                property <string> committed: row.value;
+                changed committed => {
+                    if (!self.has-focus) {
+                        self.text = self.committed;
+                    }
+                }
+
                 width: Metrics.field-input-width;
                 text: row.value;
                 // Commit on Enter and on focus loss (clamp-on-blur), like the
                 // egui keeper.
-                accepted(t) => { root.commit-field(row.id, t); }
+                accepted(t) => {
+                    root.commit-field(row.id, t);
+                    self.text = self.committed;
+                }
                 changed has-focus => {
                     if (!self.has-focus) {
                         root.commit-field(row.id, self.text);
+                        self.text = self.committed;
                     }
                 }
             }

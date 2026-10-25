@@ -7,17 +7,18 @@ use slint::{ComponentHandle, Image, SharedString};
 
 use super::rows_model;
 use crate::app::App;
+use crate::build_data::build_version;
 use crate::settings::ThemeSetting;
 use crate::state::Model;
 use crate::{AppWindow, PartyAdapter, PartyMember, SaveTabsAdapter, ShellAdapter, icons};
 
-const APP_TITLE: &str = "Infinitier Keeper (Slint)";
-
 pub(super) fn refresh(ui: &AppWindow, app: &App) {
     let shell = ui.global::<ShellAdapter>();
+    // Like the egui keeper's: the build, then the loaded game's type.
+    let app_title = format!("Infinitier Keeper {}", build_version());
     let title = match app.game() {
-        Some(game) => format!("{APP_TITLE} - {game:?}"),
-        None => APP_TITLE.to_owned(),
+        Some(game) => format!("{app_title} - {game:?}"),
+        None => app_title,
     };
     shell.set_title(title.into());
     shell.set_has_game(app.game().is_some());

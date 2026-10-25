@@ -34,13 +34,15 @@ const LEVEL_FIELDS: &[(EditableField, &str)] = &[
     (EditableField::WizardLevel, "Wizard"),
 ];
 
-/// Build the Levels & Kits cards for the selected IWD2 creature.
-pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
-    let Some(cre) = model.selected_cre() else {
-        return [Vec::new(), Vec::new(), Vec::new()];
-    };
+/// Shown instead of the cards for a creature that isn't IWD2's.
+pub const UNAVAILABLE: &str = "Levels are only available for IWD2 (CRE V2.2) creatures.";
+
+/// Build the Levels & Kits cards for the selected IWD2 creature; `None` for
+/// any other.
+pub fn build(model: &Model) -> Option<[Vec<FieldCard>; 3]> {
+    let cre = model.selected_cre()?;
     let CreHeader::V22(h) = &cre.header else {
-        return [Vec::new(), Vec::new(), Vec::new()];
+        return None;
     };
     let gam = model.gam.as_ref();
 
@@ -61,11 +63,11 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         }
     }
 
-    [
+    Some([
         vec![card("Class Levels", 0, level_rows)],
         vec![card("Kits", 1, kit_rows)],
         Vec::new(),
-    ]
+    ])
 }
 
 /// Commit an edited Levels & Kits field: a kit toggle (id ≥ offset) or a
