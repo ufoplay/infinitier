@@ -1,0 +1,109 @@
+// The Inventory tab: one row per slot — icon, position, editable quantities,
+// item name, resref and Delete. Clicking a slot selects it as the Item
+// Browser's add target; double-clicking a filled one reveals its item there.
+
+import { Button, LineEdit, ListView, Palette, VerticalBox } from "std-widgets.slint";
+import { HeaderCell } from "../components/components.slint";
+import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
+
+// One slot. `slot` is routed back on select / quantity edit / delete.
+export struct InvRow {
+    slot: int,
+    icon: image,
+    position: string,
+    filled: bool,
+    q1: string,
+    q2: string,
+    q3: string,
+    name: string,
+    resref: string,
+}
+
+export global InventoryAdapter {
+    in property <[InvRow]> rows;
+    // The selected slot, -1 for none. Set here on click, so the rows aren't
+    // rebuilt (which would drop the slot's double-click).
+    in-out property <int> selected: -1;
+    callback select(int /* slot */);
+    callback quantity(int /* slot */, int /* which, 0..2 */, string /* value */);
+    callback delete(int /* slot */);
+}
+
+// A quantity / charges input, committed on Enter and on focus loss.
+component QuantityEdit inherits LineEdit {
+    callback commit(string);
+    width: 46px;
+    accepted(t) => { root.commit(t); }
+    changed has-focus => {
+        if (!self.has-focus) {
+            root.commit(self.text);
+        }
+    }
+}
+
+export component InventoryTab inherits VerticalBox {
+    HorizontalLayout {
+        padding-left: 6px;
+        spacing: 8px;
+        Rectangle { width: 40px; }
+        HeaderCell { text: "Position"; width: 120px; }
+        HeaderCell { text: "Quantity"; width: 150px; }
+        HeaderCell { text: "Item"; horizontal-stretch: 1; }
+        HeaderCell { text: "Resource"; width: 96px; }
+        Rectangle { width: 72px; }
+    }
+    ListView {
+        vertical-stretch: 1;
+        for row in InventoryAdapter.rows: Rectangle {
+            height: 44px;
+            background: row.slot == InventoryAdapter.selected ? Palette.accent-background.transparentize(0.75) : transparent;
+            TouchArea {
+                clicked => {
+                    InventoryAdapter.selected = row.slot;
+                    InventoryAdapter.select(row.slot);
+                }
+                double-clicked => {
+                    if (row.filled) {
+                        BrowsersAdapter.front = BrowserKind.items;
+                        BrowsersAdapter.reveal(BrowserKind.items, row.resref);
+                    }
+                }
+            }
+            HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                spacing: 8px;
+                Image {
+                    width: 40px;
+                    height: 40px;
+                    source: row.icon;
+                    image-fit: contain;
+                }
+                Text { text: row.position; width: 120px; vertical-alignment: center; overflow: elide; }
+                HorizontalLayout {
+                    width: 150px;
+                    spacing: 3px;
+                    if row.filled: QuantityEdit {
+                        text: row.q1;
+                        commit(t) => { InventoryAdapter.quantity(row.slot, 0, t); }
+                    }
+                    if row.filled: QuantityEdit {
+                        text: row.q2;
+                        commit(t) => { InventoryAdapter.quantity(row.slot, 1, t); }
+                    }
+                    if row.filled: QuantityEdit {
+                        text: row.q3;
+                        commit(t) => { InventoryAdapter.quantity(row.slot, 2, t); }
+                    }
+                }
+                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                if row.filled: Button {
+                    width: 72px;
+                    text: "Delete";
+                    clicked => { InventoryAdapter.delete(row.slot); }
+                }
+            }
+        }
+    }
+}

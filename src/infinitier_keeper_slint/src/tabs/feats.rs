@@ -16,8 +16,8 @@ use infinitier_core::resource::tlk::Tlk;
 use infinitier_core::resource::two_da::TwoDA;
 
 use crate::FieldCard;
+use crate::components::field_card::{card, editable_check_row, editable_row};
 use crate::state::Model;
-use crate::ui_model::{card, editable_check_row, editable_row};
 
 /// Level-input ids start here, clear of the feat-index space.
 const LEVEL_ID_OFFSET: i32 = 1000;

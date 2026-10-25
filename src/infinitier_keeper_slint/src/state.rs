@@ -3,8 +3,7 @@
 //! A trimmed analogue of the egui keeper's `state.rs`. [`LoadedGame`] is a
 //! game with no save open; [`Model`] is a game with at least one open save,
 //! whose active save's fields live directly on it (other open saves are
-//! parked) so every tab module can read them flat. The [`CharacterTab`] enum
-//! is duplicated from the egui keeper's `ui/tabs/mod.rs`.
+//! parked) so every tab module can read them flat.
 
 use std::path::{Path, PathBuf};
 
@@ -12,9 +11,11 @@ use infinitier_core::engine_caps::EngineCaps;
 use infinitier_core::game::{GameData, GameDataBuilder};
 use infinitier_core::imported_resource::cre::ImportedCre;
 use infinitier_core::imported_resource::gam::{ImportedGam, ImportedGamNpc, NpcCre};
+use infinitier_core::resource::Game;
 use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, SpellType};
-use infinitier_core::resource::{Engine, Game};
 use infinitier_core::save_games::SaveGame;
+
+use crate::tabs::CharacterTab;
 
 /// Identifies one spell in the Spells tab, regardless of engine — kept on
 /// [`Model`] parallel to the displayed rows so a row's delete / set-memorised
@@ -35,90 +36,6 @@ pub enum SpellRefKey {
 /// Sentinel for "inner spell tab not yet chosen" → auto-pick the first
 /// non-empty category on the next build.
 pub const SPELL_TAB_AUTO: usize = usize::MAX;
-
-/// Identifier for the active per-character tab. Order matches the
-/// EEKeeper tab strip. Duplicated from the egui keeper.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CharacterTab {
-    Abilities,
-    Levels,
-    Characteristics,
-    Appearance,
-    Inventory,
-    Spells,
-    Feats,
-    Memorization,
-    Proficiencies,
-    Resistances,
-    Effects,
-    LocalVariables,
-    GlobalVariables,
-    JournalEntries,
-    Miscellaneous,
-}
-
-impl CharacterTab {
-    /// Tabs in EEKeeper display order.
-    pub const ALL: &'static [CharacterTab] = &[
-        CharacterTab::Abilities,
-        CharacterTab::Levels,
-        CharacterTab::Characteristics,
-        CharacterTab::Appearance,
-        CharacterTab::Inventory,
-        CharacterTab::Feats,
-        CharacterTab::Memorization,
-        CharacterTab::Spells,
-        CharacterTab::Proficiencies,
-        CharacterTab::Resistances,
-        CharacterTab::Effects,
-        CharacterTab::LocalVariables,
-        CharacterTab::GlobalVariables,
-        CharacterTab::JournalEntries,
-        CharacterTab::Miscellaneous,
-    ];
-
-    /// True when this tab should appear for the given game. `Spells` is
-    /// universal; `Levels`/`Feats` are IWD2-only, and
-    /// `Memorization`/`Proficiencies` are AD&D-only.
-    pub fn is_visible_for_game(&self, game: Game) -> bool {
-        let is_iwd2 = game.engine() == Engine::Iwd2;
-        match self {
-            CharacterTab::Levels | CharacterTab::Feats => is_iwd2,
-            CharacterTab::Memorization | CharacterTab::Proficiencies => !is_iwd2,
-            CharacterTab::Abilities
-            | CharacterTab::Characteristics
-            | CharacterTab::Appearance
-            | CharacterTab::Inventory
-            | CharacterTab::Spells
-            | CharacterTab::Resistances
-            | CharacterTab::Effects
-            | CharacterTab::LocalVariables
-            | CharacterTab::GlobalVariables
-            | CharacterTab::JournalEntries
-            | CharacterTab::Miscellaneous => true,
-        }
-    }
-
-    pub fn label(&self) -> &'static str {
-        match self {
-            CharacterTab::Abilities => "Abilities",
-            CharacterTab::Levels => "Levels & Kits",
-            CharacterTab::Characteristics => "Characteristics",
-            CharacterTab::Appearance => "Appearance",
-            CharacterTab::Inventory => "Inventory",
-            CharacterTab::Spells => "Spells",
-            CharacterTab::Feats => "Feats",
-            CharacterTab::Memorization => "Memorization",
-            CharacterTab::Proficiencies => "Proficiencies",
-            CharacterTab::Resistances => "Resistances",
-            CharacterTab::Effects => "Effects",
-            CharacterTab::LocalVariables => "Local Variables",
-            CharacterTab::GlobalVariables => "Global Variables",
-            CharacterTab::JournalEntries => "Journal Entries",
-            CharacterTab::Miscellaneous => "Miscellaneous",
-        }
-    }
-}
 
 /// A loaded game with no save open: its indexed resources and engine caps.
 pub struct LoadedGame {

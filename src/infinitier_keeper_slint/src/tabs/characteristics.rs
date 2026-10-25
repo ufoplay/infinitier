@@ -20,8 +20,8 @@ use infinitier_core::resource::gam::NpcCharStats;
 use infinitier_core::resource::two_da::TwoDA;
 
 use crate::FieldCard;
+use crate::components::field_card::{card, check_row, readonly_row};
 use crate::state::Model;
-use crate::ui_model::{card, check_row, readonly_row};
 
 // ── Resolved, display-ready data (duplicated from the egui data.rs) ───
 

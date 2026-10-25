@@ -1,0 +1,40 @@
+// The card tabs — Abilities, Characteristics, Resistances, Proficiencies,
+// Memorization, Levels & Kits, Feats, Miscellaneous: field cards in three
+// columns. The Rust side builds the active tab's cards.
+
+import { ScrollView } from "std-widgets.slint";
+import { FieldCard, FieldCardView } from "../components/components.slint";
+
+export global CardsAdapter {
+    // The cards of each display column.
+    in property <[FieldCard]> column0;
+    in property <[FieldCard]> column1;
+    in property <[FieldCard]> column2;
+    // The Attacks dropdown (Abilities' Combat card).
+    in property <[string]> attacks-options;
+    in property <int> attacks-index: -1;
+    callback commit-field(int /* field id */, string /* value */);
+    callback commit-attacks(int /* option index */);
+}
+
+// One outer ScrollView for all three columns, so a card's GroupBox title
+// isn't clipped by a per-column one.
+export component CardsTab inherits ScrollView {
+    HorizontalLayout {
+        spacing: 8px;
+        padding-left: 6px;
+        padding-right: 6px;
+        for column in 3: VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: start;
+            spacing: 8px;
+            for card in (column == 0 ? CardsAdapter.column0 : column == 1 ? CardsAdapter.column1 : CardsAdapter.column2): FieldCardView {
+                card: card;
+                attacks-options: CardsAdapter.attacks-options;
+                attacks-index: CardsAdapter.attacks-index;
+                commit-field(id, value) => { CardsAdapter.commit-field(id, value); }
+                commit-attacks(i) => { CardsAdapter.commit-attacks(i); }
+            }
+        }
+    }
+}

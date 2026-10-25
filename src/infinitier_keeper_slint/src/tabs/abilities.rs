@@ -14,9 +14,9 @@ use infinitier_core::imported_resource::gam::NpcCre;
 use infinitier_core::resource::Engine;
 use infinitier_core::resource::cre::{Cre, CreHeader, CreHeaderV22};
 
-use crate::fields::{AttacksOption, EditableField, Section};
+use crate::components::editable_fields::{AttacksOption, EditableField, Section};
+use crate::components::field_card::{card, readonly_row};
 use crate::state::Model;
-use crate::ui_model::{card, readonly_row};
 use crate::{FieldCard, FieldRow};
 
 /// Commit an edited Abilities field back to the model: parse + clamp +

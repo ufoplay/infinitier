@@ -17,7 +17,7 @@ use infinitier_core::engine_caps::{AbilityRange, EngineCaps};
 use infinitier_core::imported_resource::gam::ImportedGam;
 use infinitier_core::resource::cre::Cre;
 
-use crate::cre_fields;
+use crate::components::cre_fields;
 
 /// Logical grouping for the abilities tab. Each card on screen
 /// corresponds to one [`Section`]; the tab iterates

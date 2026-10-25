@@ -1,0 +1,12 @@
+// The colours the std-widgets Palette doesn't cover. The Palette supplies
+// everything else and follows the dark / light scheme.
+
+export global Theme {
+    // Secondary text: hints, empty states, units.
+    out property <brush> muted: gray;
+    out property <brush> error: #e54a4a;
+    // Behind a modal dialog.
+    out property <brush> backdrop: #00000066;
+    // Under a floating window or a popup menu.
+    out property <color> shadow: #00000050;
+}

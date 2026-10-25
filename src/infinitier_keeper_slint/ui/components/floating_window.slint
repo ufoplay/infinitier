@@ -1,0 +1,114 @@
+// A non-modal window floating over the editor: dragged by its title bar
+// (kept inside the area it floats over), resized from its bottom-right
+// grip, closed by its ×. Pressing anywhere on it asks to `raise` it over
+// its siblings. Its children fill the area below the title bar.
+
+import { Palette } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+global FloatingStyle {
+    out property <length> title-height: 28px;
+    out property <length> grip-size: 16px;
+}
+
+export component FloatingWindow inherits Rectangle {
+    in property <string> title;
+    // The area the window is kept inside while dragged / resized.
+    in property <length> area-width;
+    in property <length> area-height;
+    in property <length> min-window-width: 400px;
+    in property <length> min-window-height: 300px;
+    callback raise();
+    callback close();
+
+    background: Palette.background;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Palette.border;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: Theme.shadow;
+
+    // Clicks on the window's empty areas stay on it (and bring it forward).
+    TouchArea {
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                root.raise();
+            }
+        }
+    }
+
+    VerticalLayout {
+        // Title bar: drag to move, × to close.
+        Rectangle {
+            height: FloatingStyle.title-height;
+            background: Palette.alternate-background;
+            border-top-left-radius: root.border-radius;
+            border-top-right-radius: root.border-radius;
+            TouchArea {
+                mouse-cursor: move;
+                pointer-event(event) => {
+                    if (event.kind == PointerEventKind.down) {
+                        root.raise();
+                    }
+                }
+                moved => {
+                    root.x = max(0px, min(root.area-width - root.width, root.x + self.mouse-x - self.pressed-x));
+                    root.y = max(0px, min(root.area-height - root.height, root.y + self.mouse-y - self.pressed-y));
+                }
+            }
+            HorizontalLayout {
+                padding-left: 10px;
+                Text {
+                    text: root.title;
+                    font-weight: 700;
+                    color: Palette.foreground;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Rectangle {
+                    width: FloatingStyle.title-height;
+                    background: close-area.has-hover ? Palette.border : transparent;
+                    border-top-right-radius: root.border-radius;
+                    accessible-role: button;
+                    accessible-label: "Close " + root.title;
+                    accessible-action-default => { root.close(); }
+                    Text {
+                        text: "×";
+                        font-size: 16px;
+                        color: Palette.foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    close-area := TouchArea {
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            @children
+        }
+    }
+
+    // Resize grip.
+    TouchArea {
+        x: root.width - self.width;
+        y: root.height - self.height;
+        width: FloatingStyle.grip-size;
+        height: FloatingStyle.grip-size;
+        mouse-cursor: nwse-resize;
+        moved => {
+            root.width = max(root.min-window-width, min(root.area-width - root.x, root.width + self.mouse-x - self.pressed-x));
+            root.height = max(root.min-window-height, min(root.area-height - root.y, root.height + self.mouse-y - self.pressed-y));
+        }
+        Text {
+            text: "◢";
+            font-size: 10px;
+            color: Theme.muted;
+            horizontal-alignment: right;
+            vertical-alignment: bottom;
+        }
+    }
+}

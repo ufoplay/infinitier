@@ -7,7 +7,8 @@ use infinitier_core::resource::ResourceType;
 use infinitier_core::resource::cre::{Item, ItemFlags};
 
 use super::{Entry, first_strref};
-use crate::state::{CharacterTab, Model};
+use crate::state::Model;
+use crate::tabs::CharacterTab;
 
 /// Build the item index: parse every `.itm`, resolve its identified name and
 /// description strref. Sorted by type, then name.

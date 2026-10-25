@@ -11,8 +11,8 @@
 use infinitier_core::resource::cre::{Cre, SpellType, SubSections};
 
 use crate::FieldCard;
+use crate::components::field_card::{card, editable_row};
 use crate::state::Model;
-use crate::ui_model::{card, editable_row};
 
 struct MemRow {
     type_name: &'static str,

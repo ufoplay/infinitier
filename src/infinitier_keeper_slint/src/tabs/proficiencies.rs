@@ -14,8 +14,8 @@
 use infinitier_core::resource::cre::WeaponProficiency;
 
 use crate::FieldCard;
+use crate::components::field_card::{card, editable_row};
 use crate::state::Model;
-use crate::ui_model::{card, editable_row};
 
 /// EEKeeper's proficiency-point cap.
 const MAX_POINTS: u8 = 5;

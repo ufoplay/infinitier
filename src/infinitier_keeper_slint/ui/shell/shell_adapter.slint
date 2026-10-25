@@ -1,0 +1,19 @@
+// The window-wide state: what's loaded, the theme, the header's status and
+// its actions.
+
+export global ShellAdapter {
+    in property <string> title: "Infinitier Keeper (Slint)";
+    // What's open: a game (else "No game loaded") and a save (else "No save
+    // loaded"); gates the header buttons.
+    in property <bool> has-game;
+    in property <bool> has-save;
+    in property <bool> dark-theme;
+    // The selected party member, named in the header.
+    in property <string> character-name;
+    // One-line feedback, e.g. where a save was written.
+    in property <string> status;
+    callback load-clicked();
+    callback save-clicked();
+    callback settings-clicked();
+    callback theme-toggle();
+}

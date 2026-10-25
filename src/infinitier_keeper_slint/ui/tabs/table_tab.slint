@@ -1,0 +1,35 @@
+// The Local / Global Variables tabs: a read-only Name · Value table.
+
+import { ListView, VerticalBox } from "std-widgets.slint";
+import { HeaderCell } from "../components/components.slint";
+
+export struct VarRow {
+    name: string,
+    value: string,
+}
+
+export global TableAdapter {
+    in property <[VarRow]> rows;
+}
+
+export component TableTab inherits VerticalBox {
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 12px;
+        HeaderCell { text: "Name"; width: 300px; }
+        HeaderCell { text: "Value"; }
+    }
+    ListView {
+        vertical-stretch: 1;
+        for row in TableAdapter.rows: HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 6px;
+            padding-top: 3px;
+            padding-bottom: 3px;
+            spacing: 12px;
+            Text { text: row.name; width: 300px; overflow: elide; vertical-alignment: center; }
+            Text { text: row.value; horizontal-stretch: 1; vertical-alignment: center; }
+        }
+    }
+}

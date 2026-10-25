@@ -1,0 +1,96 @@
+// The two floating browser windows, over the editor and under the modal
+// dialogs, driven by BrowsersAdapter. The layer itself lets clicks through
+// to the editor.
+
+import { BrowserRow, BrowserState, BrowserWindow, TypeFilter } from "browser_window.slint";
+
+export enum BrowserKind { items, spells }
+
+export global BrowsersAdapter {
+    in property <BrowserState> item-state;
+    in property <[BrowserRow]> item-rows;
+    in property <[TypeFilter]> item-types;
+    in-out property <string> item-text;
+    in-out property <bool> item-all-types: true;
+    in property <BrowserState> spell-state;
+    in property <[BrowserRow]> spell-rows;
+    in property <[TypeFilter]> spell-types;
+    in-out property <string> spell-text;
+    in-out property <bool> spell-all-types: true;
+    // The window in front; UI state (whatever was opened or clicked last).
+    in-out property <BrowserKind> front: BrowserKind.items;
+    callback toggle(BrowserKind);
+    callback close(BrowserKind);
+    callback search(BrowserKind, string);
+    callback select(BrowserKind, string /* resref */);
+    callback step(BrowserKind, int /* -1 up, 1 down */);
+    callback add(BrowserKind, int /* IWD2 placement, -1 for a plain add */);
+    callback all-types(BrowserKind, bool);
+    callback type-shown(BrowserKind, string /* type */, bool);
+    // Open `kind`'s window on `resref` (double-clicking an inventory slot
+    // or a Spells-tab row).
+    callback reveal(BrowserKind, string /* resref */);
+}
+
+export component BrowserLayer inherits Rectangle {
+    // Scroll `kind`'s list so `row` is in view.
+    public function scroll-to(kind: BrowserKind, row: int) {
+        if (kind == BrowserKind.items) {
+            item-browser.scroll-to(row);
+        } else {
+            spell-browser.scroll-to(row);
+        }
+    }
+
+    item-browser := BrowserWindow {
+        x: 40px;
+        y: 70px;
+        width: min(780px, root.width - 60px);
+        height: min(600px, root.height - 90px);
+        z: BrowsersAdapter.front == BrowserKind.items ? 1 : 0;
+        area-width: root.width;
+        area-height: root.height;
+        title: "Item Browser";
+        search-hint: "type, name or resource…";
+        select-hint: "Select an item to see its description.";
+        state: BrowsersAdapter.item-state;
+        rows: BrowsersAdapter.item-rows;
+        types: BrowsersAdapter.item-types;
+        text <=> BrowsersAdapter.item-text;
+        all-types <=> BrowsersAdapter.item-all-types;
+        raise => { BrowsersAdapter.front = BrowserKind.items; }
+        close => { BrowsersAdapter.close(BrowserKind.items); }
+        search(t) => { BrowsersAdapter.search(BrowserKind.items, t); }
+        select(r) => { BrowsersAdapter.select(BrowserKind.items, r); }
+        step(d) => { BrowsersAdapter.step(BrowserKind.items, d); }
+        add(p) => { BrowsersAdapter.add(BrowserKind.items, p); }
+        set-all-types(on) => { BrowsersAdapter.all-types(BrowserKind.items, on); }
+        set-type(t, on) => { BrowsersAdapter.type-shown(BrowserKind.items, t, on); }
+    }
+    spell-browser := BrowserWindow {
+        x: 70px;
+        y: 90px;
+        width: min(820px, root.width - 90px);
+        height: min(600px, root.height - 110px);
+        z: BrowsersAdapter.front == BrowserKind.spells ? 1 : 0;
+        area-width: root.width;
+        area-height: root.height;
+        title: "Spell Browser";
+        spell-columns: true;
+        search-hint: "type, name, resource or script…";
+        select-hint: "Select a spell to see its description.";
+        state: BrowsersAdapter.spell-state;
+        rows: BrowsersAdapter.spell-rows;
+        types: BrowsersAdapter.spell-types;
+        text <=> BrowsersAdapter.spell-text;
+        all-types <=> BrowsersAdapter.spell-all-types;
+        raise => { BrowsersAdapter.front = BrowserKind.spells; }
+        close => { BrowsersAdapter.close(BrowserKind.spells); }
+        search(t) => { BrowsersAdapter.search(BrowserKind.spells, t); }
+        select(r) => { BrowsersAdapter.select(BrowserKind.spells, r); }
+        step(d) => { BrowsersAdapter.step(BrowserKind.spells, d); }
+        add(p) => { BrowsersAdapter.add(BrowserKind.spells, p); }
+        set-all-types(on) => { BrowsersAdapter.all-types(BrowserKind.spells, on); }
+        set-type(t, on) => { BrowsersAdapter.type-shown(BrowserKind.spells, t, on); }
+    }
+}

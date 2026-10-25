@@ -1,0 +1,47 @@
+// The Appearance tab: the animation's name and the colour swatches. A
+// ScrollView like the card tabs: the fixed-width swatch rows would
+// otherwise cap the panel's (and so the window's) width.
+
+import { GroupBox, ScrollView } from "std-widgets.slint";
+
+// One labelled colour slot and its pre-rendered gradient swatch.
+export struct ColorSwatch {
+    label: string,
+    image: image,
+}
+
+export global AppearanceAdapter {
+    in property <string> animation-name;
+    in property <[ColorSwatch]> swatches;
+}
+
+export component AppearanceTab inherits ScrollView {
+    VerticalLayout {
+        alignment: start;
+        spacing: 8px;
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 10px;
+            Text { text: "Appearance"; width: 130px; vertical-alignment: center; }
+            Text { text: AppearanceAdapter.animation-name; font-weight: 700; vertical-alignment: center; }
+        }
+        GroupBox {
+            title: "Colors";
+            vertical-stretch: 0;
+            VerticalLayout {
+                alignment: start;
+                spacing: 6px;
+                for swatch in AppearanceAdapter.swatches: HorizontalLayout {
+                    spacing: 10px;
+                    Text { text: swatch.label; width: 130px; vertical-alignment: center; }
+                    Image {
+                        source: swatch.image;
+                        width: 24px;
+                        height: 24px;
+                        image-rendering: pixelated;
+                    }
+                }
+            }
+        }
+    }
+}

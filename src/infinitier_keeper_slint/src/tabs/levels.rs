@@ -12,9 +12,9 @@
 use infinitier_core::resource::cre::{CreHeader, Iwd2Kits};
 
 use crate::FieldCard;
-use crate::fields::EditableField;
+use crate::components::editable_fields::EditableField;
+use crate::components::field_card::{card, editable_check_row, editable_row, readonly_row};
 use crate::state::Model;
-use crate::ui_model::{card, editable_check_row, editable_row, readonly_row};
 
 /// Kit toggle ids start here, clear of the `EditableField` index space.
 const KIT_ID_OFFSET: i32 = 1000;
@@ -84,6 +84,6 @@ pub fn commit(model: &mut Model, id: i32, value: &str) {
             cre.set_iwd2_kits(kits);
         }
     } else {
-        crate::abilities::commit(model, id, value);
+        super::abilities::commit(model, id, value);
     }
 }

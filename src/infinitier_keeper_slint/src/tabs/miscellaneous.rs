@@ -12,8 +12,8 @@ use infinitier_core::resource::cre::{Cre, CreHeader};
 use infinitier_core::resource::gam::Dhm;
 
 use crate::FieldCard;
+use crate::components::field_card::{card, readonly_row};
 use crate::state::Model;
-use crate::ui_model::{card, readonly_row};
 
 #[derive(Default)]
 struct MiscData {

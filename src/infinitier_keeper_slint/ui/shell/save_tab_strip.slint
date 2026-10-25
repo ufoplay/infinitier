@@ -1,0 +1,21 @@
+// The open saves, one closable tab each.
+
+import { ChipStrip } from "../components/components.slint";
+
+export global SaveTabsAdapter {
+    // Each open save's folder name.
+    in property <[string]> names;
+    in property <int> active;
+    callback select(int);
+    callback close(int);
+}
+
+export component SaveTabStrip inherits ChipStrip {
+    height: 36px;
+    content-height: 32px;
+    closable: true;
+    labels: SaveTabsAdapter.names;
+    current: SaveTabsAdapter.active;
+    select(i) => { SaveTabsAdapter.select(i); }
+    close(i) => { SaveTabsAdapter.close(i); }
+}

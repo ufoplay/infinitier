@@ -1,0 +1,22 @@
+// Shown while there's nothing to edit: says what to do next.
+
+import { Palette } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { ShellAdapter } from "shell_adapter.slint";
+
+export component EmptyState inherits VerticalLayout {
+    alignment: start;
+    padding-top: 48px;
+    spacing: 6px;
+    Text {
+        text: ShellAdapter.has-game ? "No save loaded" : "No game loaded";
+        font-size: 20px;
+        horizontal-alignment: center;
+        color: Palette.foreground;
+    }
+    Text {
+        text: ShellAdapter.has-game ? "Use the Load button above to open a saved game." : "Open Settings to add a game, then select it and close the dialog to load it.";
+        horizontal-alignment: center;
+        color: Theme.muted;
+    }
+}

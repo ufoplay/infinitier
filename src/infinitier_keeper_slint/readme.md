@@ -62,11 +62,17 @@ cargo run -p infinitier_keeper_slint --features mcp -- --config config_test/infi
 
 ## Layout
 
-- `ui/app.slint` — the main view (plain `std-widgets`, coloured from their `Palette` so the dark /
-  light theme applies); `ui/dialogs.slint` — the Settings / Load / Save / confirm dialogs and the
-  loading overlay.
+The UI is split like Slint's demo apps, and mirrors the egui keeper's modules:
+
+- `ui/app.slint` — the window: composes the parts below (plain `std-widgets`, coloured from their
+  `Palette` so the dark / light theme applies); `ui/theme.slint` — the few extra colours.
+- `ui/components/` — reusable widgets (list rows, chip strip, modal frame, floating window, field
+  card); `ui/shell/` — header, save tabs, party list, character panel; `ui/tabs/` — the character
+  tabs' pages; `ui/browser/` — the Item / Spell Browser windows; `ui/dialogs/` — the modal
+  dialogs. Each part reads and calls its `*Adapter` global.
 - `build.rs` — compiles the `.slint` via `slint-build`.
 - `src/main.rs` — clap args and startup; `src/app.rs` — the top-level state (no game / game /
-  open saves) and background game loading; `src/view.rs` — pushes the state to the UI;
-  `src/callbacks/` — the Slint callbacks; `src/settings*.rs`, `src/load_dialog.rs`,
-  `src/save_dialog.rs` — the dialogs' logic; one module per character tab.
+  open saves) and background game loading; `src/view/` — fills the adapters, per UI part;
+  `src/callbacks/` — handles their callbacks, per UI part; `src/tabs/` — one module per character
+  tab; `src/components/` — the shared field logic; `src/dialogs/` — the dialogs' state;
+  `src/browser/` — the browsers' indexes and add logic; `src/settings.rs` — the settings file.

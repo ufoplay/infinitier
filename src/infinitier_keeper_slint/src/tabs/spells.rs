@@ -7,7 +7,8 @@
 //! with a Delete action. The extraction + name resolution are duplicated from
 //! the egui `data.rs`/`view.rs`. Each row's `SpellRef` is stashed on
 //! `Model::spell_refs` (parallel to the displayed rows) so an edit finds its
-//! spell by row index. (The Spell Browser "add spell" flow is not yet ported.)
+//! spell by row index. Double-clicking a row reveals its spell in the Spell
+//! Browser.
 
 use infinitier_core::resource::Engine;
 use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, Iwd2Table, SpellType, SubSections};

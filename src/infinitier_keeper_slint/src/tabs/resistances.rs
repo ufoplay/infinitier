@@ -16,8 +16,8 @@
 
 use infinitier_core::resource::cre::{Cre, CreHeader};
 
+use crate::components::field_card::{card, editable_row};
 use crate::state::Model;
-use crate::ui_model::{card, editable_row};
 use crate::{FieldCard, FieldRow};
 
 // ── Read-only extraction (duplicated from the egui data.rs) ───────────

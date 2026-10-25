@@ -1,0 +1,113 @@
+// A titled card of character fields — the building block of the card tabs
+// (Abilities, Characteristics, Resistances, …): each row a label, an
+// optional "(effective: …)" hint, and an editor or a read-only value.
+
+import { CheckBox, ComboBox, GroupBox, HorizontalBox, LineEdit, VerticalBox } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+// One editable / read-only row inside a card. `id` is the index into the
+// active tab's field table, routed back on commit; `-1` marks a derived
+// read-only row. `is-attacks` swaps the text input for the Attacks
+// dropdown; `is-check` renders a checkbox (label + `checked`).
+export struct FieldRow {
+    id: int,
+    label: string,
+    value: string,
+    bonus: string,
+    editable: bool,
+    is-attacks: bool,
+    is-check: bool,
+    checked: bool,
+}
+
+// One titled card (e.g. "Ability scores") holding a set of rows, assigned
+// to a display column (0..2) like the egui keeper's three-column grid.
+export struct FieldCard {
+    title: string,
+    column: int,
+    rows: [FieldRow],
+}
+
+export component FieldCardView {
+    in property <FieldCard> card;
+    in property <[string]> attacks-options;
+    in property <int> attacks-index;
+    callback commit-field(int /* id */, string /* value */);
+    callback commit-attacks(int /* option index */);
+
+    GroupBox {
+        title: root.card.title;
+        VerticalBox {
+            spacing: 6px;
+            for row in root.card.rows: HorizontalBox {
+                alignment: start;
+                spacing: 8px;
+
+                // Checkbox row: the label lives in the box. Editable
+                // (commits "1"/"0") when the row carries a real id;
+                // read-only (disabled) for derived rows.
+                if row.is-check: CheckBox {
+                    text: row.label;
+                    checked: row.checked;
+                    enabled: row.id >= 0;
+                    toggled => {
+                        if (row.id >= 0) {
+                            root.commit-field(row.id, self.checked ? "1" : "0");
+                        }
+                    }
+                }
+
+                // Everything else: label + optional bonus + editor / value.
+                if !row.is-check: HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 8px;
+                    // The label flexes and elides (like the egui keeper's
+                    // truncating label) so the editor on the right is never
+                    // pushed off the column edge.
+                    Text {
+                        text: row.label;
+                        horizontal-stretch: 1;
+                        min-width: 40px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    if row.bonus != "": Text {
+                        text: row.bonus;
+                        color: Theme.muted;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+
+                    if row.is-attacks: ComboBox {
+                        width: 96px;
+                        model: root.attacks-options;
+                        current-index: root.attacks-index;
+                        selected => { root.commit-attacks(self.current-index); }
+                    }
+
+                    if row.editable && !row.is-attacks: LineEdit {
+                        width: 96px;
+                        text: row.value;
+                        // Commit on Enter and on focus loss (clamp-on-blur),
+                        // like the egui keeper.
+                        accepted(t) => { root.commit-field(row.id, t); }
+                        changed has-focus => {
+                            if (!self.has-focus) {
+                                root.commit-field(row.id, self.text);
+                            }
+                        }
+                    }
+
+                    if !row.editable && !row.is-attacks: Text {
+                        width: 96px;
+                        text: row.value;
+                        font-weight: 700;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

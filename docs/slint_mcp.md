@@ -84,6 +84,13 @@ take_screenshot {"windowHandle": <win>}            → eyeball it
 - **The element tree stops at 200 elements by default** (`truncated: true`), so with a long list
   on screen later widgets (an open dialog, the last tabs) are missing. Pass `maxElements` (up to
   1000), or use `query_element_descendants` for targeted lookups.
+- **Even 1000 elements may not reach a dialog**: modal dialogs come last in the tree, so on a busy
+  tab (a long spell list) they fall off the end. Switch to a light tab first, or find the dialog's
+  buttons with `query_element_descendants` (`matchElementAccessibleRole: "Button"`, `findAll`).
+- **`set_element_value` doesn't focus the input.** To commit with Enter, click the input first,
+  then set its value, then `dispatch_key_event` `"\n"`.
+- **Clicks land on whatever is on top** at the element's centre — a floating browser window or a
+  modal backdrop swallows clicks meant for the editor beneath. Move / close the window first.
 - **`get_element_tree` / `take_screenshot` want the right handle kind.** The tree takes an
   `elementHandle`; the screenshot takes a `windowHandle`. Passing a window where an element is
   expected (or vice-versa) errors.

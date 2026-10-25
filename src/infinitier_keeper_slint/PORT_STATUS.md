@@ -6,11 +6,39 @@ resuming across sessions.
 
 ## User decisions (binding)
 - **Duplicate the pure logic** into this crate; do NOT extract a shared crate; do NOT touch
-  the egui keeper. (See `src/fields.rs`, `src/cre_fields.rs` — verbatim copies.)
+  the egui keeper. (See `src/components/editable_fields.rs`, `src/components/cre_fields.rs` —
+  verbatim copies.)
 - **Full port** of all four areas: core stat tabs, inventory & items, spells & feats,
   shell & save/load.
 - Verify with the **Slint MCP** (Wayland box — no X11 tools). See `../../docs/slint_mcp.md`.
 - Don't commit/push unless asked. Nothing committed yet.
+
+## Code layout (modularised 2026-10-25)
+Split like Slint's demo apps (gallery / energy-monitor / printerdemo) and like the egui keeper's
+`components/`, `ui/` and `ui/tabs/`. Each UI part owns its structs and an exported `*Adapter`
+global that the Rust side fills (`ui.global::<XAdapter>().set_*`) and handles (`on_*`); reusable
+widgets take properties in and send callbacks out. `ui/app.slint` only composes the parts and
+re-exports the adapters / structs for Rust.
+
+| `ui/` (Slint) | `src/` (Rust) | egui keeper |
+|---|---|---|
+| `app.slint` (window), `theme.slint` (colours beyond the Palette) | `main.rs`, `app.rs`, `state.rs` | `main.rs`, `app.rs`, `state.rs` |
+| `components/` — `ListFrame`/`SelectableRow`/`RowText`/`HeaderCell`, `ChipStrip`, `ModalFrame`, `FloatingWindow`, `FieldCardView` | `components/` — `editable_fields.rs`, `cre_fields.rs`, `field_card.rs` (row builders) | `components/` |
+| `shell/` — `ShellAdapter`, `HeaderBar`, `SaveTabStrip`, `PartyList`, `EmptyState`, `CharacterPanel` (+ `CharacterContent`) | `view/shell.rs`, `view/character.rs`, `callbacks/shell.rs`, `callbacks/character.rs` | `ui/header_panel.rs`, `ui/save_tab_strip.rs`, `ui/character_panel.rs`, `components/party_selector.rs` |
+| `tabs/` — one page per layout: `CardsTab` (8 stat tabs), `TableTab` (variables), `GridTab` (Effects, Journal), `AppearanceTab`, `InventoryTab`, `SpellsTab` | `tabs/` — one module per tab + the `CharacterTab` enum | `ui/tabs/` |
+| `browser/` — `BrowserWindow` (a `FloatingWindow`), `BrowserLayer` + `BrowsersAdapter` | `browser/`, `view/browsers.rs`, `callbacks/browsers.rs` | `ui/item_browser.rs`, `ui/spell_browser.rs` |
+| `dialogs/` — Settings, Load (+ `DeleteSaveDialog`), Save, `ConfirmDialog`, `LoadingOverlay` | `dialogs/`, `view/dialogs.rs`, `callbacks/dialogs.rs` | `ui/*_action.rs` |
+
+Each folder has a barrel file (`components.slint`, `shell.slint`, `tabs.slint`, `browser.slint`,
+`dialogs.slint`) re-exporting its parts. Gotchas found while splitting:
+- A global's callback can't be implemented in .slint ("Can't assign a local callback handler to
+  an alias to a global callback"), so the browser list's scroll is the one window-level API:
+  `AppWindow.browser-scroll-to(kind, row)` (Rust: `invoke_browser_scroll_to`).
+- A `PopupWindow` among a component's children is positioned relative to the component root,
+  not to the `@children` container it lands in (the browser's spellbook menu).
+- `ChipStrip` text must not elide: eliding lets the chips shrink instead of the strip scrolling.
+
+The DONE log below predates the restructure: its file paths and property names are historical.
 
 ## DONE (working + MCP-verified)
 - Crate scaffold, workspace member, build.rs, software-renderer+winit, `mcp` feature.
@@ -99,30 +127,27 @@ all ported, clippy+fmt clean, verified on classic BG (AD&D) and Icewind Dale 2 (
   Abilities (values + previews + layout), tab visibility (AD&D shows Memorization/Proficiencies,
   hides Levels/Feats), tab switching, Resistances (correct save values, both cards), title-clip fix.
 
-## Content modes in app.slint (pick per tab in `main::refresh`)
-- **cards** — `show_cards(ui, [Vec<FieldCard>;3])`: the 3-column card grid (label+value/input/
-  checkbox rows). Used by Abilities/Resistances/Characteristics/Miscellaneous.
-- **table** — `show_table(ui, Vec<VarRow>)`: a virtualised 2-column Name·Value `ListView`. Used by
-  Local/Global Variables.
-- **grid** — `show_grid(ui, &[&str] headers, &[f32] widths, Vec<GridRow>)`: a wide N-column
-  horizontally-scrollable read-only grid (`GridRow{cells:[string]}`). Used by Effects; reuse for
-  other read-only tables. Non-virtualised (fine for short lists). For per-row actions/editing add
-  another mode.
-- **placeholder** — `show_placeholder(ui, text)`: grey "not yet ported" text (or empty).
-All four modes are reset by `clear_content(ui)`; each `show_*` calls it first then sets its own.
+## Character pages (`CharacterAdapter.content`)
+`view/character.rs` picks the page per tab and fills its adapter:
+- **cards** — `CardsAdapter.column0..2` (`[FieldCard]`) + the Attacks dropdown. Abilities, Levels &
+  Kits, Characteristics, Feats, Memorization, Proficiencies, Resistances, Miscellaneous.
+- **table** — `TableAdapter.rows` (`[VarRow]`), a virtualised Name · Value list. Local / Global
+  Variables.
+- **grid** — `GridAdapter` headers / widths / rows (`GridRow{cells}`) / wrap: a wide read-only grid,
+  scrollable both ways, not virtualised. Effects, Journal Entries (wrapped).
+- **appearance**, **inventory**, **spells** — their own pages and adapters.
+- **none** — no character selected.
 
 ## Pattern for adding a stat tab (proven with Resistances)
-1. New `src/<tab>.rs` with `build(&Model) -> [Vec<FieldCard>;3]` and `commit(&mut Model, id, &str)`.
+1. New `src/tabs/<tab>.rs` with `build(&Model) -> [Vec<FieldCard>;3]` and `commit(&mut Model, id, &str)`.
 2. Give the tab its own field enum with `ALL` + `index()`/`from_index()` (ids are tab-local).
-3. Use `ui_model::{editable_row, card}`; duplicate any pure data-extraction from the egui `data.rs`.
-4. Register `mod` in main.rs; add match arms in `refresh()` and `on_commit_field`.
-5. Build with the shim, run headless, click the tab (find its Text handle in the element tree,
-   `click_element`), screenshot to verify. NOTE: the element tree truncates at 200 elements by
-   default — pass `maxElements` (up to 1000) to `get_element_tree`. Tabs scrolled off the right
-   edge of the strip (e.g. Miscellaneous, the last AD&D tab) may still not be clickable via MCP —
-   verify those by temporarily setting `load_model`'s `selected_tab`
-   default to that tab, screenshotting, then reverting. (Possible future polish: wrap the tab
-   strip to multiple rows so every tab is on-screen.)
+3. Use `components::field_card::{editable_row, card}`; duplicate any pure data-extraction from the
+   egui `data.rs`.
+4. Add it to `tabs/mod.rs` and `CharacterTab`; add match arms in `view/character.rs` and in
+   `callbacks/character.rs`'s commit dispatch.
+5. Build, run headless, click the tab, screenshot to verify (see `../../docs/slint_mcp.md` for
+   the driving gotchas). Tabs scrolled off the right edge of the strip need the strip scrolled
+   first: drag its `ScrollBar::thumb` (dragging a chip doesn't scroll).
 
 ## DONE: Item & Spell Browsers (`src/browser/`, `ui/browser.slint`) — egui parity (2026-10-25)
 - **Floating windows** (`BrowserWindow`): non-modal panels over the editor, dragged by the title
@@ -195,7 +220,7 @@ The egui keeper gained a settings-driven shell; ported here (logic duplicated, n
   `(Edited NNNN)`; the active tab follows the new folder.
 - **Load dialog** (`src/load_dialog.rs`): newest first with "Time Saved", screenshot + portrait
   preview, double-click to open, Delete with a confirmation dialog.
-- `main.rs` split: `view.rs` (UI push), `callbacks/{character,browsers,shell}.rs` (wiring).
+- `main.rs` split: `view` (UI push), `callbacks` (wiring) — since split per UI part, see Code layout.
 - **Gotcha**: list properties are only replaced when their rows change (`view::rows_changed`) —
   a new model rebuilds the rows and breaks double-click detection.
 
@@ -219,9 +244,12 @@ python3 scripts/slint_mcp_client.py call take_screenshot '{"windowHandle":{"gene
 Test games: Baldur's Gate (AD&D), Icewind Dale 2 (IWD2/d20), all under `/home/ufo/Temp/Games/`.
 
 ## Conventions established (follow for new tabs)
-- Add tab content as a `build(model) -> [Vec<FieldCard>;3]` (stat tabs) OR a new Slint component
-  + model for tables. Route through `refresh()` in main.rs (`match model.selected_tab`).
+- Stat tabs: `build(model) -> [Vec<FieldCard>;3]` shown by `CardsTab`. Anything else: a new page in
+  `ui/tabs/` with its own struct + `*Adapter`, a `CharacterContent` variant, and a `show_*` in
+  `view/character.rs`.
+- A new UI part: its `.slint` file owns its structs + adapter; export them through the folder's
+  barrel and re-export from `app.slint`; fill it in a `view/` module, handle it in a `callbacks/`
+  module. Keep `components/` free of adapters.
 - Boundary ids for editable fields = `EditableField::index()`. Read-only rows use id `-1`.
 - Rebuild the model on commit/selection (NOT on keystroke — would reset focused LineEdit).
 - Element handles go stale after any model rebuild — re-fetch the MCP tree after actions.
-- Known cosmetic polish: GroupBox titles clip ~6px on the left inside per-column ScrollViews.

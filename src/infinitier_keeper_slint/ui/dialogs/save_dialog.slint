@@ -1,0 +1,50 @@
+// The Save dialog: the edited save's new folder name.
+
+import { Button, LineEdit, Palette } from "std-widgets.slint";
+import { DialogTitle, ErrorText, ModalFrame } from "../components/components.slint";
+import { Theme } from "../theme.slint";
+
+export global SaveAdapter {
+    in property <bool> open;
+    // Pre-filled when the dialog opens; then the user's to edit.
+    in-out property <string> folder-name;
+    in property <string> error;
+    callback confirm(string /* folder name */);
+    callback cancel();
+}
+
+export component SaveDialog inherits ModalFrame {
+    panel-width: 520px;
+    panel-height: 240px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: "Save edited save game"; }
+        Text {
+            text: "Save the current save game (GAM, SAV, BMP, WMP) into a new sibling folder.";
+            color: Palette.foreground;
+            wrap: word-wrap;
+        }
+        Text { text: "Folder name:"; color: Theme.muted; }
+        LineEdit {
+            text <=> SaveAdapter.folder-name;
+            accepted(t) => { SaveAdapter.confirm(t); }
+        }
+        if SaveAdapter.error != "": ErrorText { text: SaveAdapter.error; }
+        Rectangle { vertical-stretch: 1; }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Button {
+                text: "Cancel";
+                clicked => { SaveAdapter.cancel(); }
+            }
+            Button {
+                text: "Save";
+                primary: true;
+                clicked => { SaveAdapter.confirm(SaveAdapter.folder-name); }
+            }
+        }
+    }
+}

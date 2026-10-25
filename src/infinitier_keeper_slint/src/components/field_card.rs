@@ -6,7 +6,7 @@ use slint::{ModelRc, SharedString, VecModel};
 use crate::{FieldCard, FieldRow};
 
 /// An editable text row. `id` is the tab-local field id routed back on
-/// commit (dispatched by the active tab in `main::refresh`).
+/// commit (dispatched to the active tab by `callbacks::character`).
 pub fn editable_row(id: i32, label: &str, value: &str) -> FieldRow {
     FieldRow {
         id,

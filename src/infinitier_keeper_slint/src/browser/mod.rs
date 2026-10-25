@@ -19,29 +19,10 @@ use infinitier_core::resource::Engine;
 use slint::{Image, ModelRc, SharedString, VecModel};
 
 use crate::state::Model;
-use crate::{BrowserRow, BrowserState, TypeFilter, icons};
-
-/// Which browser a UI callback is for (`0` items, `1` spells).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BrowserKind {
-    Items,
-    Spells,
-}
+use crate::{BrowserKind, BrowserRow, BrowserState, TypeFilter, icons};
 
 impl BrowserKind {
     pub const ALL: [BrowserKind; 2] = [BrowserKind::Items, BrowserKind::Spells];
-}
-
-impl TryFrom<i32> for BrowserKind {
-    type Error = i32;
-
-    fn try_from(kind: i32) -> Result<Self, i32> {
-        match kind {
-            0 => Ok(Self::Items),
-            1 => Ok(Self::Spells),
-            other => Err(other),
-        }
-    }
 }
 
 /// One browsable resource, with what's needed to list, filter and describe

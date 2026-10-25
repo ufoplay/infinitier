@@ -1,0 +1,35 @@
+// The frame of a modal dialog: a centred panel over a dimmed backdrop that
+// swallows clicks to what's behind, plus the dialogs' title and error text.
+
+import { Palette } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+
+// The dialog's children go inside the panel.
+export component ModalFrame inherits Rectangle {
+    in property <length> panel-width: 640px;
+    in property <length> panel-height: 480px;
+    background: Theme.backdrop;
+    TouchArea { }
+    Rectangle {
+        width: min(root.panel-width, root.width - 40px);
+        height: min(root.panel-height, root.height - 40px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        background: Palette.background;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: Palette.border;
+        @children
+    }
+}
+
+export component DialogTitle inherits Text {
+    font-size: 18px;
+    font-weight: 700;
+    color: Palette.foreground;
+}
+
+export component ErrorText inherits Text {
+    color: Theme.error;
+    wrap: word-wrap;
+}

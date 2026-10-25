@@ -1,0 +1,137 @@
+// The Settings dialog: the configured games (select + close, or
+// double-click, to load one) and a form to add a game.
+
+import { Button, ComboBox, LineEdit, ListView, Palette } from "std-widgets.slint";
+import { DialogTitle, ErrorText, HeaderCell, ListFrame, ModalFrame, RowText, SelectableRow } from "../components/components.slint";
+import { Theme } from "../theme.slint";
+
+// One row of the games list.
+export struct GameRowUi {
+    type-label: string,
+    game-path: string,
+    save-path: string,
+}
+
+export global SettingsAdapter {
+    in property <bool> open;
+    in property <[GameRowUi]> rows;
+    in property <int> selected: -1;
+    // The settings file couldn't be read / written.
+    in property <string> file-error;
+    // The add form's or the last game load's error.
+    in property <string> error;
+    // The add form's game-type choices ("Autodetect", then each game).
+    in property <[string]> game-types;
+    in-out property <string> form-game-path;
+    in-out property <string> form-save-path;
+    in-out property <int> form-game-type: 0;
+    callback select(int /* row */);
+    callback pick(int /* row, double-clicked */);
+    callback remove();
+    callback add(string /* game path */, string /* save path */, int /* game type */);
+    callback close();
+}
+
+export component SettingsDialog inherits ModalFrame {
+    panel-width: 760px;
+    panel-height: 620px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        DialogTitle { text: "Settings"; }
+        if SettingsAdapter.file-error != "": ErrorText { text: SettingsAdapter.file-error; }
+
+        HeaderCell { text: "Games"; }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 8px;
+            HeaderCell { text: "Game type"; width: 200px; }
+            HeaderCell { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
+            HeaderCell { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            min-height: 120px;
+            if SettingsAdapter.rows.length == 0: Text {
+                text: "No games configured yet — add one below.";
+                color: Theme.muted;
+            }
+            ListView {
+                for row[i] in SettingsAdapter.rows: SelectableRow {
+                    index: i;
+                    selected: i == SettingsAdapter.selected;
+                    clicked => { SettingsAdapter.select(i); }
+                    double-clicked => { SettingsAdapter.pick(i); }
+                    RowText { text: row.type-label; width: 200px; selected: i == SettingsAdapter.selected; }
+                    RowText { text: row.game-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == SettingsAdapter.selected; }
+                    RowText { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == SettingsAdapter.selected; }
+                }
+            }
+            ListFrame { }
+        }
+        HorizontalLayout {
+            alignment: start;
+            spacing: 8px;
+            Button {
+                text: "Remove";
+                enabled: SettingsAdapter.selected >= 0;
+                clicked => { SettingsAdapter.remove(); }
+            }
+            Text {
+                text: "Select a game and close this dialog to load it.";
+                color: Theme.muted;
+                vertical-alignment: center;
+            }
+        }
+
+        HeaderCell { text: "Add a game"; }
+        GridLayout {
+            spacing: 8px;
+            Row {
+                Text { text: "Game path"; width: 130px; vertical-alignment: center; color: Palette.foreground; }
+                LineEdit {
+                    text <=> SettingsAdapter.form-game-path;
+                    placeholder-text: "Folder containing CHITIN.KEY";
+                }
+            }
+            Row {
+                Text { text: "Savegame path"; vertical-alignment: center; color: Palette.foreground; }
+                LineEdit {
+                    text <=> SettingsAdapter.form-save-path;
+                    placeholder-text: "Optional — folder containing save/, if outside the game folder";
+                }
+            }
+            Row {
+                Text { text: "Game type"; vertical-alignment: center; color: Palette.foreground; }
+                ComboBox {
+                    model: SettingsAdapter.game-types;
+                    current-index <=> SettingsAdapter.form-game-type;
+                }
+            }
+            Row {
+                Rectangle { }
+                HorizontalLayout {
+                    alignment: start;
+                    Button {
+                        text: "Add";
+                        clicked => {
+                            SettingsAdapter.add(SettingsAdapter.form-game-path, SettingsAdapter.form-save-path, SettingsAdapter.form-game-type);
+                        }
+                    }
+                }
+            }
+        }
+        if SettingsAdapter.error != "": ErrorText { text: SettingsAdapter.error; }
+
+        HorizontalLayout {
+            alignment: end;
+            Button {
+                text: "Close";
+                primary: true;
+                clicked => { SettingsAdapter.close(); }
+            }
+        }
+    }
+}

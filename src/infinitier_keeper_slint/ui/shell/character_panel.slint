@@ -1,0 +1,40 @@
+// The selected character: the tab strip and the active tab's page.
+
+import { VerticalBox } from "std-widgets.slint";
+import { ChipStrip } from "../components/components.slint";
+import { AppearanceTab, CardsTab, GridTab, InventoryTab, SpellsTab, TableTab } from "../tabs/tabs.slint";
+import { Theme } from "../theme.slint";
+
+// Which page shows the active tab (see tabs/tabs.slint).
+export enum CharacterContent { none, cards, table, grid, appearance, inventory, spells }
+
+export global CharacterAdapter {
+    in property <bool> has-character;
+    // The tabs shown for the loaded game.
+    in property <[string]> tab-names;
+    in-out property <int> selected-tab;
+    in property <CharacterContent> content;
+    callback select-tab(int);
+}
+
+export component CharacterPanel inherits VerticalBox {
+    spacing: 8px;
+    ChipStrip {
+        labels: CharacterAdapter.tab-names;
+        current: CharacterAdapter.selected-tab;
+        select(i) => {
+            CharacterAdapter.selected-tab = i;
+            CharacterAdapter.select-tab(i);
+        }
+    }
+    if !CharacterAdapter.has-character: Text {
+        text: "No character selected.";
+        color: Theme.muted;
+    }
+    if CharacterAdapter.content == CharacterContent.cards: CardsTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.table: TableTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.grid: GridTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.appearance: AppearanceTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.inventory: InventoryTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.spells: SpellsTab { vertical-stretch: 1; }
+}

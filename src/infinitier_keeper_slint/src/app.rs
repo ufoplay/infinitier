@@ -22,10 +22,10 @@ use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::AppWindow;
 use crate::browser::Browsers;
-use crate::load_dialog::LoadDialog;
-use crate::save_dialog::SaveDialog;
+use crate::dialogs::load_dialog::LoadDialog;
+use crate::dialogs::save_dialog::SaveDialog;
+use crate::dialogs::settings_dialog::SettingsDialog;
 use crate::settings::GameConfig;
-use crate::settings_dialog::SettingsDialog;
 use crate::state::{LoadedGame, Model};
 use crate::view;
 

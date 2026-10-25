@@ -1,0 +1,82 @@
+// The Spells tab: a strip of spellbooks (AD&D Innate / Wizard / Cleric, or
+// IWD2's per-class books) and the selected book's spells — Level,
+// Memorized (editable), Spell, Resource, Delete. Double-clicking a row
+// reveals its spell in the Spell Browser.
+
+import { Button, LineEdit, ListView, VerticalBox } from "std-widgets.slint";
+import { ChipStrip, HeaderCell } from "../components/components.slint";
+import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
+
+// One spell. `ref-id` is the display-order row, routed back on memorize /
+// delete.
+export struct SpellRowUi {
+    ref-id: int,
+    level: string,
+    memorized: string,
+    name: string,
+    resref: string,
+}
+
+export global SpellsAdapter {
+    // The spellbooks, with their spell counts.
+    in property <[string]> books;
+    in property <int> book;
+    in property <[SpellRowUi]> rows;
+    callback select-book(int);
+    callback memorize(int /* ref-id */, string /* value */);
+    callback delete(int /* ref-id */);
+}
+
+export component SpellsTab inherits VerticalBox {
+    ChipStrip {
+        labels: SpellsAdapter.books;
+        current: SpellsAdapter.book;
+        select(i) => { SpellsAdapter.select-book(i); }
+    }
+    HorizontalLayout {
+        padding-left: 6px;
+        spacing: 8px;
+        HeaderCell { text: "Level"; width: 60px; }
+        HeaderCell { text: "Memorized"; width: 90px; }
+        HeaderCell { text: "Spell"; horizontal-stretch: 1; }
+        HeaderCell { text: "Resource"; width: 96px; }
+        Rectangle { width: 72px; }
+    }
+    ListView {
+        vertical-stretch: 1;
+        for row in SpellsAdapter.rows: Rectangle {
+            // Behind the row's inputs.
+            TouchArea {
+                double-clicked => {
+                    BrowsersAdapter.front = BrowserKind.spells;
+                    BrowsersAdapter.reveal(BrowserKind.spells, row.resref);
+                }
+            }
+            HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                padding-top: 3px;
+                padding-bottom: 3px;
+                spacing: 8px;
+                Text { text: row.level; width: 60px; vertical-alignment: center; }
+                LineEdit {
+                    width: 90px;
+                    text: row.memorized;
+                    accepted(t) => { SpellsAdapter.memorize(row.ref-id, t); }
+                    changed has-focus => {
+                        if (!self.has-focus) {
+                            SpellsAdapter.memorize(row.ref-id, self.text);
+                        }
+                    }
+                }
+                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                Button {
+                    width: 72px;
+                    text: "Delete";
+                    clicked => { SpellsAdapter.delete(row.ref-id); }
+                }
+            }
+        }
+    }
+}

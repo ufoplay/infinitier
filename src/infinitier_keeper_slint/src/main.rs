@@ -3,38 +3,24 @@
 //! Reuses the whole data layer from `infinitier_core` (game-data indexing,
 //! save discovery, GAM/CRE parse + export, engine caps) and reimplements the
 //! *view* in vanilla Slint instead of egui. The editable-field logic is
-//! duplicated from the egui keeper (see [`fields`] / [`cre_fields`]) per the
-//! port decision to keep the two keepers independent.
+//! duplicated from the egui keeper (see [`components`]) per the port
+//! decision to keep the two keepers independent. The modules mirror the
+//! Slint UI in `ui/`: [`tabs`] and [`dialogs`] hold each page's state and
+//! logic, [`view`] pushes the state into the pages' adapter globals and
+//! [`callbacks`] handles their callbacks.
 //!
 //! The keeper starts with no game loaded: it loads the settings file's
 //! active game, and the Settings dialog adds games and picks another.
 
-mod abilities;
 mod app;
-mod appearance;
 mod browser;
 mod callbacks;
-mod characteristics;
-mod cre_fields;
-mod effects;
-mod feats;
-mod fields;
+mod components;
+mod dialogs;
 mod icons;
-mod inventory;
-mod journal;
-mod levels;
-mod load_dialog;
-mod memorization;
-mod miscellaneous;
-mod proficiencies;
-mod resistances;
-mod save_dialog;
 mod settings;
-mod settings_dialog;
-mod spells;
 mod state;
-mod ui_model;
-mod variables;
+mod tabs;
 mod view;
 
 use std::cell::RefCell;
@@ -42,12 +28,12 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use clap::Parser;
-use slint::{ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::App;
-use crate::fields::AttacksOption;
+use crate::components::editable_fields::AttacksOption;
+use crate::dialogs::settings_dialog::{self, SettingsDialog};
 use crate::settings::SETTINGS_FILE;
-use crate::settings_dialog::SettingsDialog;
 
 slint::include_modules!();
 
@@ -76,12 +62,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Static dropdown options.
     let attacks_labels: Vec<SharedString> =
         AttacksOption::ALL.iter().map(|o| o.label.into()).collect();
-    ui.set_attacks_options(ModelRc::new(VecModel::from(attacks_labels)));
+    ui.global::<CardsAdapter>()
+        .set_attacks_options(ModelRc::new(VecModel::from(attacks_labels)));
     let game_types: Vec<SharedString> = settings_dialog::game_type_options()
         .into_iter()
         .map(Into::into)
         .collect();
-    ui.set_settings_game_types(ModelRc::new(VecModel::from(game_types)));
+    ui.global::<SettingsAdapter>()
+        .set_game_types(ModelRc::new(VecModel::from(game_types)));
 
     callbacks::wire(&ui, &app);
     match startup_game {

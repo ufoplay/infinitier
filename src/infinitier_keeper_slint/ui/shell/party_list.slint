@@ -1,0 +1,55 @@
+// The left rail: the active save's party, portrait and name each.
+
+import { ListView, Palette, VerticalBox } from "std-widgets.slint";
+
+export struct PartyMember {
+    name: string,
+    portrait: image,
+}
+
+export global PartyAdapter {
+    in property <[PartyMember]> members;
+    in-out property <int> selected;
+    callback select(int);
+}
+
+export component PartyList inherits VerticalBox {
+    width: 220px;
+    spacing: 8px;
+    Text {
+        text: "Party";
+        font-size: 16px;
+        font-weight: 700;
+    }
+    ListView {
+        vertical-stretch: 1;
+        for member[i] in PartyAdapter.members: Rectangle {
+            height: 44px;
+            background: i == PartyAdapter.selected ? Palette.accent-background : transparent;
+            TouchArea {
+                clicked => {
+                    PartyAdapter.selected = i;
+                    PartyAdapter.select(i);
+                }
+            }
+            HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                spacing: 8px;
+                Image {
+                    width: 30px;
+                    height: 38px;
+                    source: member.portrait;
+                    image-fit: contain;
+                }
+                Text {
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    text: member.name;
+                    color: i == PartyAdapter.selected ? Palette.accent-foreground : Palette.foreground;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

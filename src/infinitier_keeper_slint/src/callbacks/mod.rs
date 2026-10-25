@@ -1,8 +1,10 @@
-//! Wiring of the Slint UI's callbacks to the keeper's state. Every callback
-//! mutates the shared [`App`] and then repaints the whole UI from it.
+//! Wiring of the Slint pages' adapter callbacks to the keeper's state, one
+//! module per part of the UI in `ui/`. Every callback mutates the shared
+//! [`App`] and then repaints the whole UI from it.
 
 mod browsers;
 mod character;
+mod dialogs;
 mod shell;
 
 use std::cell::RefCell;
@@ -18,9 +20,10 @@ type AppRc = Rc<RefCell<App>>;
 
 /// Connect every UI callback to `app`.
 pub fn wire(ui: &AppWindow, app: &AppRc) {
+    shell::wire(ui, app);
+    dialogs::wire(ui, app);
     character::wire(ui, app);
     browsers::wire(ui, app);
-    shell::wire(ui, app);
 }
 
 /// Run `edit` on the open saves' model, if any, then repaint.
