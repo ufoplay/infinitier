@@ -74,14 +74,14 @@ resuming across sessions.
   `InvRow`): BAM-decoded icons (Slint `Image`), position, editable quantity triple, TLK item name,
   resref, Delete, and row selection (`Model::inventory_selected`, the Item Browser target).
   Callbacks `inv-select`/`inv-quantity`/`inv-delete`. Verified on classic BG (icons + names +
-  quantities + delete). NOTE: the Item Browser "add item" flow is NOT ported.
+  quantities + delete). Double-clicking a filled slot reveals its item in the Item Browser.
 - `src/spells.rs` — Spells (EDITABLE). Dedicated mode (`show-spells`/`spell-tabs`/`spell-tab`/
   `spell-rows`/`SpellRowUi`): inner tab strip (AD&D Innate/Wizard/Cleric or IWD2 per-class,
   with counts), rows Level/Memorized(editable)/Spell(TLK name)/Resource/Delete, sorted (level,
   name). Per-row `SpellRef` stashed on `Model::spell_refs` (id = display row index). `refresh`
   takes `&mut Model` so Spells can record refs. Callbacks `spell-select-tab`/`spell-memorize`/
   `spell-delete`. Verified on classic BG (Dynaheir: Innate(1)/Wizard(39), Slow Poison SPIN102).
-  NOTE: the Spell Browser "add spell" flow is NOT ported.
+  Double-clicking a row reveals its spell in the Spell Browser.
 
 ## ALL 15 CHARACTER TABS DONE ✅
 Abilities, Levels & Kits, Characteristics, Appearance, Inventory, Spells, Feats, Memorization,
@@ -117,26 +117,42 @@ All four modes are reset by `clear_content(ui)`; each `show_*` calls it first th
 3. Use `ui_model::{editable_row, card}`; duplicate any pure data-extraction from the egui `data.rs`.
 4. Register `mod` in main.rs; add match arms in `refresh()` and `on_commit_field`.
 5. Build with the shim, run headless, click the tab (find its Text handle in the element tree,
-   `click_element`), screenshot to verify. NOTE: the element tree truncates at 200 elements, so
-   tabs off the right edge of the scrollable strip (e.g. Miscellaneous, the last AD&D tab) aren't
-   found/clickable via MCP — verify those by temporarily setting `load_model`'s `selected_tab`
+   `click_element`), screenshot to verify. NOTE: the element tree truncates at 200 elements by
+   default — pass `maxElements` (up to 1000) to `get_element_tree`. Tabs scrolled off the right
+   edge of the strip (e.g. Miscellaneous, the last AD&D tab) may still not be clickable via MCP —
+   verify those by temporarily setting `load_model`'s `selected_tab`
    default to that tab, screenshotting, then reverting. (Possible future polish: wrap the tab
    strip to multiple rows so every tab is on-screen.)
 
-## DONE: Item & Spell Browsers (`src/browser.rs`)
-Both browsers are ported as modal overlays (`BrowserOverlay` in app.slint, sized to the window;
-`show-*`/`*-browser-rows`/`*-add-enabled`/`*-add-label` props, header **Items**/**Spells** buttons).
-Search filters name/type/resref; the list shows Type/Name/Resource (TLK names), sorted by type then
-name; selecting + Add writes through:
-- **Item Browser**: `add_item` = the egui `assign_to_inventory` (verbatim) into
-  `Model::inventory_selected` (`set_inventory_slot_item` + `Itm::max_charges`).
-- **Spell Browser**: `add_spell` = AD&D path (`add_known_spell`, book/level from the SPL header).
-  Indexes built lazily on first open (`get_all_resources_by_type(Itm/Spl)`), cached on `Model`.
-MCP-verified: both overlays render correctly with populated, sorted, TLK-named lists and correct
-add-enabled logic. (The full click-through add couldn't be MCP-driven — element tree truncates at
-200 so browser/inventory rows fall off — but `add_item`/`add_spell` are verbatim-proven glue.)
-NOTE not ported: IWD2 spell-add (list-2DA index path), Inventory/Spells double-click → reveal in
-browser, and item/spell icon+description detail panels.
+## DONE: Item & Spell Browsers (`src/browser/`, `ui/browser.slint`) — egui parity (2026-10-25)
+- **Floating windows** (`BrowserWindow`): non-modal panels over the editor, dragged by the title
+  bar, resized from the bottom-right grip, closed by ×; any interaction raises a window over the
+  other one. Header **Items**/**Spells** toggle them and need only a loaded game.
+- **State** (`browser::Browsers` on `App`, reset on a game switch): one `Browser` per kind — the
+  lazily built index, free text, hidden types (excluded set, like egui), selection + its resolved
+  icon/description, and a pending scroll. Survives opening/closing saves.
+- **Index** (`browser/items.rs`, `browser/spells.rs`, duplicated from the egui browsers): items
+  Type/Name/Resource sorted by type+name; spells Type/Lvl/Name/Resource/Script Name (egui type
+  names incl. "Cleric", `SPELL.IDS` script names) sorted by type+level+name. Text matches type,
+  name, resref and script name.
+- **Filters**: count ("Items: N"), search, "Types" master checkbox + one per type.
+- **Detail**: selected entry's BAM icon (`icons::bam_icon`) + TLK description ("(no
+  description)" / "Select an item to see its description.").
+- **Add**: button or row double-click. Items go into the Inventory tab's selected slot (needs the
+  Inventory tab, an embedded CRE and a slot), labelled "Add to {name} inventory". AD&D spells use
+  the SPL header's book/level; IWD2 spells open a `PopupWindow` menu of
+  `ImportedSpl::iwd2_placements` ("{book} — Lvl {level}", cached per selection), at the button or
+  at the double-click.
+- **Reveal**: double-click a filled inventory slot / a Spells-tab row → open the browser, select
+  the (lower-cased) resref, clear the text, re-show its type, scroll to it.
+- **Keys**: Up/Down move the selection while the list has focus (the list follows).
+- Callbacks carry the kind (`browser-*(0|1, …)`); `view::refresh_browsers` pushes
+  `BrowserState` + rows/types (replaced only when changed) and calls `*-browser-scroll-to`.
+- `inv-select` only repaints the browsers (the Slint side highlights `inv-selected` itself), so
+  the slot rows survive the first click and the double-click registers.
+- MCP-verified on BG2 (search, types, arrows, detail, add item/spell by double-click and button,
+  reveal from Inventory/Spells, drag/resize/raise, dark theme) and IWD2 (spellbook menu from the
+  button and from a double-click, Paladin add, reveal of an upper-case resref).
 
 ## DONE: multi-save shell + portraits
 - **Multi-save** (`state.rs`): the "park" design — `Model` keeps the active save's fields flat
@@ -174,7 +190,7 @@ The egui keeper gained a settings-driven shell; ported here (logic duplicated, n
 - **Dark/Light** toggle: `dark-theme` → `Palette.color-scheme`; hard-coded colours in app.slint
   replaced by Palette brushes.
 - **Empty states** "No game loaded" / "No save loaded"; header buttons gated (Load needs a game;
-  Save/Items/Spells need a save); the last save tab can be closed.
+  Save needs a save, Items/Spells a game); the last save tab can be closed.
 - **Save dialog** (`src/save_dialog.rs`): editable name pre-filled with the next free
   `(Edited NNNN)`; the active tab follows the new folder.
 - **Load dialog** (`src/load_dialog.rs`): newest first with "Time Saved", screenshot + portrait
@@ -184,9 +200,7 @@ The egui keeper gained a settings-driven shell; ported here (logic duplicated, n
   a new model rebuilds the rows and breaks double-click detection.
 
 ## Still missing vs the egui keeper
-IWD2 spell-add (list-2DA path), double-click reveal-in-browser, browser icon/description detail
-panels + type filter checkboxes, Items/Spells browsers without an open save, a wrapping character
-tab strip, and the 3 Slint 1.18 `viewport-height` → `content-height` deprecations in app.slint.
+A wrapping character tab strip. (The Slint 1.18 `viewport-*` → `content-*` deprecations are done.)
 
 ## How to build/run/verify
 Build needs `libfontconfig1-dev`; on THIS box use the pkg-config shim:

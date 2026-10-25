@@ -79,6 +79,13 @@ component SelectableRow inherits Rectangle {
     }
 }
 
+// A list's border, placed after the list so the striped rows don't paint
+// over it.
+component ListFrame inherits Rectangle {
+    border-width: 1px;
+    border-color: Palette.border;
+}
+
 component RowText inherits Text {
     in property <bool> selected;
     color: root.selected ? Palette.accent-foreground : Palette.foreground;
@@ -123,8 +130,6 @@ export component SettingsDialog inherits ModalFrame {
         Rectangle {
             vertical-stretch: 1;
             min-height: 120px;
-            border-width: 1px;
-            border-color: Palette.border;
             if root.rows.length == 0: Text {
                 text: "No games configured yet — add one below.";
                 color: gray;
@@ -140,6 +145,7 @@ export component SettingsDialog inherits ModalFrame {
                     RowText { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == root.selected; }
                 }
             }
+            ListFrame { }
         }
         HorizontalLayout {
             alignment: start;
@@ -239,8 +245,6 @@ export component LoadDialog inherits ModalFrame {
                 }
                 Rectangle {
                     vertical-stretch: 1;
-                    border-width: 1px;
-                    border-color: Palette.border;
                     if root.rows.length == 0: Text {
                         text: "No saved games found.";
                         color: gray;
@@ -255,6 +259,7 @@ export component LoadDialog inherits ModalFrame {
                             RowText { text: row.time; horizontal-stretch: 1; selected: i == root.selected; }
                         }
                     }
+                    ListFrame { }
                 }
             }
             VerticalLayout {

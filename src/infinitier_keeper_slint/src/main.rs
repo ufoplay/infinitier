@@ -19,6 +19,7 @@ mod cre_fields;
 mod effects;
 mod feats;
 mod fields;
+mod icons;
 mod inventory;
 mod journal;
 mod levels;

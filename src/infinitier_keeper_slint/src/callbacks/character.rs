@@ -5,6 +5,7 @@ use slint::ComponentHandle;
 
 use super::{AppRc, on_model};
 use crate::state::{self, CharacterTab};
+use crate::view;
 use crate::{
     AppWindow, abilities, feats, inventory, levels, memorization, proficiencies, resistances,
     spells,
@@ -75,7 +76,14 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
         let (app, weak) = (app.clone(), ui.as_weak());
         ui.on_inv_select(move |slot| {
             let Some(ui) = weak.upgrade() else { return };
-            on_model(&ui, &app, |m| inventory::select(m, slot));
+            // The UI already highlights the slot; only the Item Browser's add
+            // target changes. Not rebuilding the rows keeps the slot's
+            // double-click (reveal in the browser) registering.
+            let mut app = app.borrow_mut();
+            if let Some(model) = app.model_mut() {
+                inventory::select(model, slot);
+            }
+            view::refresh_browsers(&ui, &mut app);
         });
     }
     {

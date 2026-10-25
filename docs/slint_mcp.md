@@ -81,6 +81,9 @@ take_screenshot {"windowHandle": <win>}            → eyeball it
 - **Element handles go stale after a model rebuild.** Any Rust-side `set_ability_fields(...)` (i.e.
   our `refresh`) swaps the `VecModel`, which invalidates every handle under it. Re-fetch the tree
   after any action that triggers a refresh — selecting a party member, committing a field.
+- **The element tree stops at 200 elements by default** (`truncated: true`), so with a long list
+  on screen later widgets (an open dialog, the last tabs) are missing. Pass `maxElements` (up to
+  1000), or use `query_element_descendants` for targeted lookups.
 - **`get_element_tree` / `take_screenshot` want the right handle kind.** The tree takes an
   `elementHandle`; the screenshot takes a `windowHandle`. Passing a window where an element is
   expected (or vice-versa) errors.

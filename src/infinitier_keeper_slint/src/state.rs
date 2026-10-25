@@ -36,15 +36,6 @@ pub enum SpellRefKey {
 /// non-empty category on the next build.
 pub const SPELL_TAB_AUTO: usize = usize::MAX;
 
-/// One entry in the Item/Spell Browser index: a game resource the browser can
-/// add to the selected creature.
-pub struct BrowserEntry {
-    pub resref: String,
-    pub name: String,
-    /// Item type ("Sword") or, for spells, the spell-type label.
-    pub category: String,
-}
-
 /// Identifier for the active per-character tab. Order matches the
 /// EEKeeper tab strip. Duplicated from the egui keeper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -171,17 +162,6 @@ pub struct Model {
     /// Spells tab: the SpellRef for each displayed row, in display order —
     /// rebuilt each Spells refresh; indexed by the row id on delete/memorise.
     pub spell_refs: Vec<SpellRefKey>,
-    /// Item Browser overlay: open flag, lazy-built item index, search query,
-    /// and selected item resref.
-    pub item_browser_open: bool,
-    pub item_index: Vec<BrowserEntry>,
-    pub item_query: String,
-    pub item_selected: Option<String>,
-    /// Spell Browser overlay: same shape as the item browser.
-    pub spell_browser_open: bool,
-    pub spell_index: Vec<BrowserEntry>,
-    pub spell_query: String,
-    pub spell_selected: Option<String>,
     /// Other open saves, "parked" while inactive. `parked[active_tab]` is
     /// always `None` — that save is the one hydrated into the flat active
     /// fields above; every other slot holds `Some`. This keeps all the tab
@@ -217,14 +197,6 @@ impl Model {
             inventory_selected: None,
             spell_tab: SPELL_TAB_AUTO,
             spell_refs: Vec::new(),
-            item_browser_open: false,
-            item_index: Vec::new(),
-            item_query: String::new(),
-            item_selected: None,
-            spell_browser_open: false,
-            spell_index: Vec::new(),
-            spell_query: String::new(),
-            spell_selected: None,
             parked: vec![None],
             active_tab: 0,
         }

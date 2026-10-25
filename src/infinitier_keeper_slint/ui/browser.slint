@@ -1,0 +1,383 @@
+// The floating Item / Spell Browser window: a panel over the editor (not
+// modal) that's dragged by its title bar and resized from its bottom-right
+// corner. It lists every item or spell of the game with a free-text and
+// per-type filter, and shows the selected entry's icon + description above
+// an Add button. Colours come from the std-widgets Palette.
+
+import { Button, CheckBox, LineEdit, ListView, Palette, ScrollView } from "std-widgets.slint";
+
+// One row of the browser list. `level` / `script` are empty for items.
+export struct BrowserRow {
+    resref: string,
+    name: string,
+    category: string,
+    level: string,
+    script: string,
+}
+
+// One type-filter checkbox.
+export struct TypeFilter {
+    name: string,
+    shown: bool,
+}
+
+// The rest of what a browser window shows.
+export struct BrowserState {
+    open: bool,
+    // "Items: N" / "Spells: N" (the filtered count).
+    count: string,
+    // The selected entry's list row, -1 when it's filtered out / none.
+    selected-row: int,
+    has-selection: bool,
+    icon: image,
+    description: string,
+    add-enabled: bool,
+    add-label: string,
+    // IWD2 spells: Add opens a menu of the spellbooks (`placements`) the
+    // spell can go into.
+    book-menu: bool,
+    placements: [string],
+}
+
+global BrowserStyle {
+    out property <length> row-height: 24px;
+    out property <length> title-height: 28px;
+    out property <length> filter-width: 220px;
+    out property <length> icon-side: 64px;
+    out property <length> min-width: 660px;
+    out property <length> min-height: 400px;
+}
+
+component HeaderCell inherits Text {
+    font-weight: 700;
+    color: Palette.foreground;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+component RowText inherits Text {
+    in property <bool> selected;
+    color: root.selected ? Palette.accent-foreground : Palette.foreground;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+export component BrowserWindow inherits Rectangle {
+    in property <string> title;
+    // Spells add the Lvl and Script Name columns.
+    in property <bool> spell-columns;
+    in property <string> search-hint;
+    in property <string> select-hint;
+    in property <BrowserState> state;
+    in property <[BrowserRow]> rows;
+    in property <[TypeFilter]> types;
+    in-out property <string> text;
+    in-out property <bool> all-types: true;
+    // The area the window is kept inside while dragged / resized.
+    in property <length> area-width;
+    in property <length> area-height;
+    callback raise();
+    callback close();
+    callback search(string);
+    callback select(string /* resref */);
+    callback step(int /* -1 up, 1 down */);
+    callback add(int /* placement, -1 for a plain add */);
+    callback set-all-types(bool);
+    callback set-type(string, bool);
+
+    // Scroll the list so `row` is in view, centring it when it was off-screen.
+    public function scroll-to(row: int) {
+        if (row * BrowserStyle.row-height < -list.content-y || (row + 1) * BrowserStyle.row-height > -list.content-y + list.visible-height) {
+            list.content-y = max(min(0px, list.visible-height - root.rows.length * BrowserStyle.row-height), min(0px, list.visible-height / 2 - (row + 0.5) * BrowserStyle.row-height));
+        }
+    }
+
+    // Add the selected entry — through the spellbook menu, opened at
+    // (`x`, `y`), when there's a book to pick.
+    function request-add(x: length, y: length) {
+        if (!root.state.add-enabled) {
+            return;
+        }
+        if (root.state.book-menu) {
+            root.menu-x = x;
+            root.menu-y = y;
+            book-menu.show();
+        } else {
+            root.add(-1);
+        }
+    }
+
+    property <length> menu-x;
+    property <length> menu-y;
+
+    visible: root.state.open;
+    background: Palette.background;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Palette.border;
+    drop-shadow-blur: 12px;
+    drop-shadow-color: #00000050;
+
+    // Clicks on the panel's empty areas stay on it (and bring it forward).
+    TouchArea {
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                root.raise();
+            }
+        }
+    }
+
+    VerticalLayout {
+        // Title bar: drag to move, × to close.
+        Rectangle {
+            height: BrowserStyle.title-height;
+            background: Palette.alternate-background;
+            border-top-left-radius: root.border-radius;
+            border-top-right-radius: root.border-radius;
+            TouchArea {
+                mouse-cursor: move;
+                pointer-event(event) => {
+                    if (event.kind == PointerEventKind.down) {
+                        root.raise();
+                    }
+                }
+                moved => {
+                    root.x = max(0px, min(root.area-width - root.width, root.x + self.mouse-x - self.pressed-x));
+                    root.y = max(0px, min(root.area-height - root.height, root.y + self.mouse-y - self.pressed-y));
+                }
+            }
+            HorizontalLayout {
+                padding-left: 10px;
+                Text {
+                    text: root.title;
+                    font-weight: 700;
+                    color: Palette.foreground;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Rectangle {
+                    width: BrowserStyle.title-height;
+                    background: close-area.has-hover ? Palette.border : transparent;
+                    border-top-right-radius: root.border-radius;
+                    accessible-role: button;
+                    accessible-label: "Close " + root.title;
+                    accessible-action-default => { root.close(); }
+                    Text {
+                        text: "×";
+                        font-size: 16px;
+                        color: Palette.foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    close-area := TouchArea {
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+
+        // The list, and the filters on its right.
+        HorizontalLayout {
+            vertical-stretch: 1;
+            padding: 8px;
+            spacing: 8px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 4px;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 8px;
+                    HeaderCell { text: "Type"; width: 96px; }
+                    if root.spell-columns: HeaderCell { text: "Lvl"; width: 30px; }
+                    HeaderCell { text: "Name"; horizontal-stretch: 2; preferred-width: 0px; }
+                    HeaderCell { text: "Resource"; width: 86px; }
+                    if root.spell-columns: HeaderCell { text: "Script Name"; horizontal-stretch: 1; preferred-width: 0px; }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                    // Up / Down move the selection while the list has focus.
+                    keys := FocusScope {
+                        key-pressed(event) => {
+                            if (event.text == Key.UpArrow) {
+                                root.step(-1);
+                                return accept;
+                            }
+                            if (event.text == Key.DownArrow) {
+                                root.step(1);
+                                return accept;
+                            }
+                            return reject;
+                        }
+                        list := ListView {
+                            for row[i] in root.rows: Rectangle {
+                                height: BrowserStyle.row-height;
+                                background: i == root.state.selected-row ? Palette.accent-background : (Math.mod(i, 2) == 1 ? Palette.alternate-background : transparent);
+                                TouchArea {
+                                    clicked => {
+                                        root.raise();
+                                        keys.focus();
+                                        root.select(row.resref);
+                                    }
+                                    double-clicked => {
+                                        root.request-add(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
+                                    }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+                                    RowText { text: row.category; width: 96px; selected: i == root.state.selected-row; }
+                                    if root.spell-columns: RowText { text: row.level; width: 30px; selected: i == root.state.selected-row; }
+                                    RowText { text: row.name; horizontal-stretch: 2; preferred-width: 0px; selected: i == root.state.selected-row; }
+                                    RowText { text: row.resref; width: 86px; selected: i == root.state.selected-row; }
+                                    if root.spell-columns: RowText { text: row.script; horizontal-stretch: 1; preferred-width: 0px; selected: i == root.state.selected-row; }
+                                }
+                            }
+                        }
+                    }
+                    // The frame, drawn over the striped rows.
+                    Rectangle {
+                        border-width: 1px;
+                        border-color: Palette.border;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                width: BrowserStyle.filter-width;
+                spacing: 6px;
+                Text { text: root.state.count; color: Palette.foreground; }
+                Text { text: "Search"; color: Palette.foreground; }
+                LineEdit {
+                    text <=> root.text;
+                    placeholder-text: root.search-hint;
+                    edited(t) => {
+                        root.raise();
+                        root.search(t);
+                    }
+                }
+                CheckBox {
+                    text: "Types";
+                    checked <=> root.all-types;
+                    toggled => {
+                        root.raise();
+                        root.set-all-types(self.checked);
+                    }
+                }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        alignment: start;
+                        padding-left: 18px;
+                        for t in root.types: CheckBox {
+                            text: t.name;
+                            checked: t.shown;
+                            toggled => {
+                                root.raise();
+                                root.set-type(t.name, self.checked);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // The Add button, then the selected entry's icon + description.
+        VerticalLayout {
+            height: max(150px, min(root.height * 0.38, 360px));
+            padding: 8px;
+            padding-top: 0px;
+            spacing: 6px;
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: root.state.add-label;
+                    primary: true;
+                    enabled: root.state.add-enabled;
+                    clicked => {
+                        root.raise();
+                        root.request-add(self.absolute-position.x - root.absolute-position.x, self.absolute-position.y - root.absolute-position.y + self.height);
+                    }
+                }
+            }
+            if !root.state.has-selection: Text {
+                text: root.select-hint;
+                color: gray;
+                vertical-stretch: 1;
+                vertical-alignment: top;
+            }
+            if root.state.has-selection: HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 8px;
+                if root.state.icon.width > 0: VerticalLayout {
+                    alignment: start;
+                    Image {
+                        source: root.state.icon;
+                        width: BrowserStyle.icon-side;
+                        height: BrowserStyle.icon-side;
+                        image-fit: contain;
+                    }
+                }
+                description := ScrollView {
+                    horizontal-stretch: 1;
+                    content-width: self.visible-width;
+                    content-height: max(self.visible-height, description-text.preferred-height);
+                    description-text := Text {
+                        y: 0px;
+                        width: description.visible-width;
+                        text: root.state.description == "" ? "(no description)" : root.state.description;
+                        color: root.state.description == "" ? gray : Palette.foreground;
+                        wrap: word-wrap;
+                        vertical-alignment: top;
+                    }
+                }
+            }
+        }
+    }
+
+    // Resize grip.
+    TouchArea {
+        x: root.width - self.width;
+        y: root.height - self.height;
+        width: 16px;
+        height: 16px;
+        mouse-cursor: nwse-resize;
+        moved => {
+            root.width = max(BrowserStyle.min-width, min(root.area-width - root.x, root.width + self.mouse-x - self.pressed-x));
+            root.height = max(BrowserStyle.min-height, min(root.area-height - root.y, root.height + self.mouse-y - self.pressed-y));
+        }
+        Text {
+            text: "◢";
+            font-size: 10px;
+            color: gray;
+            horizontal-alignment: right;
+            vertical-alignment: bottom;
+        }
+    }
+
+    // IWD2: the spellbooks to add the selected spell to.
+    book-menu := PopupWindow {
+        x: root.menu-x;
+        y: root.menu-y;
+        Rectangle {
+            background: Palette.background;
+            border-width: 1px;
+            border-color: Palette.border;
+            border-radius: 4px;
+            drop-shadow-blur: 8px;
+            drop-shadow-color: #00000050;
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+                for label[i] in root.state.placements: Button {
+                    text: label;
+                    clicked => {
+                        root.add(i);
+                        book-menu.close();
+                    }
+                }
+            }
+        }
+    }
+}

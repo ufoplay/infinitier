@@ -4,18 +4,16 @@
 //! equipment slot: inventory icon (from the item's ITM → BAM), position name,
 //! editable quantity/charges triple, identified item name, and resref, plus a
 //! Delete action. Row selection is the Item Browser's assignment target
-//! (stored on `Model::inventory_selected`, ready for the browser). The
-//! item/icon resolution is duplicated from the egui view; icons are decoded
-//! to Slint `Image`s. (The Item Browser "add item" flow is not yet ported.)
+//! (stored on `Model::inventory_selected`); double-clicking a filled slot
+//! reveals its item in the browser. The item/icon resolution is duplicated
+//! from the egui view; icons are decoded to Slint `Image`s.
 
-use infinitier_core::imported_resource::ImportedResource;
-use infinitier_core::resource::ResourceType;
 use infinitier_core::resource::itm::{Itm, ItmHeader};
 use infinitier_core::resource::tlk::Tlk;
-use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
+use slint::Image;
 
-use crate::InvRow;
 use crate::state::Model;
+use crate::{InvRow, icons};
 
 /// The inventory-icon BAM resref (same offset in every ITM header version).
 fn icon_resref(itm: &Itm) -> &str {
@@ -36,31 +34,8 @@ fn item_display(model: &Model, tlk: Option<&Tlk>, resref: &str) -> (String, Imag
         strref = itm.header.name_strref();
     }
     let name = tlk.and_then(|t| t.get(strref)).unwrap_or_default();
-    let icon = load_icon(model, icon_resref(&itm)).unwrap_or_default();
+    let icon = icons::bam_icon(&model.game_data, icon_resref(&itm)).unwrap_or_default();
     (name, icon)
-}
-
-/// Decode an inventory-icon BAM's first frame into a Slint `Image`.
-fn load_icon(model: &Model, icon: &str) -> Option<Image> {
-    if icon.is_empty() {
-        return None;
-    }
-    let imported = model
-        .game_data
-        .import_by_name_and_type(icon, ResourceType::Bam)
-        .ok()?;
-    let ImportedResource::Bam(bam) = imported.as_ref() else {
-        return None;
-    };
-    let frame = bam.render_frame_centered(0, 0)?;
-    let (w, h) = (frame.width(), frame.height());
-    if w == 0 || h == 0 {
-        return None;
-    }
-    let raw = frame.into_raw();
-    let mut pb = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
-    pb.make_mut_bytes().copy_from_slice(&raw);
-    Some(Image::from_rgba8(pb))
 }
 
 /// Build the Inventory rows for the selected creature.
@@ -85,7 +60,6 @@ pub fn build(model: &Model) -> Vec<InvRow> {
                     q3: item.quantity3.to_string().into(),
                     name: name.into(),
                     resref: item.item.as_str().into(),
-                    selected: model.inventory_selected == Some(i),
                 }
             }
             None => InvRow {
@@ -98,7 +72,6 @@ pub fn build(model: &Model) -> Vec<InvRow> {
                 q3: Default::default(),
                 name: Default::default(),
                 resref: Default::default(),
-                selected: model.inventory_selected == Some(i),
             },
         })
         .collect()

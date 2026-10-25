@@ -4,8 +4,9 @@
 
 import { VerticalBox, HorizontalBox, ListView, ScrollView, LineEdit, Button, GroupBox, ComboBox, CheckBox, Palette } from "std-widgets.slint";
 import { SettingsDialog, LoadDialog, SaveDialog, ConfirmDialog, LoadingOverlay, GameRowUi, LoadRowUi } from "dialogs.slint";
+import { BrowserWindow, BrowserRow, BrowserState, TypeFilter } from "browser.slint";
 
-export { GameRowUi, LoadRowUi }
+export { GameRowUi, LoadRowUi, BrowserRow, BrowserState, TypeFilter }
 
 // One editable / read-only row inside a character card. `id` is the index
 // into the active tab's field table, routed back on commit; `-1` marks a
@@ -78,97 +79,6 @@ export struct InvRow {
     q3: string,
     name: string,
     resref: string,
-    selected: bool,
-}
-
-// One row of the Item/Spell Browser list.
-export struct BrowserRow {
-    resref: string,
-    name: string,
-    category: string,
-    selected: bool,
-}
-
-// A modal overlay listing browsable resources (items or spells) with a
-// search box and an "Add" button. Fills the window and dims what's behind.
-component BrowserOverlay {
-    in property <string> title;
-    in property <[BrowserRow]> rows;
-    in property <bool> add-enabled;
-    in property <string> add-label;
-    callback search(string);
-    callback select(string);
-    callback add();
-    callback close();
-
-    // Dim backdrop (also swallows clicks to what's behind).
-    Rectangle {
-        width: parent.width;
-        height: parent.height;
-        background: #00000066;
-        TouchArea { }
-        Rectangle {
-            width: min(760px, parent.width - 40px);
-            height: min(600px, parent.height - 40px);
-            x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
-            background: Palette.background;
-            border-radius: 6px;
-            border-width: 1px;
-            border-color: Palette.border;
-            VerticalLayout {
-                padding: 12px;
-                spacing: 8px;
-                HorizontalLayout {
-                    spacing: 8px;
-                    Text {
-                        text: root.title;
-                        font-size: 16px;
-                        font-weight: 700;
-                        color: Palette.foreground;
-                        horizontal-stretch: 1;
-                        vertical-alignment: center;
-                    }
-                    Button { text: "Close"; clicked => { root.close(); } }
-                }
-                LineEdit {
-                    placeholder-text: "Search by name, type or resref…";
-                    edited(t) => { root.search(t); }
-                }
-                HorizontalLayout {
-                    padding-left: 6px;
-                    spacing: 8px;
-                    Text { text: "Type"; width: 150px; font-weight: 700; color: Palette.foreground; }
-                    Text { text: "Name"; horizontal-stretch: 1; font-weight: 700; color: Palette.foreground; }
-                    Text { text: "Resource"; width: 110px; font-weight: 700; color: Palette.foreground; }
-                }
-                ListView {
-                    vertical-stretch: 1;
-                    for r in root.rows: Rectangle {
-                        height: 26px;
-                        background: r.selected ? Palette.accent-background : transparent;
-                        TouchArea { clicked => { root.select(r.resref); } }
-                        HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 6px;
-                            spacing: 8px;
-                            Text { text: r.category; width: 150px; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
-                            Text { text: r.name; horizontal-stretch: 1; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
-                            Text { text: r.resref; width: 110px; overflow: elide; vertical-alignment: center; color: r.selected ? Palette.accent-foreground : Palette.foreground; }
-                        }
-                    }
-                }
-                HorizontalLayout {
-                    alignment: end;
-                    Button {
-                        text: root.add-label;
-                        enabled: root.add-enabled;
-                        clicked => { root.add(); }
-                    }
-                }
-            }
-        }
-    }
 }
 
 // A titled card rendering its rows: a label on the left, an optional
@@ -304,23 +214,29 @@ export component AppWindow inherits Window {
     in property <string> animation-name;
     in property <[ColorSwatch]> color-swatches;
     in property <bool> show-appearance: false;
-    // Inventory tab: slot rows. Shown when `show-inventory` is set.
+    // Inventory tab: slot rows and the selected slot (-1 none). Shown when
+    // `show-inventory` is set.
     in property <[InvRow]> inv-rows;
+    in-out property <int> inv-selected: -1;
     in property <bool> show-inventory: false;
     // Spells tab: inner tab strip + spell rows. Shown when `show-spells` set.
     in property <[string]> spell-tabs;
     in property <int> spell-tab;
     in property <[SpellRowUi]> spell-rows;
     in property <bool> show-spells: false;
-    // Item / Spell Browser overlays.
-    in property <bool> item-browser-open: false;
+    // Item / Spell Browser windows.
+    in property <BrowserState> item-browser-state;
     in property <[BrowserRow]> item-browser-rows;
-    in property <bool> item-add-enabled: false;
-    in property <string> item-add-label: "Add to inventory";
-    in property <bool> spell-browser-open: false;
+    in property <[TypeFilter]> item-browser-types;
+    in-out property <string> item-browser-text;
+    in-out property <bool> item-browser-all-types: true;
+    in property <BrowserState> spell-browser-state;
     in property <[BrowserRow]> spell-browser-rows;
-    in property <bool> spell-add-enabled: false;
-    in property <string> spell-add-label: "Add to character";
+    in property <[TypeFilter]> spell-browser-types;
+    in-out property <string> spell-browser-text;
+    in-out property <bool> spell-browser-all-types: true;
+    // Which browser window is in front (0 items, 1 spells).
+    property <int> front-browser: 0;
     // Multi-save tab strip.
     in property <[string]> save-tab-names;
     in property <int> active-save-tab;
@@ -371,17 +287,16 @@ export component AppWindow inherits Window {
     callback spell-select-tab(int /* inner tab */);
     callback spell-memorize(int /* ref-id */, string /* value */);
     callback spell-delete(int /* ref-id */);
-    // Browser overlays.
-    callback items-clicked();
-    callback item-search(string);
-    callback item-select(string /* resref */);
-    callback item-add();
-    callback item-close();
-    callback spells-clicked();
-    callback spell-browser-search(string);
-    callback spell-browser-select(string /* resref */);
-    callback spell-browser-add();
-    callback spell-browser-close();
+    // Browser windows; the first argument is the browser (0 items, 1 spells).
+    callback browser-toggle(int);
+    callback browser-close(int);
+    callback browser-search(int, string);
+    callback browser-select(int, string /* resref */);
+    callback browser-step(int, int /* -1 up, 1 down */);
+    callback browser-add(int, int /* IWD2 placement, -1 for a plain add */);
+    callback browser-all-types(int, bool);
+    callback browser-type(int, string /* type */, bool /* shown */);
+    callback browser-reveal(int, string /* resref */);
     // Multi-save tab strip.
     callback select-save-tab(int);
     callback close-save-tab(int);
@@ -407,6 +322,13 @@ export component AppWindow inherits Window {
     callback settings-close();
     callback theme-toggle();
 
+    public function item-browser-scroll-to(row: int) {
+        item-browser.scroll-to(row);
+    }
+    public function spell-browser-scroll-to(row: int) {
+        spell-browser.scroll-to(row);
+    }
+
     VerticalBox {
         padding: 8px;
         spacing: 8px;
@@ -426,13 +348,19 @@ export component AppWindow inherits Window {
             }
             Button {
                 text: "Items";
-                enabled: root.has-save;
-                clicked => { root.items-clicked(); }
+                enabled: root.has-game;
+                clicked => {
+                    root.front-browser = 0;
+                    root.browser-toggle(0);
+                }
             }
             Button {
                 text: "Spells";
-                enabled: root.has-save;
-                clicked => { root.spells-clicked(); }
+                enabled: root.has-game;
+                clicked => {
+                    root.front-browser = 1;
+                    root.browser-toggle(1);
+                }
             }
             Text {
                 text: root.character-name;
@@ -465,7 +393,7 @@ export component AppWindow inherits Window {
         // Save-tab strip: one chip per open save, each with a × close.
         if root.save-tab-names.length > 0: ScrollView {
             height: 36px;
-            viewport-height: 32px;
+            content-height: 32px;
             HorizontalLayout {
                 alignment: start;
                 spacing: 4px;
@@ -571,7 +499,7 @@ export component AppWindow inherits Window {
                 // Tab strip (horizontally scrollable).
                 ScrollView {
                     height: 40px;
-                    viewport-height: 36px;
+                    content-height: 36px;
                     HorizontalLayout {
                         alignment: start;
                         spacing: 4px;
@@ -659,31 +587,35 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // Appearance: animation name + colour swatches.
-                if root.has-character && root.show-appearance: VerticalLayout {
+                // Appearance: animation name + colour swatches. In a ScrollView
+                // like the card grid: the fixed-width swatch rows would
+                // otherwise cap the panel's (and so the window's) width.
+                if root.has-character && root.show-appearance: ScrollView {
                     vertical-stretch: 1;
-                    alignment: start;
-                    spacing: 8px;
-                    HorizontalLayout {
-                        padding: 6px;
-                        spacing: 10px;
-                        Text { text: "Appearance"; width: 130px; vertical-alignment: center; }
-                        Text { text: root.animation-name; font-weight: 700; vertical-alignment: center; }
-                    }
-                    GroupBox {
-                        title: "Colors";
-                        vertical-stretch: 0;
-                        VerticalLayout {
-                            alignment: start;
-                            spacing: 6px;
-                            for s in root.color-swatches: HorizontalLayout {
-                                spacing: 10px;
-                                Text { text: s.label; width: 130px; vertical-alignment: center; }
-                                Image {
-                                    source: s.image;
-                                    width: 24px;
-                                    height: 24px;
-                                    image-rendering: pixelated;
+                    VerticalLayout {
+                        alignment: start;
+                        spacing: 8px;
+                        HorizontalLayout {
+                            padding: 6px;
+                            spacing: 10px;
+                            Text { text: "Appearance"; width: 130px; vertical-alignment: center; }
+                            Text { text: root.animation-name; font-weight: 700; vertical-alignment: center; }
+                        }
+                        GroupBox {
+                            title: "Colors";
+                            vertical-stretch: 0;
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 6px;
+                                for s in root.color-swatches: HorizontalLayout {
+                                    spacing: 10px;
+                                    Text { text: s.label; width: 130px; vertical-alignment: center; }
+                                    Image {
+                                        source: s.image;
+                                        width: 24px;
+                                        height: 24px;
+                                        image-rendering: pixelated;
+                                    }
                                 }
                             }
                         }
@@ -697,7 +629,7 @@ export component AppWindow inherits Window {
                     // Inner tab strip.
                     ScrollView {
                         height: 40px;
-                        viewport-height: 36px;
+                        content-height: 36px;
                         HorizontalLayout {
                             alignment: start;
                             spacing: 4px;
@@ -729,25 +661,35 @@ export component AppWindow inherits Window {
                     }
                     ListView {
                         vertical-stretch: 1;
-                        for row in root.spell-rows: HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 6px;
-                            padding-top: 3px;
-                            padding-bottom: 3px;
-                            spacing: 8px;
-                            Text { text: row.level; width: 60px; vertical-alignment: center; }
-                            LineEdit {
-                                width: 90px;
-                                text: row.memorized;
-                                accepted(t) => { root.spell-memorize(row.ref-id, t); }
-                                changed has-focus => { if (!self.has-focus) { root.spell-memorize(row.ref-id, self.text); } }
+                        for row in root.spell-rows: Rectangle {
+                            // Double-clicking the row (outside its inputs)
+                            // reveals the spell in the Spell Browser.
+                            TouchArea {
+                                double-clicked => {
+                                    root.front-browser = 1;
+                                    root.browser-reveal(1, row.resref);
+                                }
                             }
-                            Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
-                            Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
-                            Button {
-                                width: 72px;
-                                text: "Delete";
-                                clicked => { root.spell-delete(row.ref-id); }
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                padding-top: 3px;
+                                padding-bottom: 3px;
+                                spacing: 8px;
+                                Text { text: row.level; width: 60px; vertical-alignment: center; }
+                                LineEdit {
+                                    width: 90px;
+                                    text: row.memorized;
+                                    accepted(t) => { root.spell-memorize(row.ref-id, t); }
+                                    changed has-focus => { if (!self.has-focus) { root.spell-memorize(row.ref-id, self.text); } }
+                                }
+                                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                                Button {
+                                    width: 72px;
+                                    text: "Delete";
+                                    clicked => { root.spell-delete(row.ref-id); }
+                                }
                             }
                         }
                     }
@@ -771,8 +713,22 @@ export component AppWindow inherits Window {
                         vertical-stretch: 1;
                         for row in root.inv-rows: Rectangle {
                             height: 44px;
-                            background: row.selected ? Palette.accent-background.transparentize(0.75) : transparent;
-                            TouchArea { clicked => { root.inv-select(row.slot); } }
+                            background: row.slot == root.inv-selected ? Palette.accent-background.transparentize(0.75) : transparent;
+                            // Click: select the slot (the Item Browser's add
+                            // target). Double-click a filled slot: reveal its
+                            // item in the Item Browser.
+                            TouchArea {
+                                clicked => {
+                                    root.inv-selected = row.slot;
+                                    root.inv-select(row.slot);
+                                }
+                                double-clicked => {
+                                    if (row.filled) {
+                                        root.front-browser = 0;
+                                        root.browser-reveal(0, row.resref);
+                                    }
+                                }
+                            }
                             HorizontalLayout {
                                 padding-left: 6px;
                                 padding-right: 6px;
@@ -851,30 +807,62 @@ export component AppWindow inherits Window {
         }
     }
 
-    // Modal browser overlays (on top of everything).
-    if root.item-browser-open: BrowserOverlay {
+    // The floating browser windows: over the editor, under the modal
+    // dialogs. The layer itself lets clicks through to the editor.
+    Rectangle {
         width: root.width;
         height: root.height;
-        title: "Item Browser";
-        rows: root.item-browser-rows;
-        add-enabled: root.item-add-enabled;
-        add-label: root.item-add-label;
-        search(t) => { root.item-search(t); }
-        select(r) => { root.item-select(r); }
-        add() => { root.item-add(); }
-        close() => { root.item-close(); }
-    }
-    if root.spell-browser-open: BrowserOverlay {
-        width: root.width;
-        height: root.height;
-        title: "Spell Browser";
-        rows: root.spell-browser-rows;
-        add-enabled: root.spell-add-enabled;
-        add-label: root.spell-add-label;
-        search(t) => { root.spell-browser-search(t); }
-        select(r) => { root.spell-browser-select(r); }
-        add() => { root.spell-browser-add(); }
-        close() => { root.spell-browser-close(); }
+        item-browser := BrowserWindow {
+            x: 40px;
+            y: 70px;
+            width: min(780px, root.width - 60px);
+            height: min(600px, root.height - 90px);
+            z: root.front-browser == 0 ? 1 : 0;
+            title: "Item Browser";
+            search-hint: "type, name or resource…";
+            select-hint: "Select an item to see its description.";
+            state: root.item-browser-state;
+            rows: root.item-browser-rows;
+            types: root.item-browser-types;
+            text <=> root.item-browser-text;
+            all-types <=> root.item-browser-all-types;
+            area-width: root.width;
+            area-height: root.height;
+            raise => { root.front-browser = 0; }
+            close => { root.browser-close(0); }
+            search(t) => { root.browser-search(0, t); }
+            select(r) => { root.browser-select(0, r); }
+            step(d) => { root.browser-step(0, d); }
+            add(p) => { root.browser-add(0, p); }
+            set-all-types(on) => { root.browser-all-types(0, on); }
+            set-type(t, on) => { root.browser-type(0, t, on); }
+        }
+        spell-browser := BrowserWindow {
+            x: 70px;
+            y: 90px;
+            width: min(820px, root.width - 90px);
+            height: min(600px, root.height - 110px);
+            z: root.front-browser == 1 ? 1 : 0;
+            title: "Spell Browser";
+            spell-columns: true;
+            search-hint: "type, name, resource or script…";
+            select-hint: "Select a spell to see its description.";
+            state: root.spell-browser-state;
+            rows: root.spell-browser-rows;
+            types: root.spell-browser-types;
+            text <=> root.spell-browser-text;
+            all-types <=> root.spell-browser-all-types;
+            area-width: root.width;
+            area-height: root.height;
+            raise => { root.front-browser = 1; }
+            close => { root.browser-close(1); }
+            search(t) => { root.browser-search(1, t); }
+            select(r) => { root.browser-select(1, r); }
+            step(d) => { root.browser-step(1, d); }
+            add(p) => { root.browser-add(1, p); }
+            set-all-types(on) => { root.browser-all-types(1, on); }
+            set-type(t, on) => { root.browser-type(1, t, on); }
+        }
     }
     if root.load-open: LoadDialog {
         width: root.width;

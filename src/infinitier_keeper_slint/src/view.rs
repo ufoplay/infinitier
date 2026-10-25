@@ -1,6 +1,7 @@
 //! Pushing the keeper's state to the Slint UI: the shell (title, theme,
-//! dialogs, loading overlay), the empty states, and — when a save is open —
-//! the party list, save tabs and the active character tab's content.
+//! dialogs, loading overlay), the Item / Spell Browser windows, the empty
+//! states, and — when a save is open — the party list, save tabs and the
+//! active character tab's content.
 
 use infinitier_core::imported_resource::ImportedResource;
 use infinitier_core::imported_resource::gam::{ImportedGamNpc, NpcCre};
@@ -8,12 +9,13 @@ use infinitier_core::resource::ResourceType;
 use slint::{Image, Model as _, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
 
 use crate::app::{App, Session};
+use crate::browser::{BrowserKind, BrowserView};
 use crate::fields::AttacksOption;
 use crate::settings::ThemeSetting;
 use crate::state::{CharacterTab, Model};
 use crate::{
     AppWindow, ColorSwatch, FieldCard, GridRow, InvRow, PartyMember, SpellRowUi, VarRow, abilities,
-    appearance, browser, characteristics, effects, feats, inventory, journal, levels, memorization,
+    appearance, characteristics, effects, feats, inventory, journal, levels, memorization,
     miscellaneous, proficiencies, resistances, spells, variables,
 };
 
@@ -25,6 +27,74 @@ pub fn refresh(ui: &AppWindow, app: &mut App) {
     match &mut app.session {
         Session::Saves(model) => refresh_model(ui, model),
         Session::NoGame | Session::Game(_) => clear_model(ui),
+    }
+    refresh_browsers(ui, app);
+}
+
+/// Repaint the Item and Spell Browser windows. Rows are only built while a
+/// window is open (an index can be thousands of entries).
+pub fn refresh_browsers(ui: &AppWindow, app: &mut App) {
+    let App {
+        session, browsers, ..
+    } = app;
+    let model = match &*session {
+        Session::Saves(model) => Some(&**model),
+        Session::NoGame | Session::Game(_) => None,
+    };
+    for kind in BrowserKind::ALL {
+        let view = match session.game_data() {
+            Some(game_data) => browsers.view(kind, game_data, model),
+            None => BrowserView::closed(),
+        };
+        push_browser(ui, kind, view);
+    }
+}
+
+/// Push one browser window's state. The list and type checkboxes are only
+/// replaced when they change (see [`rows_changed`]); the search text only
+/// when it isn't what the user typed.
+fn push_browser(ui: &AppWindow, kind: BrowserKind, view: BrowserView) {
+    let BrowserView {
+        state,
+        rows,
+        types,
+        text,
+        all_types,
+        scroll_to,
+    } = view;
+    match kind {
+        BrowserKind::Items => {
+            if rows_changed(&ui.get_item_browser_rows(), &rows) {
+                ui.set_item_browser_rows(ModelRc::new(VecModel::from(rows)));
+            }
+            if rows_changed(&ui.get_item_browser_types(), &types) {
+                ui.set_item_browser_types(ModelRc::new(VecModel::from(types)));
+            }
+            if ui.get_item_browser_text() != text {
+                ui.set_item_browser_text(text);
+            }
+            ui.set_item_browser_all_types(all_types);
+            ui.set_item_browser_state(state);
+            if let Some(row) = scroll_to {
+                ui.invoke_item_browser_scroll_to(row);
+            }
+        }
+        BrowserKind::Spells => {
+            if rows_changed(&ui.get_spell_browser_rows(), &rows) {
+                ui.set_spell_browser_rows(ModelRc::new(VecModel::from(rows)));
+            }
+            if rows_changed(&ui.get_spell_browser_types(), &types) {
+                ui.set_spell_browser_types(ModelRc::new(VecModel::from(types)));
+            }
+            if ui.get_spell_browser_text() != text {
+                ui.set_spell_browser_text(text);
+            }
+            ui.set_spell_browser_all_types(all_types);
+            ui.set_spell_browser_state(state);
+            if let Some(row) = scroll_to {
+                ui.invoke_spell_browser_scroll_to(row);
+            }
+        }
     }
 }
 
@@ -84,8 +154,6 @@ fn clear_model(ui: &AppWindow) {
     ui.set_has_character(false);
     ui.set_party_members(ModelRc::new(VecModel::from(Vec::<PartyMember>::new())));
     ui.set_save_tab_names(ModelRc::new(VecModel::from(Vec::<SharedString>::new())));
-    ui.set_item_browser_open(false);
-    ui.set_spell_browser_open(false);
     clear_content(ui);
 }
 
@@ -123,7 +191,6 @@ fn refresh_model(ui: &AppWindow, model: &mut Model) {
         .unwrap_or(-1);
     ui.set_attacks_index(attacks_index);
 
-    refresh_browsers(ui, model);
     refresh_shell(ui, model);
 
     if !has_character {
@@ -138,7 +205,9 @@ fn refresh_model(ui: &AppWindow, model: &mut Model) {
         CharacterTab::Memorization => show_cards(ui, memorization::build(model)),
         CharacterTab::Levels => show_cards(ui, levels::build(model)),
         CharacterTab::Feats => show_cards(ui, feats::build(model)),
-        CharacterTab::Inventory => show_inventory(ui, inventory::build(model)),
+        CharacterTab::Inventory => {
+            show_inventory(ui, inventory::build(model), model.inventory_selected)
+        }
         CharacterTab::Spells => {
             let (tabs, tab_index, rows) = spells::build(model);
             show_spells(ui, tabs, tab_index, rows);
@@ -226,23 +295,6 @@ fn load_bmp_image(model: &Model, name: &str) -> Option<Image> {
     Some(Image::from_rgba8(pb))
 }
 
-/// Push the Item/Spell Browser overlay state to the UI. Rows are only built
-/// while a browser is open (the full index can be thousands of entries).
-fn refresh_browsers(ui: &AppWindow, model: &Model) {
-    ui.set_item_browser_open(model.item_browser_open);
-    if model.item_browser_open {
-        ui.set_item_browser_rows(ModelRc::new(VecModel::from(browser::item_rows(model))));
-        ui.set_item_add_enabled(browser::item_add_enabled(model));
-        ui.set_item_add_label(browser::item_add_label(model));
-    }
-    ui.set_spell_browser_open(model.spell_browser_open);
-    if model.spell_browser_open {
-        ui.set_spell_browser_rows(ModelRc::new(VecModel::from(browser::spell_rows(model))));
-        ui.set_spell_add_enabled(browser::spell_add_enabled(model));
-        ui.set_spell_add_label(browser::spell_add_label(model));
-    }
-}
-
 /// Reset every content mode (cards / table / grid / placeholder) to empty,
 /// so each `show_*` helper only has to set its own.
 fn clear_content(ui: &AppWindow) {
@@ -301,10 +353,11 @@ fn show_appearance(ui: &AppWindow, name: SharedString, swatches: Vec<ColorSwatch
     ui.set_show_appearance(true);
 }
 
-/// Show the Inventory tab (selectable slot rows).
-fn show_inventory(ui: &AppWindow, rows: Vec<InvRow>) {
+/// Show the Inventory tab (slot rows, `selected` highlighted).
+fn show_inventory(ui: &AppWindow, rows: Vec<InvRow>, selected: Option<usize>) {
     clear_content(ui);
     ui.set_inv_rows(ModelRc::new(VecModel::from(rows)));
+    ui.set_inv_selected(index_or_none(selected));
     ui.set_show_inventory(true);
 }
 

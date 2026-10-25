@@ -21,6 +21,7 @@ use infinitier_core::save_games::SaveGame;
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::AppWindow;
+use crate::browser::Browsers;
 use crate::load_dialog::LoadDialog;
 use crate::save_dialog::SaveDialog;
 use crate::settings::GameConfig;
@@ -42,6 +43,15 @@ pub enum Session {
 
 impl Session {
     /// The loaded game's data, with or without open saves.
+    pub fn game_data(&self) -> Option<&GameData> {
+        match self {
+            Session::NoGame => None,
+            Session::Game(game) => Some(&game.game_data),
+            Session::Saves(model) => Some(&model.game_data),
+        }
+    }
+
+    /// Mutable access to the loaded game's data.
     pub fn game_data_mut(&mut self) -> Option<&mut GameData> {
         match self {
             Session::NoGame => None,
@@ -59,6 +69,8 @@ pub struct PendingGame {
 
 pub struct App {
     pub session: Session,
+    /// The loaded game's Item and Spell Browser windows.
+    pub browsers: Browsers,
     pub settings: SettingsDialog,
     pub load_dialog: LoadDialog,
     pub save_dialog: SaveDialog,
@@ -74,6 +86,7 @@ impl App {
     pub fn new(settings: SettingsDialog) -> Self {
         Self {
             session: Session::NoGame,
+            browsers: Browsers::default(),
             settings,
             load_dialog: LoadDialog::default(),
             save_dialog: SaveDialog::default(),
@@ -205,6 +218,7 @@ fn finish_loading(app: &mut App, pending: PendingGame) {
         config.game_path.display()
     );
     app.session = Session::Game(Box::new(game));
+    app.browsers = Browsers::default();
     app.load_dialog.close();
     app.save_dialog.close();
     app.status.clear();

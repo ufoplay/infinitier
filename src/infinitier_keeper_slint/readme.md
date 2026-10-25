@@ -42,14 +42,13 @@ caps on commit exactly like the egui keeper.
 
 Also ported: the **Settings** dialog (games list with autodetected types, add/remove, game
 switching on a background thread), the **Dark/Light** theme (saved in the settings file), the
-**Item Browser** and **Spell Browser** (add items/spells), the **Load** dialog (newest first, with
+floating **Item Browser** and **Spell Browser** (filters, icon + description, add items/spells
+incl. the IWD2 spellbook choice, double-click a slot or spell to reveal it), the **Load** dialog (newest first, with
 screenshot + portrait preview and Delete) + **multi-save tab strip** (open several saves at once,
 switch/close), party **portraits**, and **Save** (copies the save folder into a new
 `… (Edited NNNN)` folder and re-exports the edited GAM into it, never touching the original).
 
-A few egui niceties are still missing (see `PORT_STATUS.md`): IWD2 spell-add via the list-2DA
-path, double-click "reveal in browser", the browsers' icon/description detail panels and type
-filters, and a wrapping character tab strip.
+One egui nicety is still missing (see `PORT_STATUS.md`): a wrapping character tab strip.
 
 ## Verifying the UI
 
