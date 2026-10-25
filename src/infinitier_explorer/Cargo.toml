@@ -6,6 +6,7 @@ license.workspace = true
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
+description = "Infinitier Explorer: a resource browser for Infinity Engine games"
 publish = false
 
 [dependencies]
@@ -15,11 +16,25 @@ bytesize = { workspace = true }
 clap = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
-
-eframe = { workspace = true }
-egui-components = { workspace = true }
 rodio = { workspace = true }
-ttf-inter = { workspace = true }
+# Software renderer + winit (see the workspace manifest), plus
+# `unstable-fontique-011`: it registers a TTF resource's font at run time
+# (the TTF viewer) and finds the system's monospace family (the code views).
+slint = { workspace = true, features = ["unstable-fontique-011"] }
+
+[dev-dependencies]
+# The token lint, run on the explorer's own UI (tests/ui_tokens.rs).
+slint-themekit = { workspace = true }
 
 [build-dependencies]
+slint-build = { workspace = true }
+# Registers the themekit's `.slint` sources as the `@themekit` library.
+slint-themekit = { workspace = true }
+# Git version info for the startup log and the window title.
 vergen-gix = { workspace = true }
+
+[features]
+# Opt-in embedded MCP test server (dev only): build with `--features mcp`,
+# run with `SLINT_MCP_PORT=8080` to expose http://localhost:8080/mcp so an
+# AI agent can inspect the accessibility tree, click/type, and screenshot.
+mcp = ["slint/mcp"]

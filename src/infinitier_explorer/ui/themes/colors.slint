@@ -1,0 +1,73 @@
+// The explorer's own colours: those that show data rather than UI roles, so
+// the theme has no token for them. Like metrics.slint, the only explorer
+// files allowed to hold literal colours (tests/ui_tokens.rs).
+
+import { Theme } from "@themekit";
+
+// Lexical category of a BAF token (the BCS viewer's highlighting).
+export enum TokenKind { keyword, trigger, action, identifier, string, number, comment, punctuation, whitespace }
+
+// BAF syntax highlighting, one palette per theme brightness: roughly
+// VSCode's Dark+ and Light+.
+export global SyntaxColors {
+    public pure function color(kind: TokenKind) -> color {
+        Theme.current.dark ? self.dark(kind) : self.light(kind)
+    }
+
+    pure function dark(kind: TokenKind) -> color {
+        if kind == TokenKind.keyword {
+            return #d79bc4;
+        }
+        if kind == TokenKind.trigger {
+            return #e5c07b;
+        }
+        if kind == TokenKind.action {
+            return #7ec7ca;
+        }
+        if kind == TokenKind.identifier {
+            return #9cdcfe;
+        }
+        if kind == TokenKind.string {
+            return #ce9178;
+        }
+        if kind == TokenKind.number {
+            return #b5cea8;
+        }
+        if kind == TokenKind.comment {
+            return #6a9955;
+        }
+        #d4d4d4
+    }
+
+    // Saturated, darker colours, legible on a light background.
+    pure function light(kind: TokenKind) -> color {
+        if kind == TokenKind.keyword {
+            return #7f007f;
+        }
+        if kind == TokenKind.trigger {
+            return #b05500;
+        }
+        if kind == TokenKind.action {
+            return #0b6e99;
+        }
+        if kind == TokenKind.identifier {
+            return #001080;
+        }
+        if kind == TokenKind.string {
+            return #a31515;
+        }
+        if kind == TokenKind.number {
+            return #098658;
+        }
+        if kind == TokenKind.comment {
+            return #55824b;
+        }
+        #1f1f1f
+    }
+}
+
+// Drawn over images.
+export global OverlayColors {
+    // The TIS viewer's tile grid: white, mostly opaque, on any tileset.
+    out property <color> grid: #ffffffb4;
+}

@@ -1,15 +1,34 @@
+//! The Infinitier Explorer: browse the resources of Infinity Engine games.
+//!
+//! The data layer comes from `infinitier_core` (game-data indexing, every
+//! resource importer, the sound and movie decoders); this crate is the Slint
+//! UI on top, built on slint-themekit. The modules mirror the Slint UI in
+//! `ui/`: [`viewers`] holds each viewer's state and logic,
+//! [`view`] pushes the state into the adapter globals and [`callbacks`]
+//! handles their callbacks.
+
 mod app;
 mod build_data;
-mod components;
-mod state;
-mod ui;
+mod callbacks;
+mod fonts;
+mod ticker;
+mod tree;
+mod view;
+mod viewers;
+
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use clap::Parser;
-use eframe::egui;
 use infinitier_core::game::GameDataBuilder;
-use std::path::PathBuf;
+use slint::{ComponentHandle, ModelRc};
 
+use crate::app::App;
 use crate::build_data::build_version;
+use crate::ticker::Ticker;
+
+slint::include_modules!();
 
 /// Infinitier Explorer — browse resources from Infinity Engine games.
 #[derive(Parser)]
@@ -27,8 +46,7 @@ struct Args {
     log: String,
 }
 
-/// Render a `Vec<PathBuf>` as a comma-separated string for log / window-title
-/// purposes.
+/// `paths` as a comma-separated string, for messages.
 fn display_paths(paths: &[PathBuf]) -> String {
     paths
         .iter()
@@ -37,93 +55,43 @@ fn display_paths(paths: &[PathBuf]) -> String {
         .join(", ")
 }
 
-fn main() {
+fn main() -> Result<(), slint::PlatformError> {
     let args = Args::parse();
-
     env_logger::Builder::new().parse_filters(&args.log).init();
 
     log::info!("Infinitier Explorer {}", build_version());
 
-    let game_data = GameDataBuilder::new(args.game_path.as_slice(), None)
-        .and_then(|b| b.build())
-        .unwrap_or_else(|e| {
+    let game_data = match GameDataBuilder::new(args.game_path.as_slice(), None)
+        .and_then(|builder| builder.build())
+    {
+        Ok(game_data) => game_data,
+        Err(e) => {
             eprintln!(
                 "Failed to load key file from [{}]: {e}",
                 display_paths(&args.game_path),
             );
             std::process::exit(1);
-        });
-
+        }
+    };
     let title = format!(
         "Infinitier Explorer {} - {:?}",
         build_version(),
         game_data.game()
     );
 
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(&title)
-            .with_clamp_size_to_monitor_size(true)
-            .with_inner_size(egui::vec2(1400.0, 800.0)),
-        renderer: eframe::Renderer::Wgpu,
-        ..Default::default()
-    };
-
-    if let Err(e) = eframe::run_native(
-        &title,
-        options,
-        Box::new(move |cc| {
-            install_inter_font(&cc.egui_ctx);
-            egui_components::theme::Theme::light().install(&cc.egui_ctx);
-
-            // On Linux/X11, winit reads xrandr physical dimensions (~189 DPI on HiDPI
-            // laptops) rather than the X server's pre-configured DPI (~96 DPI), causing
-            // pixels_per_point to be set ~2x too high. Honor INFINITIER_SCALE if set,
-            // otherwise cap at 1.5 to prevent runaway zoom on misconfigured displays.
-            #[cfg(target_os = "linux")]
-            {
-                let is_x11 =
-                    std::env::var("WAYLAND_DISPLAY").is_err() && std::env::var("DISPLAY").is_ok();
-                if is_x11 {
-                    if let Ok(scale) = std::env::var("INFINITIER_SCALE") {
-                        if let Ok(ppp) = scale.parse::<f32>() {
-                            cc.egui_ctx.set_pixels_per_point(ppp);
-                        }
-                    } else {
-                        let ppp = cc.egui_ctx.pixels_per_point();
-                        if ppp > 1.5 {
-                            cc.egui_ctx.set_pixels_per_point(1.5);
-                        }
-                    }
-                }
-            }
-
-            Ok(Box::new(app::ExplorerApp::new(game_data)))
-        }),
-    ) {
-        eprintln!("Failed to run explorer: {e}");
+    let ui = AppWindow::new()?;
+    ui.global::<ShellAdapter>().set_title(title.into());
+    match fonts::monospace_family() {
+        Some(family) => ui.global::<Fonts>().set_mono(family.into()),
+        None => log::warn!("no monospace font found: code is shown in the default font"),
     }
-}
 
-/// Replace egui's default proportional font (`Ubuntu-Light`, which
-/// looks washed out on a light background) with Inter — the same
-/// typeface shadcn / gpui-component use. Bytes come from the
-/// `ttf-inter` crate, so we're not adding any binary assets to this
-/// repo. egui's built-in fallback chain (emoji, monospace, the
-/// original Ubuntu-Light) stays in place for any glyph Inter
-/// doesn't cover.
-fn install_inter_font(ctx: &egui::Context) {
-    use std::sync::Arc;
+    let app = Rc::new(RefCell::new(App::new(game_data)));
+    ui.global::<TreeAdapter>()
+        .set_rows(ModelRc::from(app.borrow().tree.clone()));
+    let ticker = Rc::new(Ticker::default());
+    callbacks::wire(&ui, &app, &ticker);
+    view::refresh(&ui, &app.borrow());
 
-    let mut fonts = egui::FontDefinitions::default();
-    fonts.font_data.insert(
-        "Inter".to_owned(),
-        Arc::new(egui::FontData::from_static(ttf_inter::REGULAR)),
-    );
-    fonts
-        .families
-        .entry(egui::FontFamily::Proportional)
-        .or_default()
-        .insert(0, "Inter".to_owned());
-    ctx.set_fonts(fonts);
+    ui.run()
 }

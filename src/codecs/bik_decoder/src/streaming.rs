@@ -27,7 +27,7 @@ pub enum BikOutputFormat {
     /// Tightly-packed RGBA8 (`width * height * 4` bytes), nearest-
     /// neighbour chroma upsample with BT.601 coefficients. One full
     /// frame copy per `next_frame` call; preferred when the consumer
-    /// just wants RGBA pixels (egui textures, screenshot dumps, …).
+    /// just wants RGBA pixels (GUI images, screenshot dumps, …).
     Rgba,
 }
 

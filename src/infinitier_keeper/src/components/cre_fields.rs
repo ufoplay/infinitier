@@ -1,11 +1,9 @@
 //! Party-wide accessors on the loaded GAM.
 //!
-//! The per-creature getters/setters that used to live here now live on
-//! [`infinitier_core::resource::cre::Cre`] as methods (`cre.ac_natural()`,
-//! `cre.set_lore(v)`, …) and are unit-tested there, next to the format
-//! they describe. What remains are the GAM-side fields the editor
-//! exposes that aren't part of any single creature: party gold and
-//! reputation.
+//! The per-creature getters/setters
+//! live on [`infinitier_core::resource::cre::Cre`]; what remains here are the
+//! GAM-side fields the editor exposes that aren't part of any single
+//! creature: party gold and reputation.
 
 use infinitier_core::imported_resource::gam::ImportedGam;
 use infinitier_core::resource::gam::{

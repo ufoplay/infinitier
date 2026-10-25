@@ -1,0 +1,23 @@
+// The open saves, one closable tab each.
+
+import { Tab, TabBar } from "@themekit";
+
+export global SaveTabsAdapter {
+    // Each open save's folder name.
+    in property <[string]> names;
+    in property <int> active;
+    callback select(int);
+    callback close(int);
+}
+
+export component SaveTabStrip inherits TabBar {
+    for name[i] in SaveTabsAdapter.names: Tab {
+        text: name;
+        selected: i == SaveTabsAdapter.active;
+        closable: true;
+        // Also the ×'s tooltip.
+        close-label: "Close this save";
+        clicked => { SaveTabsAdapter.select(i); }
+        close-requested => { SaveTabsAdapter.close(i); }
+    }
+}

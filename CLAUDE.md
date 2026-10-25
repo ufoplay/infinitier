@@ -1,17 +1,13 @@
 # Infinitier
 
-There are four GUIs over the shared `infinitier_core` data layer, two apps in two toolkits:
-the save editor `infinitier_keeper` (egui) and `infinitier_keeper_slint`, and the resource
-browser `infinitier_explorer` (egui) and `infinitier_explorer_slint`. The Slint ones are built on
+There are two GUIs over the shared `infinitier_core` data layer, both in Slint: the save
+editor `infinitier_keeper` and the resource browser `infinitier_explorer`. They are built on
 the [slint-themekit](../../github_ufoscout/slint-themekit) component library — no
-`std-widgets` — and share no code with their egui twins (logic is duplicated on purpose).
+`std-widgets`.
 
 ## GUI verification
 
-**egui keeper** — drive it through the **egui MCP**, see [docs/egui_mcp.md](docs/egui_mcp.md).
-Run with `EGUI_INSPECTION=1` and `attach`; then `query_tree` for widget ids/values and act by id.
-
-**Slint keeper / explorer** — drive them through the **Slint MCP**, see
+Drive the keeper and the explorer through the **Slint MCP**, see
 [docs/slint_mcp.md](docs/slint_mcp.md).
 Run with `--features mcp` and `SLINT_EMIT_DEBUG_INFO=1 SLINT_MCP_PORT=8080 SLINT_BACKEND=headless`
 (headless renders frames without a compositor — needed on this Wayland box); then

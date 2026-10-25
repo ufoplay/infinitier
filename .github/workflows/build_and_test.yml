@@ -23,7 +23,9 @@ jobs:
       - name: prepare image
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev
+          # ALSA for the explorer's audio; fontconfig for Slint's text
+          # stack (a build-time linker requirement).
+          sudo apt-get install -y libasound2-dev libfontconfig1-dev
 
       - uses: actions/checkout@v4
      

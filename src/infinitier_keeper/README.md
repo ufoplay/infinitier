@@ -84,3 +84,65 @@ itself), or the keeper finds no saves to load.
   install's `save\` folder is empty, use that folder as the savegame path.
 
 ![Adding a game in the Settings dialog](screenshots/settings.png)
+
+## Development
+
+The keeper is a [Slint](https://slint.dev) UI over the `infinitier_core` data
+layer (game-data indexing, save discovery, GAM/CRE parse + export, engine
+caps). It is built entirely on the
+[slint-themekit](https://github.com/ufoscout/slint-themekit) component library
+(no `std-widgets`), so one `Theme` value styles everything.
+
+### Build prerequisites
+
+- **slint-themekit**: for now a path dependency on a sibling checkout. Clone
+  it so that `../../../github_ufoscout/slint-themekit` (relative to the
+  workspace root) exists; `.vscode/settings.json` points the Slint language
+  server at the same checkout.
+- **fontconfig** on Linux: Slint's text stack links it at build time, so the
+  dev package is needed (the runtime `libfontconfig.so.1` alone isn't):
+
+  ```sh
+  sudo apt install libfontconfig1-dev      # Debian/Ubuntu
+  sudo dnf install fontconfig-devel        # Fedora
+  ```
+
+  No GL / GPU library is needed: the keeper uses Slint's software renderer
+  with the winit backend. Windows and macOS need no extra system package.
+
+### Verifying the UI
+
+The keeper can expose Slint's embedded MCP server for automated / AI-driven UI
+inspection (see [`docs/slint_mcp.md`](../../docs/slint_mcp.md)):
+
+```sh
+SLINT_EMIT_DEBUG_INFO=1 SLINT_MCP_PORT=8080 SLINT_BACKEND=headless \
+cargo run -p infinitier_keeper --features mcp -- --config config_test/infinitier_keeper.toml
+```
+
+### Layout
+
+The UI is split like Slint's demo apps:
+
+- `ui/app.slint` — the window: composes the parts below and switches the
+  themekit's `Theme` between its Light and Dark presets;
+  `ui/themes/metrics.slint` — the keeper's own layout values (the only
+  `.slint` file with literal sizes; `tests/ui_tokens.rs` enforces it, and
+  that nothing imports `std-widgets`).
+- `ui/components/` — the keeper's own widgets on themekit components
+  (floating window, field card, the tables' header row); `ui/shell/` —
+  header, save tabs, party list, character panel; `ui/tabs/` — the character
+  tabs' pages; `ui/browser/` — the Item / Spell Browser windows;
+  `ui/dialogs/` — the modal dialogs. Each part reads and calls its
+  `*Adapter` global.
+- `build.rs` — compiles the `.slint` via `slint-build` and bakes in the git
+  version.
+- `src/main.rs` — clap args and startup; `src/app.rs` — the top-level state
+  (no game / game / open saves) and background game loading; `src/view/` —
+  fills the adapters, per UI part; `src/callbacks/` — handles their
+  callbacks, per UI part; `src/tabs/` — one module per character tab;
+  `src/components/` — the shared field logic; `src/dialogs/` — the dialogs'
+  state; `src/browser/` — the browsers' indexes and add logic;
+  `src/settings.rs` — the settings file.
+
+`PORT_STATUS.md` and `THEMEKIT_MIGRATION.md` record how this UI was built.

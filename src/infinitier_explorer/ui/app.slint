@@ -1,0 +1,104 @@
+// The Infinitier Explorer's main window, built on
+// slint-themekit (`@themekit`): widgets and design values come from its
+// components and `Theme` tokens (see PORT_PLAN.md).
+//
+// The UI is split like the keeper's:
+//   components/ — the explorer's own widgets (themekit-based), stateless
+//   shell/      — the window's chrome: the resource tree, the status line
+//   viewers/    — one viewer per kind of resource, and their host
+//   themes/     — the explorer's own layout values and data colours
+// Each part reads and calls its `*Adapter` global, which the Rust side
+// fills and handles; this file only composes the parts.
+
+import { Divider, Splitter, Theme, ThemePresets } from "@themekit";
+import { Metrics } from "themes/metrics.slint";
+import { TokenKind } from "themes/colors.slint";
+import { Fonts } from "components/components.slint";
+import { ResourcePanel, ShellAdapter, StatusBar, TreeAdapter, TreeNav, TreeRow } from "shell/shell.slint";
+import {
+    BafLine,
+    BafSpan,
+    BamAdapter,
+    BcsAdapter,
+    FntAdapter,
+    FntField,
+    ImageAdapter,
+    MovieAdapter,
+    SoundAdapter,
+    TisAdapter,
+    TtfAdapter,
+    TtfDetail,
+    TtfSample,
+    ViewerAdapter,
+    ViewerHost,
+    ViewerKind,
+} from "viewers/viewers.slint";
+
+// For the Rust side.
+export {
+    Fonts,
+    ShellAdapter,
+    TreeAdapter,
+    TreeNav,
+    TreeRow,
+    ViewerAdapter,
+    ViewerKind,
+    ImageAdapter,
+    BamAdapter,
+    TisAdapter,
+    FntAdapter,
+    FntField,
+    TtfAdapter,
+    TtfDetail,
+    TtfSample,
+    BcsAdapter,
+    BafLine,
+    BafSpan,
+    TokenKind,
+    SoundAdapter,
+    MovieAdapter,
+}
+
+export component AppWindow inherits Window {
+    title: ShellAdapter.title;
+    background: Theme.palette.background;
+    preferred-width: Metrics.window-width;
+    preferred-height: Metrics.window-height;
+    min-width: Metrics.window-min-width;
+    min-height: Metrics.window-min-height;
+    // The tree has the keyboard from the start.
+    forward-focus: panel;
+
+    // The colour theme.
+    property <bool> dark-theme: ShellAdapter.dark-theme;
+    changed dark-theme => { root.apply-theme(); }
+    init => { root.apply-theme(); }
+
+    function apply-theme() {
+        Theme.current = root.dark-theme ? ThemePresets.dark : ThemePresets.light;
+    }
+
+    // The resource panel's width: UI state, which the splitter changes.
+    property <length> panel-width: Metrics.panel-width;
+
+    // Scroll the resource tree so `row` is in view. (A global's callback
+    // can't be implemented in .slint, so the Rust side calls this instead.)
+    public function tree-scroll-to(row: int) {
+        panel.scroll-to(row);
+    }
+
+    VerticalLayout {
+        HorizontalLayout {
+            vertical-stretch: 1;
+            panel := ResourcePanel { width: root.panel-width; }
+            Splitter {
+                dragged(delta) => {
+                    root.panel-width = max(Metrics.panel-min-width, min(root.panel-width + delta, Metrics.panel-max-width, root.width - Metrics.viewer-min-width));
+                }
+            }
+            ViewerHost { horizontal-stretch: 1; }
+        }
+        Divider { }
+        StatusBar { }
+    }
+}

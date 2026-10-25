@@ -1,34 +1,19 @@
-//! Per-field editor scaffolding for the egui keeper.
+//! Editable-field model for the keeper.
 //!
-//! Mirrors the GPUI keeper's `editable_fields` (same enum, same
-//! per-version dispatch, same clamping helpers) but with the
-//! immediate-mode plumbing collapsed to plain `HashMap<…, String>`
-//! buffers — egui has no InputState entities, no subscriptions, no
-//! lazy init. Each frame:
+//! Everything up to and including [`write_clamped_cre`] /
+//! [`write_clamped_gam`] is the engine-aware parse/clamp/write rules of the
+//! editable fields; the Slint side binds a data model, so no per-field text
+//! buffers live here.
 //!
-//! 1. [`KeeperEditors::prepare`] re-mirrors every buffer from the
-//!    current CRE / GAM, so the displayed values always track the
-//!    active save / party slot. The field with keyboard focus — and any
-//!    field whose edit hasn't committed yet — are skipped, so in-flight
-//!    typing isn't clobbered.
-//! 2. The abilities tab renders one [`KeeperEditors::show_input`]
-//!    per visible row, which wraps `egui::TextEdit::singleline`
-//!    around the buffer and commits on focus-loss / Enter.
-//!
-//! The pattern is "take the String out of the map, hand it to the
-//! widget, put it back" — this satisfies the borrow checker (the
-//! TextEdit holds a `&mut String` while the rest of `self` needs to
-//! be mutable for `state.save` writes).
+//! The UI addresses a field by its **index into [`EditableField::ALL`]**
+//! (`id`), which is the stable identifier passed across the Slint boundary
+//! and back to [`EditableField::from_index`].
 
-use std::collections::HashMap;
-
-use eframe::egui;
 use infinitier_core::engine_caps::{AbilityRange, EngineCaps};
-use infinitier_core::imported_resource::gam::{ImportedGam, NpcCre};
+use infinitier_core::imported_resource::gam::ImportedGam;
 use infinitier_core::resource::cre::Cre;
 
 use crate::components::cre_fields;
-use crate::state::AppState;
 
 /// Logical grouping for the abilities tab. Each card on screen
 /// corresponds to one [`Section`]; the tab iterates
@@ -178,6 +163,25 @@ impl EditableField {
         EditableField::WizardLevel,
     ];
 
+    /// The stable id passed across the Slint boundary: this field's index
+    /// into [`Self::ALL`].
+    pub fn index(self) -> i32 {
+        Self::ALL
+            .iter()
+            .position(|&f| f == self)
+            .map(|i| i as i32)
+            .unwrap_or(-1)
+    }
+
+    /// Inverse of [`Self::index`]: resolve an id from the UI back to a
+    /// field. `None` for the sentinel `-1` (read-only rows) or any
+    /// out-of-range id.
+    pub fn from_index(id: i32) -> Option<Self> {
+        usize::try_from(id)
+            .ok()
+            .and_then(|i| Self::ALL.get(i).copied())
+    }
+
     pub fn section(self) -> Section {
         match self {
             Self::Strength
@@ -242,7 +246,7 @@ impl EditableField {
 
     /// `true` when the value lives on the party-wide GAM rather
     /// than on the per-character CRE.
-    fn is_gam_field(self) -> bool {
+    pub fn is_gam_field(self) -> bool {
         matches!(self, Self::Reputation | Self::PartyGold)
     }
 
@@ -496,7 +500,7 @@ impl EditableField {
     }
 
     /// Parse + clamp + write to a CRE. No-op on GAM-side fields.
-    fn write_clamped_cre(self, cre: &mut Cre, raw: &str, caps: &EngineCaps) {
+    pub fn write_clamped_cre(self, cre: &mut Cre, raw: &str, caps: &EngineCaps) {
         match self {
             Self::Strength => write_u8(raw, caps.ability_score, cre.strength(), |v| {
                 cre.set_strength(v)
@@ -737,7 +741,7 @@ impl EditableField {
         }
     }
 
-    fn write_clamped_gam(self, gam: &mut ImportedGam, raw: &str, caps: &EngineCaps) {
+    pub fn write_clamped_gam(self, gam: &mut ImportedGam, raw: &str, caps: &EngineCaps) {
         match self {
             Self::Reputation => write_u32(
                 raw,
@@ -917,169 +921,5 @@ impl AttacksOption {
 
     pub fn index_for_byte(byte: u8) -> Option<usize> {
         Self::ALL.iter().position(|o| o.byte == byte)
-    }
-}
-
-// ── KeeperEditors — the immediate-mode editor scaffold ───────────────
-
-/// In-flight text + Attacks-dropdown index for every editable field.
-/// One instance lives on [`crate::app::KeeperApp`]; the abilities tab
-/// reads / writes through it. Cheap to construct (just two
-/// allocations) so there's no lazy-init dance like the GPUI keeper —
-/// `Default::default()` is the right call from `KeeperApp::new`.
-#[derive(Default)]
-pub struct KeeperEditors {
-    inputs: HashMap<EditableField, String>,
-    /// Selected index into [`AttacksOption::ALL`]. `None` when the
-    /// active CRE's attacks byte isn't a documented variant.
-    pub attacks_idx: Option<usize>,
-    /// The field currently being edited (has keyboard focus), if any.
-    /// [`Self::prepare`] leaves this one buffer alone so in-flight text
-    /// isn't clobbered while every other field re-mirrors the model.
-    focused_field: Option<EditableField>,
-    /// A field whose text was edited but not yet committed.
-    pending_field: Option<EditableField>,
-}
-
-impl KeeperEditors {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Per-frame sync. Mirror every editable field's buffer from the
-    /// active CRE / GAM so the view always reflects the current save —
-    /// no cache invalidation to get wrong. Two buffers are left untouched:
-    /// the one being edited right now ([`Self::focused_field`]) and one
-    /// with an uncommitted edit ([`Self::pending_field`]) — their in-flight
-    /// text stands until it commits on focus loss.
-    ///
-    /// Because it reads the model directly every frame, any change to
-    /// what's active (switching party slot, switching save tab, opening
-    /// a different save) is reflected the moment the model changes —
-    /// there's nothing to stale.
-    pub fn prepare(&mut self, state: &AppState) {
-        let Some(cre) = selected_cre(state) else {
-            self.inputs.clear();
-            self.attacks_idx = None;
-            return;
-        };
-        for &field in EditableField::ALL {
-            // Leave alone the field being typed in *and* one whose edit hasn't
-            // committed yet (focus may already have moved on — see
-            // [`Self::pending_field`]).
-            if field == EditableField::Attacks
-                || self.focused_field == Some(field)
-                || self.pending_field == Some(field)
-            {
-                continue;
-            }
-            self.inputs
-                .insert(field, field.read_text(cre, &state.active().save));
-        }
-        self.attacks_idx = AttacksOption::index_for_byte(cre.attacks_byte());
-    }
-
-    /// Direct text buffer access. Used by the abilities tab to read
-    /// the in-flight value for live bonus computation without going
-    /// through `show_input`.
-    pub fn text(&self, field: EditableField) -> &str {
-        self.inputs.get(&field).map(String::as_str).unwrap_or("")
-    }
-
-    /// Render a themed `Input` (bordered + rounded — the shadcn
-    /// look) bound to `field`. On focus-loss (or Enter), parse +
-    /// clamp + write back to the CRE / GAM, then refresh the buffer
-    /// with the clamped string so the user sees the rounded value.
-    ///
-    /// Returns `true` when the value was committed this frame.
-    pub fn show_input(
-        &mut self,
-        ui: &mut egui::Ui,
-        field: EditableField,
-        state: &mut AppState,
-        width: f32,
-    ) -> bool {
-        let mut buf = std::mem::take(self.inputs.entry(field).or_default());
-        let response = ui.add(egui_components::Input::new(&mut buf).width(width).small());
-        // Track which field owns keyboard focus so `prepare` can leave
-        // its in-flight text alone while re-mirroring every other field.
-        if response.has_focus() {
-            self.focused_field = Some(field);
-        } else if self.focused_field == Some(field) {
-            self.focused_field = None;
-        }
-        if response.changed() {
-            self.pending_field = Some(field);
-        }
-        let committed = response.lost_focus();
-        if committed {
-            commit(field, &buf, state);
-            if self.pending_field == Some(field) {
-                self.pending_field = None;
-            }
-            if let Some(cre) = selected_cre(state) {
-                buf = field.read_text(cre, &state.active().save);
-            }
-        }
-        *self.inputs.entry(field).or_default() = buf;
-        committed
-    }
-}
-
-fn commit(field: EditableField, raw: &str, state: &mut AppState) {
-    // Split-borrow: `state.engine_caps` (immutable) and the active
-    // tab's `save` (mutable) are disjoint fields of `state`, so
-    // Rust lets us hold both simultaneously by destructuring
-    // explicit references. `tabs[*active_tab]` reaches into one
-    // element of `tabs` — disjoint from `engine_caps`.
-    let AppState {
-        engine_caps,
-        tabs,
-        active_tab,
-        ..
-    } = state;
-    let active = &mut tabs[*active_tab];
-    if field.is_gam_field() {
-        field.write_clamped_gam(&mut active.save, raw, engine_caps);
-        return;
-    }
-    let Some(idx) = active.selected_party_index else {
-        return;
-    };
-    let Some(npc) = active.save.party_npcs.get_mut(idx) else {
-        return;
-    };
-    let Some(NpcCre::Cre(boxed)) = npc.cre.as_mut() else {
-        return;
-    };
-    field.write_clamped_cre(boxed, raw, engine_caps);
-}
-
-/// Commit the Attacks dropdown's current selection back to the CRE.
-/// Called by the abilities tab when the user picks a new option.
-pub fn commit_attacks(idx: usize, state: &mut AppState) {
-    let Some(option) = AttacksOption::ALL.get(idx) else {
-        return;
-    };
-    let active = state.active_mut();
-    let Some(slot) = active.selected_party_index else {
-        return;
-    };
-    let Some(npc) = active.save.party_npcs.get_mut(slot) else {
-        return;
-    };
-    let Some(NpcCre::Cre(boxed)) = npc.cre.as_mut() else {
-        return;
-    };
-    boxed.set_attacks_byte(option.byte);
-}
-
-fn selected_cre(state: &AppState) -> Option<&Cre> {
-    let active = state.active();
-    let idx = active.selected_party_index?;
-    let npc = active.save.party_npcs.get(idx)?;
-    match npc.cre.as_ref()? {
-        NpcCre::Cre(boxed) => Some(boxed.as_ref()),
-        NpcCre::Ref(_) => None,
     }
 }

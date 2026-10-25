@@ -1,22 +1,20 @@
 # Driving the Slint apps with the Slint MCP
 
-Both Slint GUIs, `infinitier_keeper_slint` and `infinitier_explorer_slint`, have the same `mcp`
-feature; the examples use the keeper, the explorer runs the same way with its game folders as
-arguments.
+Both GUIs, `infinitier_keeper` and `infinitier_explorer`, have the same `mcp` feature; the
+examples use the keeper, the explorer runs the same way with its game folders as arguments.
 
 Slint ships an **embedded MCP server** behind the `slint/mcp` cargo feature. When enabled and
 switched on at runtime it opens an HTTP endpoint that an external tool (or an AI agent) can use to
-read the app's **element tree**, **inject input**, and **capture screenshots** — the Slint analogue
-of the [egui inspection port](egui_mcp.md).
+read the app's **element tree**, **inject input**, and **capture screenshots**.
 
 ## One-time setup (already done in this repo)
 
-1. **The `mcp` feature** — `src/infinitier_keeper_slint/Cargo.toml` gates it:
+1. **The `mcp` feature** — `src/infinitier_keeper/Cargo.toml` gates it:
    ```toml
    [features]
    mcp = ["slint/mcp"]
    ```
-   It is a dev-only opt-in; a normal `cargo run -p infinitier_keeper_slint` has no MCP surface.
+   It is a dev-only opt-in; a normal `cargo run -p infinitier_keeper` has no MCP surface.
 
 2. **Debug info at build time** — the element tree needs source locations, so build with
    `SLINT_EMIT_DEBUG_INFO=1` (see below).
@@ -35,7 +33,7 @@ of the [egui inspection port](egui_mcp.md).
 SLINT_EMIT_DEBUG_INFO=1 \
 SLINT_MCP_PORT=8080 \
 SLINT_BACKEND=headless \
-cargo run -p infinitier_keeper_slint --features mcp -- \
+cargo run -p infinitier_keeper --features mcp -- \
     --config config_test/infinitier_keeper.toml
 # serves Streamable HTTP at http://127.0.0.1:8080/mcp
 ```
@@ -104,8 +102,8 @@ take_screenshot {"windowHandle": <win>}            → eyeball it
 - **Headless still needs `SLINT_EMIT_DEBUG_INFO=1` at build time** — without it the tree comes back
   without element ids/locations and locating widgets by id fails.
 - **Screenshots are true off-screen renders** in headless mode — no window has to be visible or
-  focused, unlike the egui/X11 path.
-- **Don't `pkill -f infinitier_keeper_slint`** — the pattern matches your own shell command line and
+  focused.
+- **Don't `pkill -f infinitier_keeper`** — the pattern matches your own shell command line and
   kills the driving shell. Record the PID (`echo $! > app.pid`) and `kill "$(cat app.pid)"`.
 - **A killed app leaves its temp files behind.** Loading a game with compressed (BIFC) archives
   — BG2 does — unpacks each into a `/tmp/infinitier_*` directory (~60 MB) that's removed on
@@ -130,4 +128,4 @@ sudo apt install libfontconfig1-dev     # Debian/Ubuntu
 ```
 
 The runtime `libfontconfig.so.1` alone is not enough — the `.pc`/`.so` dev symlink is a build-time
-linker requirement. See `src/infinitier_keeper_slint/readme.md`.
+linker requirement. See `src/infinitier_keeper/README.md`.

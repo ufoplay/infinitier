@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Same loop, but the decoder converts each frame to tightly-packed RGBA8
 (`width * height * 4` bytes) using BT.601 with nearest-neighbour chroma
-upsample. Use this when feeding directly into an egui texture, an
+upsample. Use this when feeding directly into a GUI image, an
 image dump, or any consumer that doesn't want to handle YUV.
 
 ```rust,no_run

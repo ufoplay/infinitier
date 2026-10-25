@@ -58,8 +58,9 @@ impl Importer for TtfImporter<'_> {
 #[derive(Clone)]
 pub struct Ttf {
     /// Original font bytes, shared so the viewer (or any other
-    /// consumer) can install them into a text renderer (e.g. egui's
-    /// `FontData::from_owned`) without a second read of the file.
+    /// consumer) can register them with a text renderer (the explorer
+    /// registers them with Slint's font collection) without a second read
+    /// of the file.
     pub raw: Arc<Vec<u8>>,
     /// Name ID 1 — the font family ("Lato", "Eadui", …).
     pub family_name: String,
@@ -220,7 +221,7 @@ mod tests {
     #[test]
     fn test_raw_bytes_match_source() {
         // The `raw` field must hold the exact file contents — the
-        // viewer relies on this to install the font into egui's text
+        // viewer relies on this to register the font with Slint's text
         // renderer without re-reading from disk.
         let path = get_assets_path().join("TTF/Lato-Bold.ttf");
         let expected = std::fs::read(&path).unwrap();

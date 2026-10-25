@@ -1,0 +1,75 @@
+// The Memorization / Proficiencies tabs: a short striped table. Its first
+// column names each row; the other columns hold numbers, some of them
+// editable (drag or type, each change committed at once).
+
+import { Label, ListItem, ListView, NumberField, Theme } from "@themekit";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
+import { Metrics } from "../themes/metrics.slint";
+
+// A value cell. An editable one, kept from `minimum` to `maximum`, routes
+// `id` back with each new value.
+export struct EditCell {
+    text: string,
+    editable: bool,
+    id: int,
+    minimum: int,
+    maximum: int,
+}
+
+export struct EditRow {
+    name: string,
+    // One per value column.
+    cells: [EditCell],
+}
+
+export global EditTableAdapter {
+    // The first column's header, then the value columns' headers.
+    in property <string> name-header;
+    in property <[string]> headers;
+    in property <[EditRow]> rows;
+    callback commit(int /* cell id */, string /* value */);
+}
+
+export component EditTableTab inherits HorizontalLayout {
+    VerticalLayout {
+        // Not stretched across the whole tab: it grows up to its widest, and
+        // the filler after it takes the rest.
+        max-width: Metrics.edit-table-width;
+        horizontal-stretch: 1;
+        spacing: Theme.spacing.xs;
+
+        TableHeader {
+            ColumnHeader {
+                text: EditTableAdapter.name-header;
+                horizontal-stretch: 1;
+            }
+            for header in EditTableAdapter.headers: ColumnHeader {
+                text: header;
+                width: Metrics.edit-table-value-column;
+            }
+        }
+        ListView {
+            for row[i] in EditTableAdapter.rows: ListItem {
+                index: i;
+                Label {
+                    text: row.name;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                for cell in row.cells: HorizontalLayout {
+                    width: Metrics.edit-table-value-column;
+                    alignment: start;
+                    if cell.editable: NumberField {
+                        width: Metrics.field-input-width;
+                        value: cell.text.to-float();
+                        minimum: cell.minimum;
+                        maximum: cell.maximum;
+                        changed(value) => { EditTableAdapter.commit(cell.id, value); }
+                    }
+                    if !cell.editable: Label { text: cell.text; }
+                }
+            }
+        }
+    }
+    Rectangle { horizontal-stretch: 0; }
+}

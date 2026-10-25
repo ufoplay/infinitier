@@ -5,9 +5,7 @@ members = [
     "src/core",
     "src/datasource",
     "src/infinitier_explorer",
-    "src/infinitier_explorer_slint",
     "src/infinitier_keeper",
-    "src/infinitier_keeper_slint",
     "src/fs",
     "src/test_utils",
     "src/resources/*",
@@ -35,9 +33,7 @@ infinitier_wbm_decoder = { path = "src/codecs/wbm_decoder", version = "0.0.14"  
 infinitier_common = { path = "src/common", version = "0.0.14" }
 infinitier_core = { path = "src/core", version = "0.0.14"  }
 infinitier_datasource = { path = "src/datasource", version = "0.0.14"  }
-infinitier_egui_common = { path = "src/egui_common", version = "0.0.14" }
 infinitier_fs = { path = "src/fs", version = "0.0.14"  }
-infinitier_keeper = { path = "src/infinitier_keeper", version = "0.0.14"  }
 infinitier_test_utils = { path = "src/test_utils" }
 
 # Resources
@@ -104,8 +100,8 @@ texture2ddecoder = "0.1"
 texpresso = "2"
 
 # Pure-Rust TrueType / OpenType parser. Used by the TTF resource importer
-# to extract `name` / `head` / `hhea` metadata; sample-text rendering in
-# the viewer goes through egui's text renderer instead.
+# to extract `name` / `head` / `hhea` metadata; the explorer's viewer draws
+# the sample text with Slint, registering the font at run time.
 ttf-parser = "0.25"
 
 # Audio playback
@@ -116,25 +112,22 @@ matroska-demuxer = "0.8"
 oxideav-vp8 = "0.2.3"
 oxideav-core = "0.1"
 
-# egui UI
-# `default-features = false` drops eframe's `accesskit` feature which clashes with Xilem.
-# `inspection` opens a TCP port for the `egui_mcp` server / AccessKit tree
-# introspection + input injection, but only when the `EGUI_INSPECTION` env
-# var is set at runtime — otherwise it is inert.
-eframe = { version = "0.36", features = ["inspection"] }
-# Local dev: path to the sibling egui-components checkout so table-widget
-# changes take effect without pushing. Restore the git dep (and pin the
-# pushed rev) before committing.
-egui-components = { git = "https://github.com/ufoscout/egui-components.git", branch = "main" }
-# Bundles the Inter typeface (OFL-1.1, https://rsms.me/inter) as a
-# `pub const REGULAR: &[u8]`. The active weight is selected via the
-# crate's Cargo features (`regular`, `bold`, `medium`, …) — only
-# one may be enabled at a time; the constant name stays the same.
-ttf-inter = { version = "0.1", default-features = false, features = ["regular"] }
-
-# Slint UI
-# The Slint keeper's component library (`@themekit`), used from its build
-# script and its token-lint test. Local dev: path to the sibling
+# Slint UI (the keeper and the explorer)
+# Software renderer + winit: no OpenGL / GPU stack to build or link against.
+# Text needs the fontconfig runtime library (and its dev package at build
+# time on Linux, see the keeper's readme). The apps add their own extras:
+# the explorer `unstable-fontique-011` (fonts registered at run time), both
+# `mcp` behind their `mcp` feature. `~`: the `unstable-*` features may change
+# with any minor release.
+slint = { version = "~1.18.1", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-software",
+] }
+slint-build = "~1.18.1"
+# The apps' component library (`@themekit`), used from their build scripts
+# and their token-lint tests. Local dev: path to the sibling
 # slint-themekit checkout so new components take effect without pushing.
 # Switch to the git dep (and pin the pushed rev) before pushing: CI can't see
 # this path.

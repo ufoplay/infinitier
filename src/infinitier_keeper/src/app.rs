@@ -1,152 +1,236 @@
+//! Top-level state of the keeper: which game (if any) is loaded and
+//! which saves are open, the shell's dialogs, and game switching.
+//!
+//! The keeper starts with no game; it loads the settings' active game, or one
+//! picked in the Settings dialog, on a background thread while a modal
+//! "Loading…" overlay with a spinner blocks the UI.
+
 use std::any::Any;
+use std::cell::RefCell;
 use std::fmt::Display;
+use std::rc::Rc;
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
-use eframe::egui;
-use egui_components::theme::Theme;
-use egui_components::{Dialog, Label};
+use infinitier_core::fs::Importer;
+use infinitier_core::game::GameData;
+use infinitier_core::imported_resource::gam::ImportedGam;
+use infinitier_core::resource::Game;
+use infinitier_core::resource::gam::GamImporter;
+use infinitier_core::save_games::SaveGame;
+use slint::{ComponentHandle, Timer, TimerMode};
 
-use crate::game_view::GameView;
+use crate::AppWindow;
+use crate::browser::Browsers;
+use crate::dialogs::load_dialog::LoadDialog;
+use crate::dialogs::save_dialog::SaveDialog;
+use crate::dialogs::settings_dialog::SettingsDialog;
 use crate::settings::GameConfig;
-use crate::state::{AppState, GameLoadError};
-use crate::ui::{HeaderPanel, SettingsAction};
+use crate::state::{LoadedGame, Model};
+use crate::view;
 
-pub struct KeeperApp {
-    header_panel: HeaderPanel,
-    /// The loaded game; `None` until one is loaded from the settings.
-    game: Option<GameView>,
-    /// Settings dialog: the configured games, and which one to load.
-    settings_action: SettingsAction,
-    /// Game being loaded: the settings' active game at startup, or one
-    /// picked in the Settings dialog.
-    pending_game: Option<PendingGame>,
+/// How often a running game load is checked for completion.
+const LOAD_POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+/// What the keeper has open.
+pub enum Session {
+    NoGame,
+    /// A game is loaded but no save is open.
+    Game(Box<LoadedGame>),
+    /// A game with at least one open save.
+    Saves(Box<Model>),
 }
 
-/// A game being read on a background thread, so the UI keeps painting its
-/// "Loading…" modal — spinner included, everything underneath blocked —
-/// until the thread is done.
-struct PendingGame {
-    config: GameConfig,
-    loading: JoinHandle<Result<AppState, GameLoadError>>,
-}
-
-impl KeeperApp {
-    /// Start by loading the settings' active game, if they name one; the
-    /// Settings dialog picks any other.
-    pub fn new(settings_action: SettingsAction) -> Self {
-        let mut app = Self {
-            header_panel: HeaderPanel,
-            game: None,
-            settings_action,
-            pending_game: None,
-        };
-        if let Some(config) = app.settings_action.startup_game() {
-            app.start_loading(config);
-        }
-        app
-    }
-
-    /// Start reading `config`'s game data on a background thread.
-    fn start_loading(&mut self, config: GameConfig) {
-        let roots = config.roots();
-        let game_type = config.game_type;
-        let spawned = thread::Builder::new()
-            .name("game-load".into())
-            .spawn(move || AppState::load(&roots, game_type));
-        match spawned {
-            Ok(loading) => self.pending_game = Some(PendingGame { config, loading }),
-            Err(e) => self.load_failed(&config, &e),
+impl Session {
+    /// The loaded game's data, with or without open saves.
+    pub fn game_data(&self) -> Option<&GameData> {
+        match self {
+            Session::NoGame => None,
+            Session::Game(game) => Some(&game.game_data),
+            Session::Saves(model) => Some(&model.game_data),
         }
     }
 
-    /// Swap in the game a finished background load produced, in place of
-    /// the current one, if any. Every open save and every per-game cache
-    /// belongs to the old game, so its whole view is replaced. If the load
-    /// failed the current game stays, and the Settings dialog reopens with
-    /// the error.
-    fn finish_loading(&mut self, ctx: &egui::Context, pending: PendingGame) {
-        let PendingGame { config, loading } = pending;
-        let state = match loading.join() {
-            Ok(Ok(state)) => state,
-            Ok(Err(e)) => return self.load_failed(&config, &e),
-            Err(panic) => return self.load_failed(&config, &panic_message(panic.as_ref())),
-        };
-        log::info!(
-            "[settings] switched to {:?} at {}",
-            state.game_data.game(),
-            config.game_path.display()
-        );
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(state.window_title()));
-        clear_frame_store(ctx);
-        self.settings_action.game_loaded(config);
-        self.game = Some(GameView::new(state));
-    }
-
-    fn load_failed(&mut self, config: &GameConfig, err: &dyn Display) {
-        log::error!(
-            "[settings] failed to load {}: {err}",
-            config.game_path.display()
-        );
-        self.settings_action.game_load_failed(config, err);
-    }
-}
-
-impl eframe::App for KeeperApp {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // A background load that finished: swap its game in before anything
-        // reads the game state.
-        if let Some(pending) = self.pending_game.take_if(|p| p.loading.is_finished()) {
-            self.finish_loading(ui.ctx(), pending);
-        }
-        let header_action = self.header_panel.show(ui, self.game.is_some());
-        if header_action.settings_clicked {
-            self.settings_action.open();
-        }
-        if let Some(theme) = header_action.theme_changed {
-            self.settings_action.set_theme(theme);
-        }
-        if let Some(config) = self.settings_action.show(ui.ctx()) {
-            self.start_loading(config);
-        }
-        match &mut self.game {
-            Some(game) => game.show(ui, header_action),
-            None => no_game_state(ui),
-        }
-        if let Some(pending) = &self.pending_game {
-            // The spinner keeps requesting frames, so the finished load is
-            // picked up on the next one.
-            loading_notice(ui.ctx(), &pending.config);
+    /// Mutable access to the loaded game's data.
+    pub fn game_data_mut(&mut self) -> Option<&mut GameData> {
+        match self {
+            Session::NoGame => None,
+            Session::Game(game) => Some(&mut game.game_data),
+            Session::Saves(model) => Some(&mut model.game_data),
         }
     }
 }
 
-/// Drop everything memoised in egui's frame store. The character tabs
-/// cache game-derived data there (TLK strings, palette, calendar, item
-/// icons, …), which would otherwise leak the previous game into the new
-/// one. Widget state (scroll offsets, column widths) goes with it. The
-/// theme is kept in the same store, so it is reinstalled.
-fn clear_frame_store(ctx: &egui::Context) {
-    let theme = Theme::get(ctx);
-    ctx.data_mut(|d| d.clear());
-    theme.install(ctx);
+/// A game being read on a background thread.
+pub struct PendingGame {
+    pub config: GameConfig,
+    loading: JoinHandle<Result<LoadedGame, String>>,
 }
 
-/// Modal painted while a game loads (see [`PendingGame`]). Re-opened every
-/// frame, so Esc or a backdrop click can't dismiss it; being modal, it
-/// blocks the rest of the UI.
-fn loading_notice(ctx: &egui::Context, config: &GameConfig) {
-    let mut open = true;
-    Dialog::new("Loading game")
-        .no_close_button()
-        .show(ctx, &mut open, |ui| {
-            ui.horizontal(|ui| {
-                ui.add(egui::Spinner::new());
-                ui.add(Label::new(format!(
-                    "Loading {}…",
-                    config.game_path.display()
-                )));
-            });
-        });
+pub struct App {
+    pub session: Session,
+    /// The loaded game's Item and Spell Browser windows.
+    pub browsers: Browsers,
+    pub settings: SettingsDialog,
+    pub load_dialog: LoadDialog,
+    pub save_dialog: SaveDialog,
+    /// The game being loaded, if any; its overlay blocks the UI meanwhile.
+    pub pending: Option<PendingGame>,
+    /// Polls [`Self::pending`] for completion while a load runs.
+    loading_timer: Timer,
+    /// One-line feedback in the header (e.g. where a save was written).
+    pub status: String,
+}
+
+impl App {
+    pub fn new(settings: SettingsDialog) -> Self {
+        Self {
+            session: Session::NoGame,
+            browsers: Browsers::default(),
+            settings,
+            load_dialog: LoadDialog::default(),
+            save_dialog: SaveDialog::default(),
+            pending: None,
+            loading_timer: Timer::default(),
+            status: String::new(),
+        }
+    }
+
+    pub fn model(&self) -> Option<&Model> {
+        match &self.session {
+            Session::Saves(model) => Some(model),
+            Session::NoGame | Session::Game(_) => None,
+        }
+    }
+
+    pub fn model_mut(&mut self) -> Option<&mut Model> {
+        match &mut self.session {
+            Session::Saves(model) => Some(model),
+            Session::NoGame | Session::Game(_) => None,
+        }
+    }
+
+    /// The loaded game's type.
+    pub fn game(&self) -> Option<Game> {
+        match &self.session {
+            Session::NoGame => None,
+            Session::Game(game) => Some(game.game_data.game()),
+            Session::Saves(model) => Some(model.game_data.game()),
+        }
+    }
+
+    /// Open `save` into a tab and make it active — or just focus its tab
+    /// when it is already open.
+    pub fn open_save(&mut self, save: SaveGame) -> Result<(), String> {
+        if let Some(tab) = self.model().and_then(|m| m.tab_of(&save.folder_path)) {
+            if let Some(model) = self.model_mut() {
+                model.switch_save(tab);
+            }
+            return Ok(());
+        }
+        let game_data = self.session.game_data_mut().ok_or("no game is loaded")?;
+        let gam = import_save(&save, game_data)?;
+        log::info!("[load] opened save {}", save.folder_path.display());
+        match std::mem::replace(&mut self.session, Session::NoGame) {
+            Session::Saves(mut model) => {
+                model.open_save(save, Box::new(gam));
+                self.session = Session::Saves(model);
+            }
+            Session::Game(game) => {
+                self.session = Session::Saves(Box::new(Model::new(*game, save, Box::new(gam))))
+            }
+            Session::NoGame => {}
+        }
+        Ok(())
+    }
+
+    /// Close save tab `i`. Closing the last one keeps the game loaded with
+    /// no save open.
+    pub fn close_save(&mut self, i: usize) {
+        match std::mem::replace(&mut self.session, Session::NoGame) {
+            Session::Saves(model) if model.parked.len() == 1 && i == 0 => {
+                self.session = Session::Game(Box::new(model.into_game()));
+            }
+            Session::Saves(mut model) => {
+                model.close_save(i);
+                self.session = Session::Saves(model);
+            }
+            other => self.session = other,
+        }
+    }
+}
+
+/// Import and resolve the GAM of `save` against `game_data`.
+fn import_save(save: &SaveGame, game_data: &GameData) -> Result<ImportedGam, String> {
+    let gam = GamImporter {
+        name: save.folder_name(),
+        engine: game_data.game().engine(),
+    }
+    .import(&save.gam)
+    .map_err(|e| format!("couldn't read \"{}\": {e}", save.folder_name()))?;
+    ImportedGam::load(gam, game_data)
+        .map_err(|e| format!("couldn't load \"{}\": {e}", save.folder_name()))
+}
+
+/// Start reading `config`'s game on a background thread. The loading
+/// overlay stays up until the thread finishes; then the game replaces the
+/// current one (closing its saves), or the Settings dialog reopens with the
+/// error and the current game stays.
+pub fn start_loading(app_rc: &Rc<RefCell<App>>, ui: &AppWindow, config: GameConfig) {
+    let mut app = app_rc.borrow_mut();
+    let roots = config.roots();
+    let game_type = config.game_type;
+    let spawned = thread::Builder::new()
+        .name("game-load".into())
+        .spawn(move || LoadedGame::load(&roots, game_type));
+    match spawned {
+        Ok(loading) => {
+            app.pending = Some(PendingGame { config, loading });
+            let (app_rc, weak) = (app_rc.clone(), ui.as_weak());
+            app.loading_timer
+                .start(TimerMode::Repeated, LOAD_POLL_INTERVAL, move || {
+                    let Some(ui) = weak.upgrade() else { return };
+                    let mut app = app_rc.borrow_mut();
+                    if let Some(pending) = app.pending.take_if(|p| p.loading.is_finished()) {
+                        app.loading_timer.stop();
+                        finish_loading(&mut app, pending);
+                        view::refresh(&ui, &mut app);
+                    }
+                });
+        }
+        Err(e) => load_failed(&mut app, &config, &e),
+    }
+    view::refresh(ui, &mut app);
+}
+
+/// Swap in the game a finished background load produced, or report why it
+/// couldn't be loaded.
+fn finish_loading(app: &mut App, pending: PendingGame) {
+    let PendingGame { config, loading } = pending;
+    let game = match loading.join() {
+        Ok(Ok(game)) => game,
+        Ok(Err(e)) => return load_failed(app, &config, &e),
+        Err(panic) => return load_failed(app, &config, &panic_message(panic.as_ref())),
+    };
+    log::info!(
+        "[settings] switched to {:?} at {}",
+        game.game_data.game(),
+        config.game_path.display()
+    );
+    app.session = Session::Game(Box::new(game));
+    app.browsers = Browsers::default();
+    app.load_dialog.close();
+    app.save_dialog.close();
+    app.status.clear();
+    app.settings.game_loaded(config);
+}
+
+fn load_failed(app: &mut App, config: &GameConfig, err: &dyn Display) {
+    log::error!(
+        "[settings] failed to load {}: {err}",
+        config.game_path.display()
+    );
+    app.settings.game_load_failed(config, err);
 }
 
 /// What a panicked loader thread reported, for the error shown in Settings.
@@ -159,19 +243,4 @@ fn panic_message(payload: &(dyn Any + Send)) -> String {
         Some(message) => format!("the loader crashed: {message}"),
         None => "the loader crashed".to_owned(),
     }
-}
-
-/// Placeholder shown until a game is loaded, pointing at the Settings
-/// dialog where games are added and picked.
-fn no_game_state(ui: &mut egui::Ui) {
-    egui::CentralPanel::default().show(ui, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.add_space(48.0);
-            ui.heading("No game loaded");
-            ui.add_space(6.0);
-            ui.label(
-                "Open Settings to add a game, then select it and close the dialog to load it.",
-            );
-        });
-    });
 }

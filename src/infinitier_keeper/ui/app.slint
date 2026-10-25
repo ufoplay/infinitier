@@ -1,0 +1,164 @@
+// The Infinitier Keeper's main window, built on
+// slint-themekit (`@themekit`): widgets and design values come from its
+// components and `Theme` tokens (see THEMEKIT_MIGRATION.md).
+//
+// The UI is split like Slint's demo apps:
+//   components/ — the keeper's own widgets (themekit-based), stateless
+//   shell/      — the window's chrome: header, save tabs, party, tab strip
+//   tabs/       — the character tabs' pages
+//   browser/    — the floating Item / Spell Browser windows
+//   dialogs/    — the modal dialogs
+//   themes/     — the keeper's own layout values (`Metrics`)
+// Each part reads and calls its `*Adapter` global, which the Rust side
+// fills and handles; this file only composes the parts.
+
+import { Divider, Theme, ThemePresets } from "@themekit";
+import { Metrics } from "themes/metrics.slint";
+import { FieldCard, FieldRow } from "components/components.slint";
+import {
+    CharacterAdapter,
+    CharacterContent,
+    CharacterPanel,
+    EmptyState,
+    HeaderBar,
+    PartyAdapter,
+    PartyList,
+    PartyMember,
+    SaveTabsAdapter,
+    SaveTabStrip,
+    ShellAdapter,
+} from "shell/shell.slint";
+import {
+    AppearanceAdapter,
+    CardsAdapter,
+    ColorSwatch,
+    EditCell,
+    EditRow,
+    EditTableAdapter,
+    GridAdapter,
+    GridRow,
+    InventoryAdapter,
+    InvRow,
+    SpellRowUi,
+    SpellsAdapter,
+    TableAdapter,
+    VarRow,
+} from "tabs/tabs.slint";
+import { BrowserKind, BrowserLayer, BrowserRow, BrowsersAdapter, BrowserState, TypeFilter } from "browser/browser.slint";
+import {
+    DeleteSaveDialog,
+    GameRowUi,
+    LoadAdapter,
+    LoadDialog,
+    LoadingAdapter,
+    LoadingOverlay,
+    LoadRowUi,
+    SaveAdapter,
+    SaveDialog,
+    SettingsAdapter,
+    SettingsDialog,
+} from "dialogs/dialogs.slint";
+
+// For the Rust side.
+export {
+    ShellAdapter,
+    SaveTabsAdapter,
+    PartyAdapter,
+    PartyMember,
+    CharacterAdapter,
+    CharacterContent,
+    CardsAdapter,
+    FieldCard,
+    FieldRow,
+    EditTableAdapter,
+    EditRow,
+    EditCell,
+    TableAdapter,
+    VarRow,
+    GridAdapter,
+    GridRow,
+    AppearanceAdapter,
+    ColorSwatch,
+    InventoryAdapter,
+    InvRow,
+    SpellsAdapter,
+    SpellRowUi,
+    BrowsersAdapter,
+    BrowserKind,
+    BrowserRow,
+    BrowserState,
+    TypeFilter,
+    SettingsAdapter,
+    GameRowUi,
+    LoadAdapter,
+    LoadRowUi,
+    SaveAdapter,
+    LoadingAdapter,
+}
+
+export component AppWindow inherits Window {
+    title: ShellAdapter.title;
+    background: Theme.palette.background;
+    preferred-width: Metrics.window-width;
+    preferred-height: Metrics.window-height;
+    min-width: Metrics.window-min-width;
+    min-height: Metrics.window-min-height;
+
+    // The colour theme.
+    property <bool> dark-theme: ShellAdapter.dark-theme;
+    changed dark-theme => { root.apply-theme(); }
+    init => { root.apply-theme(); }
+
+    function apply-theme() {
+        Theme.current = root.dark-theme ? ThemePresets.dark : ThemePresets.light;
+    }
+
+
+    // Scroll browser `kind`'s list so `row` is in view. (A global's callback
+    // can't be implemented in .slint, so the Rust side calls this instead.)
+    public function browser-scroll-to(kind: BrowserKind, row: int) {
+        browsers.scroll-to(kind, row);
+    }
+
+    VerticalLayout {
+        padding: Theme.spacing.md;
+        spacing: Theme.spacing.sm;
+        HeaderBar { }
+        if SaveTabsAdapter.names.length > 0: SaveTabStrip { }
+        // Sets the open saves apart from the page below.
+        if SaveTabsAdapter.names.length > 0: Divider { }
+        if !ShellAdapter.has-save: EmptyState { vertical-stretch: 1; }
+        if ShellAdapter.has-save: HorizontalLayout {
+            spacing: Theme.spacing.sm;
+            PartyList { }
+            CharacterPanel { horizontal-stretch: 1; }
+        }
+    }
+
+    // Over the editor: the floating browsers, then the modal dialogs, then
+    // the loading overlay (covering everything, an open dialog included).
+    browsers := BrowserLayer {
+        width: root.width;
+        height: root.height;
+    }
+    if LoadAdapter.open: LoadDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if LoadAdapter.open && LoadAdapter.confirm-delete: DeleteSaveDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if SaveAdapter.open: SaveDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if SettingsAdapter.open: SettingsDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if LoadingAdapter.active: LoadingOverlay {
+        width: root.width;
+        height: root.height;
+    }
+}

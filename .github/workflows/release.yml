@@ -60,6 +60,13 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      # Slint's text stack links fontconfig at build time on Linux.
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev
+
       # e.g. infinitier_keeper-v0.0.2-x86_64-pc-windows-msvc.zip, with a .sha256
       # checksum file.
       - name: Build and upload infinitier_keeper
