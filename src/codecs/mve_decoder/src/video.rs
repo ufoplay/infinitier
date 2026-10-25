@@ -1135,8 +1135,8 @@ fn decode16_0xe(
     // splat it across all 8 rows via `copy_from_slice` — one row-sized
     // `memcpy` per row instead of 8 × 2-byte stores.
     let mut row = [0u8; 16];
-    for chunk in row.chunks_exact_mut(2) {
-        chunk.copy_from_slice(&vb);
+    for chunk in row.as_chunks_mut::<2>().0 {
+        *chunk = vb;
     }
     for y in 0..8usize {
         let off = (dst_px + y * width) * BPP16;

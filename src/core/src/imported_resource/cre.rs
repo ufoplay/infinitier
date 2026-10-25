@@ -325,7 +325,9 @@ fn slots_and_items(cre: &Cre) -> (Vec<i16>, &[Item]) {
 /// The `item_slots` table is stored as little-endian `i16` indices.
 fn as_i16(bytes: &[u8]) -> Vec<i16> {
     bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|c| i16::from_le_bytes([c[0], c[1]]))
         .collect()
 }

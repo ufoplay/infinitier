@@ -1907,7 +1907,7 @@ impl Cre {
         items.remove(removed as usize);
         // Dropping a record shifts every later index down by one; the cleared
         // slot itself becomes empty.
-        for chunk in item_slots.chunks_exact_mut(2) {
+        for chunk in item_slots.as_chunks_mut::<2>().0 {
             let idx = i16::from_le_bytes([chunk[0], chunk[1]]);
             let new = match idx {
                 _ if idx == removed => -1,
@@ -3595,7 +3595,9 @@ mod tests {
             panic!("expected V1 sub-sections");
         };
         s.item_slots
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .position(|c| i16::from_le_bytes([c[0], c[1]]) < 0)
             .expect("a V1 creature should have an empty inventory slot")
     }

@@ -48,7 +48,13 @@ pub fn assert_images_are_equal(img_a: &DynamicImage, img_b: &DynamicImage, toler
             }
         }
         Some(t) => {
-            for (i, (pa, pb)) in a.chunks_exact(4).zip(b.chunks_exact(4)).enumerate() {
+            for (i, (pa, pb)) in a
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(b.as_chunks::<4>().0)
+                .enumerate()
+            {
                 for c in 0..4 {
                     let d = pa[c].abs_diff(pb[c]);
                     if d > t {

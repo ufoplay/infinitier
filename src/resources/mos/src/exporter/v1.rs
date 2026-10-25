@@ -221,7 +221,7 @@ fn build_block(
         }
         let nq = NeuQuant::new(10, available_slots, &flat);
         let rgba_map = nq.color_map_rgba();
-        for entry in rgba_map.chunks_exact(4) {
+        for entry in rgba_map.as_chunks::<4>().0 {
             palette.push(Rgb {
                 r: entry[0],
                 g: entry[1],

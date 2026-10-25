@@ -242,7 +242,7 @@ fn run_ffmpeg(args: &[&str]) -> Result<(), Box<dyn Error>> {
 fn palette_from_pal8_header(header: &[u8]) -> Box<[[u8; 3]; 256]> {
     debug_assert_eq!(header.len(), PAL8_HEADER_BYTES);
     let mut palette = Box::new([[0u8; 3]; 256]);
-    for (i, chunk) in header.chunks_exact(4).enumerate() {
+    for (i, chunk) in header.as_chunks::<4>().0.iter().enumerate() {
         palette[i] = [chunk[0], chunk[1], chunk[2]];
     }
     palette

@@ -21,7 +21,7 @@ The goal is to implement pure Rust readers for all file formats used by the Infi
 
 Requirements:
 
-- A recent Rust toolchain. The workspace uses `edition = "2024"` and `resolver = "3"`, so Rust **1.85** or newer is required. Install via [rustup](https://rustup.rs/) and keep it on `stable`.
+- A recent Rust toolchain. The workspace uses `edition = "2024"` and `resolver = "3"`, and `as_chunks`, so Rust **1.88** or newer is required. Install via [rustup](https://rustup.rs/) and keep it on `stable`.
 - [`just`](https://github.com/casey/just) — (optional) a simple build tool that can be used as the task runner. Run `just` with no arguments to list available recipes.
 
 - On Ubuntu/Debian, the audio backend (`rodio` / ALSA) needs the ALSA development headers, and

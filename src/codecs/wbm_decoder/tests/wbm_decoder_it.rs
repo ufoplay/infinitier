@@ -233,7 +233,7 @@ fn logo_wbm_rgba_output_shape() {
         decoder.width() as usize * decoder.height() as usize * 4
     );
     assert!(
-        pixels.chunks_exact(4).all(|px| px[3] == 255),
+        pixels.as_chunks::<4>().0.iter().all(|px| px[3] == 255),
         "all alpha bytes must be 255",
     );
 }

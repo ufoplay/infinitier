@@ -513,8 +513,10 @@ impl<R: BufRead + Seek> MveDecoder<R> {
         } else {
             // Raw i16 LE samples
             self.scratch
-                .chunks_exact(2)
-                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&c| i16::from_le_bytes(c))
                 .collect()
         };
 
@@ -580,13 +582,18 @@ impl<R: BufRead + Seek> MveDecoder<R> {
         let mut rgba = vec![0u8; n_pixels * 4];
         match self.format {
             VideoFormat::Palette8 => {
-                for (dst, &idx) in rgba.chunks_exact_mut(4).zip(self.buf1.iter()) {
-                    dst.copy_from_slice(&self.palette[idx as usize]);
+                for (dst, &idx) in rgba.as_chunks_mut::<4>().0.iter_mut().zip(self.buf1.iter()) {
+                    *dst = self.palette[idx as usize];
                 }
             }
             VideoFormat::Rgb555 => {
-                for (dst, src) in rgba.chunks_exact_mut(4).zip(self.buf1.chunks_exact(2)) {
-                    let px = u16::from_le_bytes([src[0], src[1]]);
+                for (dst, &src) in rgba
+                    .as_chunks_mut::<4>()
+                    .0
+                    .iter_mut()
+                    .zip(self.buf1.as_chunks::<2>().0)
+                {
+                    let px = u16::from_le_bytes(src);
                     let r = ((px >> 10) & 0x1f) as u8;
                     let g = ((px >> 5) & 0x1f) as u8;
                     let b = (px & 0x1f) as u8;

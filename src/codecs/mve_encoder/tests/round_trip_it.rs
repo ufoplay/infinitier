@@ -52,7 +52,7 @@ fn solid_colour_round_trip() {
     assert_eq!((w, h), (320, 240));
     assert_eq!(frames.len(), 30);
     for (i, f) in frames.iter().enumerate() {
-        for chunk in f.chunks_exact(4) {
+        for chunk in f.as_chunks::<4>().0 {
             assert_eq!(chunk, &[0, 0, 252, 255], "frame {i} pixel mismatch");
         }
     }
