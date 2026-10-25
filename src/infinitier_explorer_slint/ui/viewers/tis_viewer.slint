@@ -1,0 +1,85 @@
+import { Checkbox, Divider, Label, Slider, Theme, Tone, VerticalDivider } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+import { OverlayColors } from "../themes/colors.slint";
+import { FittedImage } from "../components/components.slint";
+
+export global TisAdapter {
+    // The tiles composited `columns` per row.
+    in property <image> image;
+    in property <length> width;
+    in property <length> height;
+    // A tile's side, and the composite's size in tiles (the grid).
+    in property <length> tile-size;
+    in property <int> grid-columns;
+    in property <int> grid-rows;
+    // Tiles per row, and the range that keeps the composite within limits.
+    in property <int> columns;
+    in property <int> columns-min;
+    in property <int> columns-max;
+    in property <bool> show-grid;
+    // Too many tiles for any arrangement: only the first ones are shown.
+    in property <bool> truncated;
+    callback columns-changed(columns: int);
+    callback grid-toggled();
+}
+
+// A TIS tileset: the tiles-per-row and grid controls above the composite.
+export component TisViewer inherits Rectangle {
+    VerticalLayout {
+        HorizontalLayout {
+            padding: Theme.spacing.sm;
+            spacing: Theme.spacing.sm;
+            alignment: start;
+
+            Label { text: "Tiles per row:"; }
+            Slider {
+                width: Metrics.columns-slider-width;
+                value: TisAdapter.columns;
+                minimum: TisAdapter.columns-min;
+                maximum: TisAdapter.columns-max;
+                enabled: TisAdapter.columns-min < TisAdapter.columns-max;
+                changed(value) => { TisAdapter.columns-changed(round(value)); }
+            }
+            Label { text: "\{TisAdapter.columns} / \{TisAdapter.columns-max}"; }
+            VerticalDivider { }
+            Checkbox {
+                text: "Show grid";
+                checked: TisAdapter.show-grid;
+                toggled => { TisAdapter.grid-toggled(); }
+            }
+            if TisAdapter.truncated: VerticalDivider { }
+            if TisAdapter.truncated: Label {
+                text: "⚠ Tileset too large; showing partial view";
+                tone: Tone.warning;
+            }
+        }
+        Divider { }
+        fitted := FittedImage {
+            vertical-stretch: 1;
+            source: TisAdapter.image;
+            natural-width: TisAdapter.width;
+            natural-height: TisAdapter.height;
+
+            property <length> tile: TisAdapter.tile-size * self.scale;
+            property <bool> grid: TisAdapter.show-grid && self.tile > Metrics.grid-min-spacing;
+
+            // One line per tile boundary, the outer edges included.
+            if fitted.grid: Rectangle {
+                for column in TisAdapter.grid-columns + 1: Rectangle {
+                    x: min(fitted.image-x + column * fitted.tile, fitted.image-x + fitted.image-width - self.width);
+                    y: fitted.image-y;
+                    width: Theme.sizes.border-width;
+                    height: fitted.image-height;
+                    background: OverlayColors.grid;
+                }
+                for row in TisAdapter.grid-rows + 1: Rectangle {
+                    x: fitted.image-x;
+                    y: min(fitted.image-y + row * fitted.tile, fitted.image-y + fitted.image-height - self.height);
+                    width: fitted.image-width;
+                    height: Theme.sizes.border-width;
+                    background: OverlayColors.grid;
+                }
+            }
+        }
+    }
+}

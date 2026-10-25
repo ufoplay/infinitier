@@ -1,0 +1,52 @@
+import { Label, ProgressBar, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+import { Transport } from "../components/components.slint";
+
+export global SoundAdapter {
+    // No audio device: the player is disabled.
+    in property <bool> device-missing;
+    in property <float> progress;
+    // "position / duration".
+    in property <string> time;
+    in property <bool> playing;
+    in property <bool> can-play;
+    callback play-toggled();
+    callback stop();
+}
+
+// An ACM / WAV / WAVC sound: a player, streaming the decoded clip.
+export component SoundViewer inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: Theme.spacing.lg;
+
+        Label {
+            text: "Sound Player";
+            role: TextRole.title;
+            horizontal-alignment: center;
+        }
+        if SoundAdapter.device-missing: Label {
+            text: "No audio output device available — playback disabled.";
+            tone: Tone.warning;
+            horizontal-alignment: center;
+        }
+        if !SoundAdapter.device-missing: HorizontalLayout {
+            alignment: center;
+            ProgressBar {
+                width: Metrics.sound-progress-width;
+                value: SoundAdapter.progress;
+            }
+        }
+        if !SoundAdapter.device-missing: Label {
+            text: SoundAdapter.time;
+            role: TextRole.heading;
+            horizontal-alignment: center;
+        }
+        if !SoundAdapter.device-missing: Transport {
+            playing: SoundAdapter.playing;
+            enabled: SoundAdapter.can-play;
+            play-toggled => { SoundAdapter.play-toggled(); }
+            stop => { SoundAdapter.stop(); }
+        }
+    }
+}

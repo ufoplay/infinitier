@@ -1,0 +1,33 @@
+// An image centred in its area, scaled to fit it: down only (so it never
+// blurs past its natural size), or up too with `grow`. Children are drawn
+// over it: place them with `image-x` / `image-y` and `scale`.
+export component FittedImage inherits Rectangle {
+    in property <image> source;
+    // The image's natural size: one image pixel per logical pixel.
+    in property <length> natural-width;
+    in property <length> natural-height;
+    in property <bool> grow;
+
+    out property <float> scale: root.natural-width > 0 && root.natural-height > 0
+        ? (root.grow ? root.fit : min(1, root.fit))
+        : 0;
+    out property <length> image-x: img.x;
+    out property <length> image-y: img.y;
+    out property <length> image-width: img.width;
+    out property <length> image-height: img.height;
+
+    property <float> fit: min(root.width / root.natural-width, root.height / root.natural-height);
+
+    clip: true;
+
+    img := Image {
+        source: root.source;
+        width: root.natural-width * root.scale;
+        height: root.natural-height * root.scale;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        image-fit: fill;
+    }
+
+    @children
+}

@@ -1,0 +1,80 @@
+import { Divider, Label, ScrollArea, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+
+// A metadata line of the font's `name` table.
+export struct TtfDetail {
+    label: string,
+    value: string,
+}
+
+// The sample text at one size.
+export struct TtfSample {
+    label: string,
+    size: length,
+}
+
+export global TtfAdapter {
+    // The family the font was registered under ("" if it couldn't be).
+    in property <string> family;
+    in property <string> full-name;
+    in property <[TtfDetail]> details;
+    in property <string> sample;
+    in property <[TtfSample]> samples;
+    callback sample-edited(text: string);
+}
+
+// A TrueType font: its name in its own face, its metadata, and a sample
+// sentence (editable) at several sizes.
+export component TtfViewer inherits Rectangle {
+    ScrollArea {
+        VerticalLayout {
+            padding: Theme.spacing.md;
+            spacing: Theme.spacing.sm;
+
+            Text {
+                text: TtfAdapter.full-name;
+                font-family: TtfAdapter.family;
+                font-size: Metrics.ttf-title-size;
+                color: Theme.palette.text;
+                wrap: word-wrap;
+            }
+            for detail in TtfAdapter.details: HorizontalLayout {
+                spacing: Theme.spacing.md;
+                Label {
+                    width: Metrics.ttf-label-width;
+                    text: detail.label;
+                    role: TextRole.heading;
+                }
+                Label {
+                    text: detail.value;
+                    wrap: word-wrap;
+                }
+            }
+            Divider { }
+            Label {
+                text: "Sample text";
+                role: TextRole.heading;
+            }
+            TextField {
+                text: TtfAdapter.sample;
+                placeholder: "Type a sample sentence…";
+                edited(text) => { TtfAdapter.sample-edited(text); }
+            }
+            for sample in TtfAdapter.samples: VerticalLayout {
+                padding-top: Theme.spacing.sm;
+                spacing: Theme.spacing.xs;
+                Label {
+                    text: sample.label;
+                    tone: Tone.muted;
+                }
+                Text {
+                    text: TtfAdapter.sample == "" ? "(empty)" : TtfAdapter.sample;
+                    font-family: TtfAdapter.family;
+                    font-size: sample.size;
+                    color: Theme.palette.text;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

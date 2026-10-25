@@ -5,6 +5,7 @@ members = [
     "src/core",
     "src/datasource",
     "src/infinitier_explorer",
+    "src/infinitier_explorer_slint",
     "src/infinitier_keeper",
     "src/infinitier_keeper_slint",
     "src/fs",

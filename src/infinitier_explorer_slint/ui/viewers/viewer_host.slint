@@ -1,0 +1,29 @@
+import { Divider } from "@themekit";
+import { InfoBar } from "../components/components.slint";
+import { ViewerAdapter, ViewerKind } from "viewer_adapter.slint";
+import { MessageViewer } from "message_viewer.slint";
+import { ImageViewer } from "image_viewer.slint";
+import { BamViewer } from "bam_viewer.slint";
+import { TisViewer } from "tis_viewer.slint";
+import { FntViewer } from "fnt_viewer.slint";
+import { TtfViewer } from "ttf_viewer.slint";
+import { BcsViewer } from "bcs_viewer.slint";
+import { SoundViewer } from "sound_viewer.slint";
+import { MovieViewer } from "movie_viewer.slint";
+
+// The central area: the selected resource's viewer over its info bar.
+export component ViewerHost inherits Rectangle {
+    VerticalLayout {
+        if ViewerAdapter.kind == ViewerKind.message: MessageViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.image: ImageViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.bam: BamViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.tis: TisViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.fnt: FntViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.ttf: TtfViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.bcs: BcsViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.sound: SoundViewer { vertical-stretch: 1; }
+        if ViewerAdapter.kind == ViewerKind.movie: MovieViewer { vertical-stretch: 1; }
+        if ViewerAdapter.info.length > 0: Divider { }
+        if ViewerAdapter.info.length > 0: InfoBar { items: ViewerAdapter.info; }
+    }
+}

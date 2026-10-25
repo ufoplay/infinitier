@@ -1,0 +1,118 @@
+import { Button, ButtonKind, Divider, Label, ListView, TextRole, Theme, TreeItem } from "@themekit";
+import { ShellAdapter } from "shell_adapter.slint";
+
+// One visible row of the resource tree: a group (one file extension) or a
+// resource inside an open group.
+export struct TreeRow {
+    text: string,
+    level: int,
+    expandable: bool,
+    expanded: bool,
+    selected: bool,
+}
+
+// A keyboard move through the tree.
+export enum TreeNav {
+    // The row above or below.
+    previous,
+    next,
+    // Close the group, or go up to it from a resource inside.
+    collapse,
+    // Open the group, or go down into an open one.
+    expand,
+}
+
+export global TreeAdapter {
+    in property <[TreeRow]> rows;
+    callback row-clicked(row: int);
+    callback row-toggled(row: int);
+    callback navigate(move: TreeNav);
+}
+
+// The left panel: the theme toggle, the "Resources" heading and the tree of
+// the game's resources, grouped by file extension.
+export component ResourcePanel inherits Rectangle {
+    background: Theme.palette.surface;
+    // The arrow keys move through the tree.
+    forward-focus: keys;
+
+    // A row's height: the rows are all alike, so one hidden row measures it.
+    // (The list's `content-height` lags behind a change of its rows.)
+    property <length> row-height: probe.preferred-height;
+
+    // Scroll the tree so `row` is in view, and the view within the rows: a
+    // group just closed can leave it past the end.
+    public function scroll-to(row: int) {
+        let top = row * root.row-height;
+        let content = TreeAdapter.rows.length * root.row-height;
+        let wanted = max(top + root.row-height - list.visible-height, min(-list.content-y, top));
+        list.content-y = -max(0px, min(wanted, content - list.visible-height));
+    }
+
+    VerticalLayout {
+        padding: Theme.spacing.sm;
+        spacing: Theme.spacing.xs;
+
+        HorizontalLayout {
+            spacing: Theme.spacing.sm;
+            alignment: start;
+            // Names the theme it switches to.
+            Button {
+                text: ShellAdapter.dark-theme ? "Light" : "Dark";
+                kind: ButtonKind.ghost;
+                clicked => { ShellAdapter.theme-toggle(); }
+            }
+            Label {
+                text: "Resources";
+                role: TextRole.heading;
+            }
+        }
+        Divider { }
+
+        keys := FocusScope {
+            key-pressed(event) => {
+                if event.text == Key.UpArrow {
+                    TreeAdapter.navigate(TreeNav.previous);
+                    return accept;
+                }
+                if event.text == Key.DownArrow {
+                    TreeAdapter.navigate(TreeNav.next);
+                    return accept;
+                }
+                if event.text == Key.LeftArrow {
+                    TreeAdapter.navigate(TreeNav.collapse);
+                    return accept;
+                }
+                if event.text == Key.RightArrow {
+                    TreeAdapter.navigate(TreeNav.expand);
+                    return accept;
+                }
+                reject
+            }
+
+            list := ListView {
+                accessible-role: tree;
+                for row[index] in TreeAdapter.rows: TreeItem {
+                    text: row.text;
+                    level: row.level;
+                    expandable: row.expandable;
+                    expanded: row.expanded;
+                    selected: row.selected;
+                    clicked => {
+                        keys.focus();
+                        TreeAdapter.row-clicked(index);
+                    }
+                    toggled => {
+                        keys.focus();
+                        TreeAdapter.row-toggled(index);
+                    }
+                }
+            }
+        }
+    }
+
+    probe := TreeItem {
+        visible: false;
+        text: "X";
+    }
+}

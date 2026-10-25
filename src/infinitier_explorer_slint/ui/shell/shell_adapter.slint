@@ -1,0 +1,9 @@
+// The window-wide state: the title, the theme and the status line.
+
+export global ShellAdapter {
+    in property <string> title: "Infinitier Explorer (Slint)";
+    in property <bool> dark-theme;
+    // What's selected and where it comes from, or "No file selected".
+    in property <string> status;
+    callback theme-toggle();
+}

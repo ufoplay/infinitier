@@ -1,0 +1,19 @@
+import { Label, Theme, Tone } from "@themekit";
+import { ShellAdapter } from "shell_adapter.slint";
+
+// The bottom line of the window: the selected resource and its source.
+export component StatusBar inherits Rectangle {
+    background: Theme.palette.surface;
+
+    HorizontalLayout {
+        padding-left: Theme.spacing.md;
+        padding-right: Theme.spacing.md;
+        padding-top: Theme.spacing.xs;
+        padding-bottom: Theme.spacing.xs;
+        Label {
+            text: ShellAdapter.status;
+            tone: Tone.muted;
+            overflow: elide;
+        }
+    }
+}

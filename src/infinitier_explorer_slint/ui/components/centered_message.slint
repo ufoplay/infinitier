@@ -1,0 +1,15 @@
+import { Label, Tone } from "@themekit";
+
+// A one-line message in the middle of its area.
+export component CenteredMessage inherits Rectangle {
+    in property <string> text;
+    in property <Tone> tone: Tone.neutral;
+
+    Label {
+        text: root.text;
+        tone: root.tone;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+        width: root.width;
+    }
+}

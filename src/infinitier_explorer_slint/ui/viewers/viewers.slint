@@ -1,0 +1,13 @@
+// The central area's viewers, one per kind of resource. Each reads its own
+// `*Adapter` global, which the Rust side fills for the selected resource.
+
+export { ViewerAdapter, ViewerKind } from "viewer_adapter.slint";
+export { ViewerHost } from "viewer_host.slint";
+export { ImageAdapter } from "image_viewer.slint";
+export { BamAdapter } from "bam_viewer.slint";
+export { TisAdapter } from "tis_viewer.slint";
+export { FntAdapter, FntField } from "fnt_viewer.slint";
+export { TtfAdapter, TtfDetail, TtfSample } from "ttf_viewer.slint";
+export { BafLine, BafSpan, BcsAdapter } from "bcs_viewer.slint";
+export { SoundAdapter } from "sound_viewer.slint";
+export { MovieAdapter } from "movie_viewer.slint";

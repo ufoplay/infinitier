@@ -1,0 +1,15 @@
+import { Theme } from "@themekit";
+
+// The system's monospace font family. The Rust side looks it up at startup:
+// Slint takes a family by name, and "monospace" isn't one.
+export global Fonts {
+    in property <string> mono;
+}
+
+// One run of code in the monospace font.
+export component CodeText inherits Text {
+    color: Theme.palette.text;
+    font-family: Fonts.mono;
+    font-size: Theme.typography.body-size;
+    vertical-alignment: center;
+}

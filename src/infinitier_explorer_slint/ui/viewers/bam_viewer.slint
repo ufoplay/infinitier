@@ -1,0 +1,86 @@
+import { Button, ButtonKind, Divider, Icons, Label, Select, Slider, Theme, Tone, VerticalDivider } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+import { CenteredMessage, FittedImage } from "../components/components.slint";
+
+export global BamAdapter {
+    // The current frame, composited on its cycle's canvas.
+    in property <image> image;
+    in property <length> width;
+    in property <length> height;
+    in property <bool> has-frame;
+    in property <bool> playing;
+    // More than one frame in the cycle.
+    in property <bool> can-play;
+    // "i (n frames)" per cycle.
+    in property <[string]> cycles;
+    in property <int> cycle;
+    // The frame within the cycle, and the last one.
+    in property <int> frame;
+    in property <int> frame-max;
+    // "frame / max", or "—" for an empty cycle.
+    in property <string> frame-text;
+    // "(frame #n)": the frame's index in the whole file, or "".
+    in property <string> frame-index-text;
+    callback play-toggled();
+    callback cycle-selected(cycle: int);
+    callback frame-changed(frame: int);
+}
+
+// A BAM animation: the current frame, then the player and the cycle and
+// frame pickers.
+export component BamViewer inherits Rectangle {
+    VerticalLayout {
+        if BamAdapter.has-frame: FittedImage {
+            vertical-stretch: 1;
+            source: BamAdapter.image;
+            natural-width: BamAdapter.width;
+            natural-height: BamAdapter.height;
+        }
+        if !BamAdapter.has-frame: CenteredMessage {
+            vertical-stretch: 1;
+            text: "No frames to display";
+        }
+        Divider { }
+        HorizontalLayout {
+            padding: Theme.spacing.sm;
+            spacing: Theme.spacing.sm;
+            alignment: start;
+
+            Button {
+                text: BamAdapter.playing ? "Pause" : "Play";
+                icon: BamAdapter.playing ? Icons.pause : Icons.play;
+                kind: ButtonKind.secondary;
+                enabled: BamAdapter.can-play;
+                clicked => { BamAdapter.play-toggled(); }
+            }
+            VerticalDivider { }
+            Label { text: "Cycle:"; }
+            Select {
+                width: Metrics.cycle-select-width;
+                options: BamAdapter.cycles;
+                current-index: BamAdapter.cycle;
+                placeholder: "—";
+                enabled: BamAdapter.cycles.length > 0;
+                selected(index) => { BamAdapter.cycle-selected(index); }
+            }
+            Label {
+                text: "of \{BamAdapter.cycles.length}";
+                tone: Tone.muted;
+            }
+            VerticalDivider { }
+            Label { text: "Frame:"; }
+            if BamAdapter.frame-max > 0: Slider {
+                width: Metrics.frame-slider-width;
+                value: BamAdapter.frame;
+                maximum: BamAdapter.frame-max;
+                changed(value) => { BamAdapter.frame-changed(round(value)); }
+            }
+            Label { text: BamAdapter.frame-text; }
+            if BamAdapter.frame-index-text != "": VerticalDivider { }
+            if BamAdapter.frame-index-text != "": Label {
+                text: BamAdapter.frame-index-text;
+                tone: Tone.muted;
+            }
+        }
+    }
+}

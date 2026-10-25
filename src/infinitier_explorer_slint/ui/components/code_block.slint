@@ -1,0 +1,28 @@
+import { Theme } from "@themekit";
+import { Fonts } from "code_text.slint";
+
+// Read-only monospace text on a surface, which can be selected and copied
+// (Ctrl+C), like a hex dump.
+export component CodeBlock inherits Rectangle {
+    in property <string> text;
+
+    background: Theme.palette.surface;
+    border-radius: Theme.radii.md;
+    border-width: Theme.sizes.border-width;
+    border-color: Theme.palette.border;
+
+    HorizontalLayout {
+        padding: Theme.spacing.md;
+
+        TextInput {
+            text: root.text;
+            read-only: true;
+            single-line: false;
+            color: Theme.palette.text;
+            selection-background-color: Theme.palette.primary-container;
+            selection-foreground-color: Theme.palette.on-primary-container;
+            font-family: Fonts.mono;
+            font-size: Theme.typography.body-size;
+        }
+    }
+}

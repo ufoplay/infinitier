@@ -4161,6 +4161,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "infinitier_explorer_slint"
+version = "0.0.14"
+dependencies = [
+ "bytesize",
+ "clap",
+ "env_logger",
+ "infinitier_core",
+ "log",
+ "rodio",
+ "slint",
+ "slint-build",
+ "slint-themekit",
+ "vergen-gix",
+]
+
+[[package]]
 name = "infinitier_fnt_resource"
 version = "0.0.14"
 dependencies = [

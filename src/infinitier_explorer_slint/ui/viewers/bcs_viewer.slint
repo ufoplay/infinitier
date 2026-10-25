@@ -1,0 +1,86 @@
+import { Button, ButtonKind, Divider, Icons, Label, ListView, Theme, Tone } from "@themekit";
+import { SyntaxColors, TokenKind } from "../themes/colors.slint";
+import { CodeText } from "../components/components.slint";
+
+// A run of one token kind within a line of BAF.
+export struct BafSpan {
+    text: string,
+    kind: TokenKind,
+}
+
+export struct BafLine {
+    spans: [BafSpan],
+}
+
+export global BcsAdapter {
+    // The decompiled script, one highlighted line per row.
+    in property <[BafLine]> lines;
+    // The longest line's length, in characters: the rows' width.
+    in property <int> columns;
+    // The whole script, as text, for Copy.
+    in property <string> source;
+}
+
+// A compiled BCS script, shown decompiled to BAF with syntax highlighting.
+export component BcsViewer inherits Rectangle {
+    // A monospace character's advance, measured on ten of them.
+    property <length> char-width: probe.preferred-width / 10;
+    property <length> line-height: Theme.typography.body-size * 1.5;
+
+    VerticalLayout {
+        HorizontalLayout {
+            padding: Theme.spacing.sm;
+            spacing: Theme.spacing.sm;
+            alignment: start;
+            Button {
+                text: "Copy";
+                icon: Icons.copy;
+                kind: ButtonKind.secondary;
+                clicked => {
+                    // Through a hidden input: Slint reaches the clipboard
+                    // only from a text input's selection.
+                    clipboard.text = BcsAdapter.source;
+                    clipboard.select-all();
+                    clipboard.copy();
+                    clipboard.text = "";
+                }
+            }
+            Label {
+                text: "Copies the whole script.";
+                tone: Tone.muted;
+            }
+        }
+        Divider { }
+        code := ListView {
+            background: Theme.palette.surface;
+            content-width: max(self.visible-width, BcsAdapter.columns * root.char-width + Theme.spacing.md * 2);
+
+            for line in BcsAdapter.lines: Rectangle {
+                width: code.content-width;
+                height: root.line-height;
+
+                HorizontalLayout {
+                    padding-left: Theme.spacing.md;
+                    padding-right: Theme.spacing.md;
+                    alignment: start;
+
+                    for span in line.spans: CodeText {
+                        text: span.text;
+                        color: SyntaxColors.color(span.kind);
+                    }
+                }
+            }
+        }
+    }
+
+    probe := CodeText {
+        visible: false;
+        text: "0000000000";
+    }
+    clipboard := TextInput {
+        visible: false;
+        width: 0;
+        height: 0;
+        read-only: true;
+    }
+}

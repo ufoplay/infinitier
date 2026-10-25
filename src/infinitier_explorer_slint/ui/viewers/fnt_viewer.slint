@@ -1,0 +1,80 @@
+import { Label, ScrollArea, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+import { CodeBlock } from "../components/components.slint";
+
+// One row of the FNT struct table (NearInfinity's "Edit" tab).
+export struct FntField {
+    attribute: string,
+    value: string,
+    offset: string,
+    size: string,
+}
+
+export global FntAdapter {
+    in property <[FntField]> fields;
+    // Why the file holds more than the fields; "" when it doesn't.
+    in property <string> note;
+    // "Showing first n of m bytes…", or "(no body bytes)".
+    in property <string> dump-summary;
+    // A hex dump of the body's first bytes; "" when the body is empty.
+    in property <string> dump;
+}
+
+component FieldRow inherits HorizontalLayout {
+    in property <FntField> field;
+    in property <bool> header;
+
+    spacing: Theme.spacing.lg;
+    Label {
+        width: Metrics.fnt-attribute-width;
+        text: root.field.attribute;
+        role: root.header ? TextRole.heading : TextRole.body;
+    }
+    Label {
+        width: Metrics.fnt-value-width;
+        text: root.field.value;
+        role: root.header ? TextRole.heading : TextRole.body;
+    }
+    Label {
+        width: Metrics.fnt-offset-width;
+        text: root.field.offset;
+        role: root.header ? TextRole.heading : TextRole.body;
+    }
+    Label {
+        text: root.field.size;
+        role: root.header ? TextRole.heading : TextRole.body;
+    }
+}
+
+// An FNT font envelope: its fields, a note on the opaque body, and a hex dump
+// of the body's start.
+export component FntViewer inherits Rectangle {
+    ScrollArea {
+        content-spacing: Theme.spacing.md;
+
+        VerticalLayout {
+            padding: Theme.spacing.md;
+            spacing: Theme.spacing.md;
+
+            VerticalLayout {
+                spacing: Theme.spacing.xs;
+                FieldRow {
+                    header: true;
+                    field: { attribute: "Attribute", value: "Value", offset: "Offset", size: "Size" };
+                }
+                for field in FntAdapter.fields: FieldRow { field: field; }
+            }
+            if FntAdapter.note != "": Label {
+                text: FntAdapter.note;
+                tone: Tone.muted;
+                wrap: word-wrap;
+            }
+            Label {
+                text: "Raw (post-header body)";
+                role: TextRole.heading;
+            }
+            Label { text: FntAdapter.dump-summary; }
+            if FntAdapter.dump != "": CodeBlock { text: FntAdapter.dump; }
+        }
+    }
+}

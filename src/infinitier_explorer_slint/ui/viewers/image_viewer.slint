@@ -1,0 +1,16 @@
+import { FittedImage } from "../components/components.slint";
+
+export global ImageAdapter {
+    in property <image> image;
+    in property <length> width;
+    in property <length> height;
+}
+
+// A raster image (BMP, PVRZ, MOS, PNG…), fitted to the area.
+export component ImageViewer inherits Rectangle {
+    FittedImage {
+        source: ImageAdapter.image;
+        natural-width: ImageAdapter.width;
+        natural-height: ImageAdapter.height;
+    }
+}

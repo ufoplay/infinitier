@@ -1,0 +1,40 @@
+// The explorer's own layout values: sizes that belong to this app's layout
+// rather than to the theme's roles. Files under ui/themes/ are the only
+// explorer files allowed to hold literal design values (tests/ui_tokens.rs).
+
+export global Metrics {
+    // The main window.
+    out property <length> window-width: 1400px;
+    out property <length> window-height: 800px;
+    out property <length> window-min-width: 800px;
+    out property <length> window-min-height: 480px;
+
+    // The resource panel on the left: its first width, and the range the
+    // splitter keeps it in. The viewer keeps at least `viewer-min-width`.
+    out property <length> panel-width: 260px;
+    out property <length> panel-min-width: 160px;
+    out property <length> panel-max-width: 640px;
+    out property <length> viewer-min-width: 320px;
+
+    // The BAM viewer's cycle picker and frame slider.
+    out property <length> cycle-select-width: 200px;
+    out property <length> frame-slider-width: 240px;
+    // The TIS viewer's columns slider; its grid isn't drawn when the tiles
+    // shrink below `grid-min-spacing` (it would only blur the image).
+    out property <length> columns-slider-width: 240px;
+    out property <length> grid-min-spacing: 0.5px;
+
+    // The FNT viewer's struct table columns.
+    out property <length> fnt-attribute-width: 140px;
+    out property <length> fnt-value-width: 160px;
+    out property <length> fnt-offset-width: 80px;
+
+    // The TTF viewer: the font's name in its own face, and the metadata
+    // labels' column.
+    out property <length> ttf-title-size: 36px;
+    out property <length> ttf-label-width: 100px;
+
+    // The sound and movie players' progress bars.
+    out property <length> sound-progress-width: 440px;
+    out property <length> movie-progress-width: 420px;
+}

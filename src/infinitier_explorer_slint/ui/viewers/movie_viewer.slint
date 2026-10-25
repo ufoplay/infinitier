@@ -1,0 +1,83 @@
+import { Divider, Label, ProgressBar, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+import { FittedImage, Transport } from "../components/components.slint";
+
+export global MovieAdapter {
+    // The frame on screen while playing.
+    in property <image> frame;
+    in property <bool> has-frame;
+    // The movie's size, e.g. "640×480".
+    in property <length> width;
+    in property <length> height;
+    in property <string> size-text;
+    // Why the movie can't play ("" when it can).
+    in property <string> error;
+    in property <float> progress;
+    // "position / duration".
+    in property <string> time;
+    in property <bool> playing;
+    in property <bool> can-play;
+    callback play-toggled();
+    callback stop();
+}
+
+// An MVE / BIK / WBM movie: the video, fitted to the area, over its
+// transport.
+export component MovieViewer inherits Rectangle {
+    VerticalLayout {
+        if MovieAdapter.error != "": Label {
+            vertical-stretch: 1;
+            text: MovieAdapter.error;
+            tone: Tone.danger;
+            horizontal-alignment: center;
+            vertical-alignment: top;
+        }
+        if MovieAdapter.error == "" && MovieAdapter.has-frame: FittedImage {
+            vertical-stretch: 1;
+            grow: true;
+            source: MovieAdapter.frame;
+            natural-width: MovieAdapter.width;
+            natural-height: MovieAdapter.height;
+        }
+        if MovieAdapter.error == "" && !MovieAdapter.has-frame: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            spacing: Theme.spacing.md;
+            Label {
+                text: "Movie Player";
+                role: TextRole.title;
+                horizontal-alignment: center;
+            }
+            Label {
+                text: MovieAdapter.size-text;
+                horizontal-alignment: center;
+            }
+        }
+        Divider { }
+        VerticalLayout {
+            padding: Theme.spacing.sm;
+            spacing: Theme.spacing.sm;
+            Transport {
+                playing: MovieAdapter.playing;
+                enabled: MovieAdapter.can-play;
+                play-toggled => { MovieAdapter.play-toggled(); }
+                stop => { MovieAdapter.stop(); }
+            }
+            HorizontalLayout {
+                alignment: center;
+                spacing: Theme.spacing.md;
+                VerticalLayout {
+                    alignment: center;
+                    ProgressBar {
+                        width: Metrics.movie-progress-width;
+                        value: MovieAdapter.progress;
+                    }
+                }
+                Label {
+                    text: MovieAdapter.time;
+                    tone: Tone.muted;
+                }
+            }
+        }
+    }
+}

@@ -1,4 +1,8 @@
-# Driving the Slint Keeper with the Slint MCP
+# Driving the Slint apps with the Slint MCP
+
+Both Slint GUIs, `infinitier_keeper_slint` and `infinitier_explorer_slint`, have the same `mcp`
+feature; the examples use the keeper, the explorer runs the same way with its game folders as
+arguments.
 
 Slint ships an **embedded MCP server** behind the `slint/mcp` cargo feature. When enabled and
 switched on at runtime it opens an HTTP endpoint that an external tool (or an AI agent) can use to
@@ -103,6 +107,19 @@ take_screenshot {"windowHandle": <win>}            → eyeball it
   focused, unlike the egui/X11 path.
 - **Don't `pkill -f infinitier_keeper_slint`** — the pattern matches your own shell command line and
   kills the driving shell. Record the PID (`echo $! > app.pid`) and `kill "$(cat app.pid)"`.
+- **A killed app leaves its temp files behind.** Loading a game with compressed (BIFC) archives
+  — BG2 does — unpacks each into a `/tmp/infinitier_*` directory (~60 MB) that's removed on
+  drop, which `kill` skips. A day of test runs filled the 32 GB RAM-backed `/tmp`. Run test
+  instances with a private `TMPDIR` and empty it after each `kill`.
+- **`SLINT_EMIT_DEBUG_INFO` is read by the build script**, which doesn't rerun just because the
+  variable changed: `touch build.rs` when switching it on for a crate already built without it.
+- **Roles come back capitalised** (`Slider`, `ListItem`, `Button`), and zero coordinates are
+  left out of `absolutePosition` (read them with a default of 0).
+- **The explorer's splitter is a `Slider` too** (it resizes by steps for assistive
+  technologies): a real slider is the one with an `accessibleValue`.
+- **The explorer's tree is virtualized** — only the rows in view are in the element tree. Move
+  through it with the arrow keys (`dispatch_key_event` with `"\uf700"` up, `"\uf701"` down,
+  `"\uf702"` left, `"\uf703"` right); the tree has the keyboard from the start.
 
 ## Build prerequisite (Linux)
 

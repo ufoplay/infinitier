@@ -1,0 +1,27 @@
+import { Button, ButtonKind, Icons, Theme } from "@themekit";
+
+// The players' Play / Pause and Stop buttons.
+export component Transport inherits HorizontalLayout {
+    in property <bool> playing;
+    in property <bool> enabled;
+    callback play-toggled();
+    callback stop();
+
+    spacing: Theme.spacing.sm;
+    alignment: center;
+
+    Button {
+        text: root.playing ? "Pause" : "Play";
+        icon: root.playing ? Icons.pause : Icons.play;
+        kind: ButtonKind.secondary;
+        enabled: root.enabled;
+        clicked => { root.play-toggled(); }
+    }
+    Button {
+        text: "Stop";
+        icon: Icons.stop;
+        kind: ButtonKind.secondary;
+        enabled: root.enabled;
+        clicked => { root.stop(); }
+    }
+}

@@ -1,0 +1,12 @@
+// Which viewer shows the selected resource, and the facts in its info bar.
+
+export enum ViewerKind { message, image, bam, tis, fnt, ttf, bcs, sound, movie }
+
+export global ViewerAdapter {
+    in property <ViewerKind> kind;
+    // For the `message` kind: what it says, and whether it is an error.
+    in property <string> message: "Select a resource from the panel on the left.";
+    in property <bool> error;
+    // The info bar's items; none hides the bar.
+    in property <[string]> info;
+}

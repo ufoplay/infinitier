@@ -1,0 +1,28 @@
+import { Label, Theme, Tone, VerticalDivider } from "@themekit";
+
+// A viewer's bottom bar: facts about the resource (size, format, origin…),
+// separated by dividers.
+export component InfoBar inherits Rectangle {
+    in property <[string]> items;
+
+    background: Theme.palette.surface;
+
+    HorizontalLayout {
+        padding-left: Theme.spacing.md;
+        padding-right: Theme.spacing.md;
+        padding-top: Theme.spacing.sm;
+        padding-bottom: Theme.spacing.sm;
+        spacing: Theme.spacing.sm;
+        alignment: start;
+
+        for item[index] in root.items: HorizontalLayout {
+            spacing: Theme.spacing.sm;
+            if index > 0: VerticalDivider { }
+            Label {
+                text: item;
+                tone: Tone.muted;
+                overflow: elide;
+            }
+        }
+    }
+}

@@ -1,0 +1,12 @@
+import { Tone } from "@themekit";
+import { CenteredMessage } from "../components/components.slint";
+import { ViewerAdapter } from "viewer_adapter.slint";
+
+// Every resource without a viewer of its own: nothing selected, a format not
+// viewed yet ("ARE Viewer"), an unknown type, or an import error.
+export component MessageViewer inherits Rectangle {
+    CenteredMessage {
+        text: ViewerAdapter.message;
+        tone: ViewerAdapter.error ? Tone.danger : Tone.neutral;
+    }
+}
