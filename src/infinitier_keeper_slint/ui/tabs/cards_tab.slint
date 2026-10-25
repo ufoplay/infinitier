@@ -2,7 +2,7 @@
 // Memorization, Levels & Kits, Feats, Miscellaneous: field cards in three
 // columns. The Rust side builds the active tab's cards.
 
-import { ScrollView } from "std-widgets.slint";
+import { ScrollArea, Theme } from "@themekit";
 import { FieldCard, FieldCardView } from "../components/components.slint";
 
 export global CardsAdapter {
@@ -17,17 +17,14 @@ export global CardsAdapter {
     callback commit-attacks(int /* option index */);
 }
 
-// One outer ScrollView for all three columns, so a card's GroupBox title
-// isn't clipped by a per-column one.
-export component CardsTab inherits ScrollView {
+// One ScrollArea for all three columns, so they scroll together.
+export component CardsTab inherits ScrollArea {
     HorizontalLayout {
-        spacing: 8px;
-        padding-left: 6px;
-        padding-right: 6px;
+        spacing: Theme.spacing.sm;
         for column in 3: VerticalLayout {
             horizontal-stretch: 1;
             alignment: start;
-            spacing: 8px;
+            spacing: Theme.spacing.sm;
             for card in (column == 0 ? CardsAdapter.column0 : column == 1 ? CardsAdapter.column1 : CardsAdapter.column2): FieldCardView {
                 card: card;
                 attacks-options: CardsAdapter.attacks-options;

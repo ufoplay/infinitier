@@ -2,9 +2,9 @@
 // item name, resref and Delete. Clicking a slot selects it as the Item
 // Browser's add target; double-clicking a filled one reveals its item there.
 
-import { Button, LineEdit, ListView, Palette, VerticalBox } from "std-widgets.slint";
-import { HeaderCell } from "../components/components.slint";
+import { Button, ButtonKind, Icons, Label, ListItem, ListView, TextField, TextRole, Theme, Tone } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
+import { Metrics } from "../themes/metrics.slint";
 
 // One slot. `slot` is routed back on select / quantity edit / delete.
 export struct InvRow {
@@ -30,9 +30,9 @@ export global InventoryAdapter {
 }
 
 // A quantity / charges input, committed on Enter and on focus loss.
-component QuantityEdit inherits LineEdit {
+component QuantityEdit inherits TextField {
     callback commit(string);
-    width: 46px;
+    width: Metrics.quantity-width;
     accepted(t) => { root.commit(t); }
     changed has-focus => {
         if (!self.has-focus) {
@@ -41,69 +41,69 @@ component QuantityEdit inherits LineEdit {
     }
 }
 
-export component InventoryTab inherits VerticalBox {
+component ColumnHeader inherits Label {
+    role: TextRole.caption;
+    tone: Tone.muted;
+}
+
+export component InventoryTab inherits VerticalLayout {
+    spacing: Theme.spacing.xs;
     HorizontalLayout {
-        padding-left: 6px;
-        spacing: 8px;
-        Rectangle { width: 40px; }
-        HeaderCell { text: "Position"; width: 120px; }
-        HeaderCell { text: "Quantity"; width: 150px; }
-        HeaderCell { text: "Item"; horizontal-stretch: 1; }
-        HeaderCell { text: "Resource"; width: 96px; }
-        Rectangle { width: 72px; }
+        padding-left: Theme.spacing.md;
+        padding-right: Theme.spacing.md + Theme.sizes.scrollbar-width + Theme.spacing.xs;
+        spacing: Theme.spacing.sm;
+        Rectangle { width: Metrics.inventory-icon; }
+        ColumnHeader { text: "Position"; width: Metrics.inventory-position-column; }
+        ColumnHeader { text: "Quantity"; width: Metrics.inventory-quantity-column; }
+        ColumnHeader { text: "Item"; horizontal-stretch: 1; }
+        ColumnHeader { text: "Resource"; width: Metrics.inventory-resource-column; }
+        Rectangle { width: Theme.sizes.control-height; }
     }
     ListView {
-        vertical-stretch: 1;
-        for row in InventoryAdapter.rows: Rectangle {
-            height: 44px;
-            background: row.slot == InventoryAdapter.selected ? Palette.accent-background.transparentize(0.75) : transparent;
-            TouchArea {
-                clicked => {
-                    InventoryAdapter.selected = row.slot;
-                    InventoryAdapter.select(row.slot);
-                }
-                double-clicked => {
-                    if (row.filled) {
-                        BrowsersAdapter.front = BrowserKind.items;
-                        BrowsersAdapter.reveal(BrowserKind.items, row.resref);
-                    }
+        for row in InventoryAdapter.rows: ListItem {
+            selected: row.slot == InventoryAdapter.selected;
+            clicked => {
+                InventoryAdapter.selected = row.slot;
+                InventoryAdapter.select(row.slot);
+            }
+            double-clicked => {
+                if (row.filled) {
+                    BrowsersAdapter.front = BrowserKind.items;
+                    BrowsersAdapter.reveal(BrowserKind.items, row.resref);
                 }
             }
+            Image {
+                width: Metrics.inventory-icon;
+                height: Metrics.inventory-icon;
+                source: row.icon;
+                image-fit: contain;
+            }
+            Label { text: row.position; width: Metrics.inventory-position-column; overflow: elide; }
             HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                spacing: 8px;
-                Image {
-                    width: 40px;
-                    height: 40px;
-                    source: row.icon;
-                    image-fit: contain;
+                width: Metrics.inventory-quantity-column;
+                spacing: Theme.spacing.xs;
+                if row.filled: QuantityEdit {
+                    text: row.q1;
+                    commit(t) => { InventoryAdapter.quantity(row.slot, 0, t); }
                 }
-                Text { text: row.position; width: 120px; vertical-alignment: center; overflow: elide; }
-                HorizontalLayout {
-                    width: 150px;
-                    spacing: 3px;
-                    if row.filled: QuantityEdit {
-                        text: row.q1;
-                        commit(t) => { InventoryAdapter.quantity(row.slot, 0, t); }
-                    }
-                    if row.filled: QuantityEdit {
-                        text: row.q2;
-                        commit(t) => { InventoryAdapter.quantity(row.slot, 1, t); }
-                    }
-                    if row.filled: QuantityEdit {
-                        text: row.q3;
-                        commit(t) => { InventoryAdapter.quantity(row.slot, 2, t); }
-                    }
+                if row.filled: QuantityEdit {
+                    text: row.q2;
+                    commit(t) => { InventoryAdapter.quantity(row.slot, 1, t); }
                 }
-                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
-                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
-                if row.filled: Button {
-                    width: 72px;
-                    text: "Delete";
-                    clicked => { InventoryAdapter.delete(row.slot); }
+                if row.filled: QuantityEdit {
+                    text: row.q3;
+                    commit(t) => { InventoryAdapter.quantity(row.slot, 2, t); }
                 }
             }
+            Label { text: row.name; horizontal-stretch: 1; overflow: elide; }
+            Label { text: row.resref; width: Metrics.inventory-resource-column; overflow: elide; }
+            if row.filled: Button {
+                icon: Icons.trash;
+                kind: ButtonKind.ghost;
+                accessible-label: "Delete";
+                clicked => { InventoryAdapter.delete(row.slot); }
+            }
+            if !row.filled: Rectangle { width: Theme.sizes.control-height; }
         }
     }
 }

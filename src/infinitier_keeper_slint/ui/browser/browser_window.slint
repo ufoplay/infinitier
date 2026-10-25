@@ -3,9 +3,9 @@
 // description above an Add button. A FloatingWindow, so the editor stays
 // usable behind it.
 
-import { Button, CheckBox, LineEdit, ListView, Palette, ScrollView } from "std-widgets.slint";
-import { FloatingWindow, HeaderCell, ListFrame, RowText, SelectableRow } from "../components/components.slint";
-import { Theme } from "../theme.slint";
+import { Button, Checkbox, Label, ListItem, ListView, Menu, MenuItem, ScrollArea, TextField, TextRole, Theme, Tone } from "@themekit";
+import { FloatingWindow } from "../components/components.slint";
+import { Metrics } from "../themes/metrics.slint";
 
 // One row of the list. `level` / `script` are empty for items.
 export struct BrowserRow {
@@ -40,10 +40,11 @@ export struct BrowserState {
     placements: [string],
 }
 
-global BrowserStyle {
-    out property <length> row-height: 24px;
-    out property <length> filter-width: 220px;
-    out property <length> icon-side: 64px;
+// A column header, aligned with the rows' cells.
+component ColumnHeader inherits Label {
+    role: TextRole.caption;
+    tone: Tone.muted;
+    overflow: elide;
 }
 
 export component BrowserWindow inherits FloatingWindow {
@@ -54,8 +55,9 @@ export component BrowserWindow inherits FloatingWindow {
     in property <BrowserState> state;
     in property <[BrowserRow]> rows;
     in property <[TypeFilter]> types;
+    // The search box's text (the user's draft, reset from outside).
     in-out property <string> text;
-    in-out property <bool> all-types: true;
+    in property <bool> all-types: true;
     callback search(string);
     callback select(string /* resref */);
     callback step(int /* -1 up, 1 down */);
@@ -65,8 +67,8 @@ export component BrowserWindow inherits FloatingWindow {
 
     // Scroll the list so `row` is in view, centring it when it was off-screen.
     public function scroll-to(row: int) {
-        if (row * BrowserStyle.row-height < -list.content-y || (row + 1) * BrowserStyle.row-height > -list.content-y + list.visible-height) {
-            list.content-y = max(min(0px, list.visible-height - root.rows.length * BrowserStyle.row-height), min(0px, list.visible-height / 2 - (row + 0.5) * BrowserStyle.row-height));
+        if (row * Metrics.browser-row-height < -list.content-y || (row + 1) * Metrics.browser-row-height > -list.content-y + list.visible-height) {
+            list.content-y = max(min(0px, list.visible-height - root.rows.length * Metrics.browser-row-height), min(0px, list.visible-height / 2 - (row + 0.5) * Metrics.browser-row-height));
         }
     }
 
@@ -89,27 +91,29 @@ export component BrowserWindow inherits FloatingWindow {
     property <length> menu-y;
 
     visible: root.state.open;
-    min-window-width: 660px;
-    min-window-height: 400px;
+    min-window-width: Metrics.browser-min-width;
+    min-window-height: Metrics.browser-min-height;
 
     VerticalLayout {
         // The list, and the filters on its right.
         HorizontalLayout {
             vertical-stretch: 1;
-            padding: 8px;
-            spacing: 8px;
+            padding: Theme.spacing.sm;
+            spacing: Theme.spacing.sm;
             VerticalLayout {
                 horizontal-stretch: 1;
-                spacing: 4px;
+                spacing: Theme.spacing.xs;
+                // Padded like the rows, whose width leaves room for the
+                // list's scroll indicator.
                 HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    HeaderCell { text: "Type"; width: 96px; }
-                    if root.spell-columns: HeaderCell { text: "Lvl"; width: 30px; }
-                    HeaderCell { text: "Name"; horizontal-stretch: 2; preferred-width: 0px; }
-                    HeaderCell { text: "Resource"; width: 86px; }
-                    if root.spell-columns: HeaderCell { text: "Script Name"; horizontal-stretch: 1; preferred-width: 0px; }
+                    padding-left: Theme.spacing.md;
+                    padding-right: Theme.spacing.md + Theme.sizes.scrollbar-width + Theme.spacing.xs;
+                    spacing: Theme.spacing.sm;
+                    ColumnHeader { text: "Type"; width: Metrics.browser-type-column; }
+                    if root.spell-columns: ColumnHeader { text: "Lvl"; width: Metrics.browser-level-column; }
+                    ColumnHeader { text: "Name"; horizontal-stretch: 2; preferred-width: 0px; }
+                    ColumnHeader { text: "Resource"; width: Metrics.browser-resource-column; }
+                    if root.spell-columns: ColumnHeader { text: "Script Name"; horizontal-stretch: 1; preferred-width: 0px; }
                 }
                 Rectangle {
                     vertical-stretch: 1;
@@ -127,8 +131,8 @@ export component BrowserWindow inherits FloatingWindow {
                             return reject;
                         }
                         list := ListView {
-                            for row[i] in root.rows: SelectableRow {
-                                height: BrowserStyle.row-height;
+                            for row[i] in root.rows: ListItem {
+                                height: Metrics.browser-row-height;
                                 index: i;
                                 selected: i == root.state.selected-row;
                                 clicked => {
@@ -137,52 +141,54 @@ export component BrowserWindow inherits FloatingWindow {
                                     root.select(row.resref);
                                 }
                                 double-clicked => {
-                                    root.request-add(self.absolute-position.x - root.absolute-position.x + self.mouse-x, self.absolute-position.y - root.absolute-position.y + self.mouse-y);
+                                    root.request-add(self.absolute-position.x - root.absolute-position.x + self.pointer-x, self.absolute-position.y - root.absolute-position.y + self.pointer-y);
                                 }
-                                RowText { text: row.category; width: 96px; selected: i == root.state.selected-row; }
-                                if root.spell-columns: RowText { text: row.level; width: 30px; selected: i == root.state.selected-row; }
-                                RowText { text: row.name; horizontal-stretch: 2; preferred-width: 0px; selected: i == root.state.selected-row; }
-                                RowText { text: row.resref; width: 86px; selected: i == root.state.selected-row; }
-                                if root.spell-columns: RowText { text: row.script; horizontal-stretch: 1; preferred-width: 0px; selected: i == root.state.selected-row; }
+                                Label { text: row.category; width: Metrics.browser-type-column; overflow: elide; }
+                                if root.spell-columns: Label { text: row.level; width: Metrics.browser-level-column; }
+                                Label { text: row.name; horizontal-stretch: 2; preferred-width: 0px; overflow: elide; }
+                                Label { text: row.resref; width: Metrics.browser-resource-column; overflow: elide; }
+                                if root.spell-columns: Label { text: row.script; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
                             }
                         }
                     }
-                    ListFrame { }
+                    // The list's frame, drawn over the rows' stripes.
+                    Rectangle {
+                        border-width: Theme.sizes.border-width;
+                        border-color: Theme.palette.border;
+                    }
                 }
             }
 
             VerticalLayout {
-                width: BrowserStyle.filter-width;
-                spacing: 6px;
-                Text { text: root.state.count; color: Palette.foreground; }
-                Text { text: "Search"; color: Palette.foreground; }
-                LineEdit {
+                width: Metrics.browser-filters-width;
+                spacing: Theme.spacing.xs;
+                Label { text: root.state.count; }
+                Label { text: "Search"; role: TextRole.caption; tone: Tone.muted; }
+                TextField {
                     text <=> root.text;
-                    placeholder-text: root.search-hint;
+                    placeholder: root.search-hint;
                     edited(t) => {
                         root.raise();
                         root.search(t);
                     }
                 }
-                CheckBox {
+                Checkbox {
                     text: "Types";
-                    checked <=> root.all-types;
+                    checked: root.all-types;
                     toggled => {
                         root.raise();
-                        root.set-all-types(self.checked);
+                        root.set-all-types(!root.all-types);
                     }
                 }
-                ScrollView {
-                    vertical-stretch: 1;
-                    VerticalLayout {
-                        alignment: start;
-                        padding-left: 18px;
-                        for t in root.types: CheckBox {
+                ScrollArea {
+                    for t in root.types: HorizontalLayout {
+                        padding-left: Theme.spacing.lg;
+                        Checkbox {
                             text: t.name;
                             checked: t.shown;
                             toggled => {
                                 root.raise();
-                                root.set-type(t.name, self.checked);
+                                root.set-type(t.name, !t.shown);
                             }
                         }
                     }
@@ -192,15 +198,14 @@ export component BrowserWindow inherits FloatingWindow {
 
         // The Add button, then the selected entry's icon + description.
         VerticalLayout {
-            height: max(150px, min(root.height * 0.38, 360px));
-            padding: 8px;
+            height: max(Metrics.browser-detail-min-height, min(root.height * 0.38, Metrics.browser-detail-max-height));
+            padding: Theme.spacing.sm;
             padding-top: 0px;
-            spacing: 6px;
+            spacing: Theme.spacing.sm;
             HorizontalLayout {
                 alignment: start;
                 Button {
                     text: root.state.add-label;
-                    primary: true;
                     enabled: root.state.add-enabled;
                     clicked => {
                         root.raise();
@@ -208,33 +213,28 @@ export component BrowserWindow inherits FloatingWindow {
                     }
                 }
             }
-            if !root.state.has-selection: Text {
+            if !root.state.has-selection: Label {
                 text: root.select-hint;
-                color: Theme.muted;
+                tone: Tone.muted;
                 vertical-stretch: 1;
                 vertical-alignment: top;
             }
             if root.state.has-selection: HorizontalLayout {
                 vertical-stretch: 1;
-                spacing: 8px;
+                spacing: Theme.spacing.sm;
                 if root.state.icon.width > 0: VerticalLayout {
                     alignment: start;
                     Image {
                         source: root.state.icon;
-                        width: BrowserStyle.icon-side;
-                        height: BrowserStyle.icon-side;
+                        width: Metrics.browser-icon;
+                        height: Metrics.browser-icon;
                         image-fit: contain;
                     }
                 }
-                description := ScrollView {
-                    horizontal-stretch: 1;
-                    content-width: self.visible-width;
-                    content-height: max(self.visible-height, description-text.preferred-height);
-                    description-text := Text {
-                        y: 0px;
-                        width: description.visible-width;
+                ScrollArea {
+                    Label {
                         text: root.state.description == "" ? "(no description)" : root.state.description;
-                        color: root.state.description == "" ? Theme.muted : Palette.foreground;
+                        tone: root.state.description == "" ? Tone.muted : Tone.neutral;
                         wrap: word-wrap;
                         vertical-alignment: top;
                     }
@@ -245,27 +245,12 @@ export component BrowserWindow inherits FloatingWindow {
 
     // IWD2: the spellbooks to add the selected spell to. Positioned relative
     // to the window itself, not to the content area its children fill.
-    book-menu := PopupWindow {
+    book-menu := Menu {
         x: root.menu-x;
         y: root.menu-y;
-        Rectangle {
-            background: Palette.background;
-            border-width: 1px;
-            border-color: Palette.border;
-            border-radius: 4px;
-            drop-shadow-blur: 8px;
-            drop-shadow-color: Theme.shadow;
-            VerticalLayout {
-                padding: 4px;
-                spacing: 2px;
-                for label[i] in root.state.placements: Button {
-                    text: label;
-                    clicked => {
-                        root.add(i);
-                        book-menu.close();
-                    }
-                }
-            }
+        for label[i] in root.state.placements: MenuItem {
+            text: label;
+            clicked => { root.add(i); }
         }
     }
 }

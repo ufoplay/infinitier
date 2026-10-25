@@ -1,7 +1,8 @@
 # Infinitier
 
 There are two GUIs over the shared `infinitier_core` data layer:
-`infinitier_keeper` (egui) and `infinitier_keeper_slint` (Slint, vanilla `std-widgets`).
+`infinitier_keeper` (egui) and `infinitier_keeper_slint` (Slint, built on the
+[slint-themekit](../../github_ufoscout/slint-themekit) component library — no `std-widgets`).
 
 ## GUI verification
 

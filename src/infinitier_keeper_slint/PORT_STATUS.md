@@ -1,7 +1,8 @@
 # Slint keeper port — status & continuation notes
 
 Ongoing task: clone `infinitier_keeper` (egui) as `infinitier_keeper_slint` with the
-**same functionality**, vanilla Slint (`std-widgets` only). This file is the handoff for
+**same functionality** in Slint — now built on slint-themekit (see `THEMEKIT_MIGRATION.md`),
+originally vanilla `std-widgets`. This file is the handoff for
 resuming across sessions.
 
 ## User decisions (binding)
@@ -22,8 +23,8 @@ re-exports the adapters / structs for Rust.
 
 | `ui/` (Slint) | `src/` (Rust) | egui keeper |
 |---|---|---|
-| `app.slint` (window), `theme.slint` (colours beyond the Palette) | `main.rs`, `app.rs`, `state.rs` | `main.rs`, `app.rs`, `state.rs` |
-| `components/` — `ListFrame`/`SelectableRow`/`RowText`/`HeaderCell`, `ChipStrip`, `ModalFrame`, `FloatingWindow`, `FieldCardView` | `components/` — `editable_fields.rs`, `cre_fields.rs`, `field_card.rs` (row builders) | `components/` |
+| `app.slint` (window, Light / Dark), `themes/metrics.slint` (the keeper's layout values) | `main.rs`, `app.rs`, `state.rs` | `main.rs`, `app.rs`, `state.rs` |
+| `components/` — `FloatingWindow`, `FieldCardView` (on themekit components) | `components/` — `editable_fields.rs`, `cre_fields.rs`, `field_card.rs` (row builders) | `components/` |
 | `shell/` — `ShellAdapter`, `HeaderBar`, `SaveTabStrip`, `PartyList`, `EmptyState`, `CharacterPanel` (+ `CharacterContent`) | `view/shell.rs`, `view/character.rs`, `callbacks/shell.rs`, `callbacks/character.rs` | `ui/header_panel.rs`, `ui/save_tab_strip.rs`, `ui/character_panel.rs`, `components/party_selector.rs` |
 | `tabs/` — one page per layout: `CardsTab` (8 stat tabs), `TableTab` (variables), `GridTab` (Effects, Journal), `AppearanceTab`, `InventoryTab`, `SpellsTab` | `tabs/` — one module per tab + the `CharacterTab` enum | `ui/tabs/` |
 | `browser/` — `BrowserWindow` (a `FloatingWindow`), `BrowserLayer` + `BrowsersAdapter` | `browser/`, `view/browsers.rs`, `callbacks/browsers.rs` | `ui/item_browser.rs`, `ui/spell_browser.rs` |
@@ -36,7 +37,8 @@ Each folder has a barrel file (`components.slint`, `shell.slint`, `tabs.slint`, 
   `AppWindow.browser-scroll-to(kind, row)` (Rust: `invoke_browser_scroll_to`).
 - A `PopupWindow` among a component's children is positioned relative to the component root,
   not to the `@children` container it lands in (the browser's spellbook menu).
-- `ChipStrip` text must not elide: eliding lets the chips shrink instead of the strip scrolling.
+- Widgets come from slint-themekit (`@themekit`), design values from its `Theme` tokens; the
+  keeper's own sizes live in `themes/metrics.slint` (`tests/ui_tokens.rs` enforces both).
 
 The DONE log below predates the restructure: its file paths and property names are historical.
 
@@ -225,7 +227,9 @@ The egui keeper gained a settings-driven shell; ported here (logic duplicated, n
   a new model rebuilds the rows and breaks double-click detection.
 
 ## Still missing vs the egui keeper
-A wrapping character tab strip. (The Slint 1.18 `viewport-*` → `content-*` deprecations are done.)
+Nothing functional. The character tab strip now wraps (themekit `TabBar`, see
+`THEMEKIT_MIGRATION.md`). Presentation differences remain: the egui party rail (large portrait,
+counter, slider), its empty-slot / external-CRE messages, and tooltips.
 
 ## How to build/run/verify
 Build needs `libfontconfig1-dev`; on THIS box use the pkg-config shim:

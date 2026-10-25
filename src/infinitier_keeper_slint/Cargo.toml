@@ -30,10 +30,14 @@ slint = { version = "1.17", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+# The token lint, run on the keeper's own UI (tests/ui_tokens.rs).
+slint-themekit = { workspace = true }
 tempfile = { workspace = true }
 
 [build-dependencies]
 slint-build = "1.17"
+# Registers the themekit's `.slint` sources as the `@themekit` library.
+slint-themekit = { workspace = true }
 
 [features]
 # Opt-in embedded MCP test server (dev only): build with `--features mcp`,

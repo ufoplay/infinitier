@@ -1,0 +1,76 @@
+// The keeper's own layout values: sizes that belong to this app's layout
+// rather than to the theme's roles. Files under ui/themes/ are the only
+// keeper files allowed to hold literal design values (tests/ui_tokens.rs).
+
+export global Metrics {
+    // The main window.
+    out property <length> window-width: 1100px;
+    out property <length> window-height: 760px;
+    out property <length> window-min-width: 820px;
+    out property <length> window-min-height: 520px;
+
+    // The party list on the left, and its portraits.
+    out property <length> party-width: 220px;
+    out property <length> portrait-width: 30px;
+    out property <length> portrait-height: 38px;
+
+    // The floating browser windows: where the Item Browser first opens (the
+    // Spell Browser `browser-cascade` further), their size, and the
+    // smallest the grip resizes them to.
+    out property <length> browser-x: 40px;
+    out property <length> browser-y: 70px;
+    out property <length> browser-cascade: 30px;
+    out property <length> item-browser-width: 780px;
+    out property <length> spell-browser-width: 820px;
+    out property <length> browser-height: 600px;
+    out property <length> browser-min-width: 660px;
+    out property <length> browser-min-height: 400px;
+    // Inside a browser: the list's rows and fixed columns, the filter
+    // column, the entry's icon and the detail area's height range.
+    out property <length> browser-row-height: 28px;
+    out property <length> browser-type-column: 96px;
+    out property <length> browser-level-column: 30px;
+    out property <length> browser-resource-column: 86px;
+    out property <length> browser-filters-width: 220px;
+    out property <length> browser-icon: 64px;
+    out property <length> browser-detail-min-height: 150px;
+    out property <length> browser-detail-max-height: 360px;
+
+    // The card tabs: a field's label never squeezes below this, and its
+    // input / value column.
+    out property <length> field-label-min-width: 40px;
+    out property <length> field-input-width: 96px;
+    // Appearance: the labels' column and the colour swatches.
+    out property <length> appearance-label-width: 130px;
+    out property <length> swatch-size: 24px;
+    // Local / Global Variables: the names' column.
+    out property <length> variable-name-width: 300px;
+    // Inventory: the item icon and the fixed columns.
+    out property <length> inventory-icon: 40px;
+    out property <length> inventory-position-column: 120px;
+    out property <length> inventory-quantity-column: 164px;
+    out property <length> quantity-width: 52px;
+    out property <length> inventory-resource-column: 96px;
+    // Spells: the fixed columns.
+    out property <length> spell-level-column: 60px;
+    out property <length> spell-memorized-column: 90px;
+    out property <length> spell-resource-column: 96px;
+
+    // The dialogs. Settings and Load have fixed sizes (their lists take the
+    // spare room); the others fit their content's height.
+    out property <length> settings-dialog-width: 760px;
+    out property <length> settings-dialog-height: 620px;
+    out property <length> settings-type-column: 200px;
+    out property <length> settings-label-width: 130px;
+    out property <length> settings-list-min-height: 120px;
+    out property <length> load-dialog-width: 820px;
+    out property <length> load-dialog-height: 560px;
+    out property <length> load-name-column: 220px;
+    out property <length> load-preview-width: 220px;
+    out property <length> load-preview-height: 165px;
+    out property <length> load-portrait-width: 30px;
+    out property <length> load-portrait-height: 46px;
+    out property <length> save-dialog-width: 520px;
+    out property <length> confirm-dialog-width: 480px;
+    out property <length> loading-dialog-width: 600px;
+}

@@ -1,8 +1,7 @@
 // The Effects / Journal Entries tabs: a wide read-only grid, scrollable both
 // ways. The lists are short, so the rows aren't virtualised.
 
-import { ScrollView } from "std-widgets.slint";
-import { HeaderCell } from "../components/components.slint";
+import { Label, ScrollArea, TextRole, Theme, Tone } from "@themekit";
 
 // One grid row; `cells` line up with the adapter's headers / widths.
 export struct GridRow {
@@ -19,30 +18,25 @@ export global GridAdapter {
     in property <bool> wrap;
 }
 
-export component GridTab inherits ScrollView {
-    VerticalLayout {
-        alignment: start;
-        HorizontalLayout {
-            padding: 6px;
-            spacing: 12px;
-            for header[i] in GridAdapter.headers: HeaderCell {
-                text: header;
-                width: GridAdapter.widths[i];
-            }
+export component GridTab inherits ScrollArea {
+    content-spacing: Theme.spacing.xs;
+    HorizontalLayout {
+        spacing: Theme.spacing.md;
+        for header[i] in GridAdapter.headers: Label {
+            text: header;
+            role: TextRole.caption;
+            tone: Tone.muted;
+            width: GridAdapter.widths[i];
         }
-        for row in GridAdapter.rows: HorizontalLayout {
-            padding-left: 6px;
-            padding-right: 6px;
-            padding-top: 2px;
-            padding-bottom: 2px;
-            spacing: 12px;
-            for cell[i] in row.cells: Text {
-                text: cell;
-                width: GridAdapter.widths[i];
-                overflow: GridAdapter.wrap ? clip : elide;
-                wrap: GridAdapter.wrap ? word-wrap : no-wrap;
-                vertical-alignment: top;
-            }
+    }
+    for row in GridAdapter.rows: HorizontalLayout {
+        spacing: Theme.spacing.md;
+        for cell[i] in row.cells: Label {
+            text: cell;
+            width: GridAdapter.widths[i];
+            overflow: GridAdapter.wrap ? clip : elide;
+            wrap: GridAdapter.wrap ? word-wrap : no-wrap;
+            vertical-alignment: top;
         }
     }
 }

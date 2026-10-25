@@ -1,40 +1,32 @@
 // A yes / no prompt for a destructive action.
 
-import { Button, Palette } from "std-widgets.slint";
-import { DialogTitle, ModalFrame } from "../components/components.slint";
+import { Button, ButtonKind, Dialog, Label, Theme } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
-export component ConfirmDialog inherits ModalFrame {
-    in property <string> title;
+export component ConfirmDialog inherits Dialog {
     in property <string> message;
     in property <string> confirm-label: "Confirm";
     callback confirm();
     callback cancel();
 
-    panel-width: 480px;
-    panel-height: 200px;
+    panel-width: Metrics.confirm-dialog-width;
 
-    VerticalLayout {
-        padding: 16px;
-        spacing: 8px;
-        DialogTitle { text: root.title; }
-        Text {
-            text: root.message;
-            color: Palette.foreground;
-            wrap: word-wrap;
+    Label {
+        text: root.message;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Cancel";
+            kind: ButtonKind.secondary;
+            clicked => { root.cancel(); }
         }
-        Rectangle { vertical-stretch: 1; }
-        HorizontalLayout {
-            alignment: end;
-            spacing: 8px;
-            Button {
-                text: "Cancel";
-                clicked => { root.cancel(); }
-            }
-            Button {
-                text: root.confirm-label;
-                primary: true;
-                clicked => { root.confirm(); }
-            }
+        Button {
+            text: root.confirm-label;
+            kind: ButtonKind.danger;
+            clicked => { root.confirm(); }
         }
     }
 }

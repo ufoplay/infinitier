@@ -1,9 +1,8 @@
 // The Load dialog: the game's saves (newest first) with a screenshot +
 // portrait preview, and the prompt confirming a save's deletion.
 
-import { Button, ListView } from "std-widgets.slint";
-import { DialogTitle, ErrorText, HeaderCell, ListFrame, ModalFrame, RowText, SelectableRow } from "../components/components.slint";
-import { Theme } from "../theme.slint";
+import { Button, ButtonKind, Dialog, Label, ListItem, ListView, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 import { ConfirmDialog } from "confirm_dialog.slint";
 
 // One row of the saves list.
@@ -31,87 +30,97 @@ export global LoadAdapter {
     callback delete-cancel();
 }
 
-export component LoadDialog inherits ModalFrame {
-    panel-width: 820px;
-    panel-height: 560px;
+component ColumnHeader inherits Label {
+    role: TextRole.caption;
+    tone: Tone.muted;
+}
 
-    VerticalLayout {
-        padding: 16px;
-        spacing: 8px;
-        DialogTitle { text: "Open Single Player Saved Game"; }
-        HorizontalLayout {
-            spacing: 12px;
-            vertical-stretch: 1;
-            VerticalLayout {
-                horizontal-stretch: 1;
-                spacing: 4px;
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    HeaderCell { text: "Game Name"; width: 220px; }
-                    HeaderCell { text: "Time Saved"; horizontal-stretch: 1; }
-                }
-                Rectangle {
-                    vertical-stretch: 1;
-                    if LoadAdapter.rows.length == 0: Text {
-                        text: "No saved games found.";
-                        color: Theme.muted;
-                    }
-                    ListView {
-                        for row[i] in LoadAdapter.rows: SelectableRow {
-                            index: i;
-                            selected: i == LoadAdapter.selected;
-                            clicked => { LoadAdapter.select(i); }
-                            double-clicked => { LoadAdapter.pick(i); }
-                            RowText { text: row.name; width: 220px; selected: i == LoadAdapter.selected; }
-                            RowText { text: row.time; horizontal-stretch: 1; selected: i == LoadAdapter.selected; }
-                        }
-                    }
-                    ListFrame { }
-                }
+export component LoadDialog inherits Dialog {
+    title: "Open Single Player Saved Game";
+    panel-width: Metrics.load-dialog-width;
+    panel-height: Metrics.load-dialog-height;
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        spacing: Theme.spacing.md;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.spacing.xs;
+            HorizontalLayout {
+                padding-left: Theme.spacing.md;
+                padding-right: Theme.spacing.md;
+                spacing: Theme.spacing.sm;
+                ColumnHeader { text: "Game Name"; width: Metrics.load-name-column; }
+                ColumnHeader { text: "Time Saved"; horizontal-stretch: 1; }
             }
-            VerticalLayout {
-                width: 220px;
-                alignment: start;
-                spacing: 8px;
-                Image {
-                    source: LoadAdapter.screenshot;
-                    width: 220px;
-                    height: 165px;
-                    image-fit: contain;
+            Rectangle {
+                vertical-stretch: 1;
+                if LoadAdapter.rows.length == 0: Label {
+                    text: "No saved games found.";
+                    tone: Tone.muted;
                 }
-                HorizontalLayout {
-                    alignment: start;
-                    spacing: 3px;
-                    for portrait in LoadAdapter.portraits: Image {
-                        source: portrait;
-                        width: 30px;
-                        height: 46px;
-                        image-fit: contain;
+                ListView {
+                    for row[i] in LoadAdapter.rows: ListItem {
+                        index: i;
+                        selected: i == LoadAdapter.selected;
+                        clicked => { LoadAdapter.select(i); }
+                        double-clicked => { LoadAdapter.pick(i); }
+                        Label { text: row.name; width: Metrics.load-name-column; overflow: elide; }
+                        Label { text: row.time; horizontal-stretch: 1; overflow: elide; }
                     }
+                }
+                // The list's frame, drawn over the rows' stripes.
+                Rectangle {
+                    border-width: Theme.sizes.border-width;
+                    border-color: Theme.palette.border;
                 }
             }
         }
-        if LoadAdapter.error != "": ErrorText { text: LoadAdapter.error; }
-        HorizontalLayout {
-            spacing: 8px;
-            Button {
-                text: "Delete";
-                enabled: LoadAdapter.selected >= 0;
-                clicked => { LoadAdapter.delete(); }
+        VerticalLayout {
+            width: Metrics.load-preview-width;
+            alignment: start;
+            spacing: Theme.spacing.sm;
+            Image {
+                source: LoadAdapter.screenshot;
+                width: Metrics.load-preview-width;
+                height: Metrics.load-preview-height;
+                image-fit: contain;
             }
-            Rectangle { horizontal-stretch: 1; }
-            Button {
-                text: "Cancel";
-                clicked => { LoadAdapter.cancel(); }
+            HorizontalLayout {
+                alignment: start;
+                spacing: Theme.spacing.xs;
+                for portrait in LoadAdapter.portraits: Image {
+                    source: portrait;
+                    width: Metrics.load-portrait-width;
+                    height: Metrics.load-portrait-height;
+                    image-fit: contain;
+                }
             }
-            Button {
-                text: "Load";
-                primary: true;
-                enabled: LoadAdapter.selected >= 0;
-                clicked => { LoadAdapter.load(); }
-            }
+        }
+    }
+    if LoadAdapter.error != "": Label {
+        text: LoadAdapter.error;
+        tone: Tone.danger;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Delete";
+            kind: ButtonKind.danger;
+            enabled: LoadAdapter.selected >= 0;
+            clicked => { LoadAdapter.delete(); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: "Cancel";
+            kind: ButtonKind.secondary;
+            clicked => { LoadAdapter.cancel(); }
+        }
+        Button {
+            text: "Load";
+            enabled: LoadAdapter.selected >= 0;
+            clicked => { LoadAdapter.load(); }
         }
     }
 }

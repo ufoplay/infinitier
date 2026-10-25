@@ -3,9 +3,9 @@
 // Memorized (editable), Spell, Resource, Delete. Double-clicking a row
 // reveals its spell in the Spell Browser.
 
-import { Button, LineEdit, ListView, VerticalBox } from "std-widgets.slint";
-import { ChipStrip, HeaderCell } from "../components/components.slint";
+import { Button, ButtonKind, Icons, Label, ListItem, ListView, Tab, TabBar, TextField, TextRole, Theme, Tone } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
+import { Metrics } from "../themes/metrics.slint";
 
 // One spell. `ref-id` is the display-order row, routed back on memorize /
 // delete.
@@ -27,40 +27,43 @@ export global SpellsAdapter {
     callback delete(int /* ref-id */);
 }
 
-export component SpellsTab inherits VerticalBox {
-    ChipStrip {
-        labels: SpellsAdapter.books;
-        current: SpellsAdapter.book;
-        select(i) => { SpellsAdapter.select-book(i); }
+component ColumnHeader inherits Label {
+    role: TextRole.caption;
+    tone: Tone.muted;
+}
+
+export component SpellsTab inherits VerticalLayout {
+    spacing: Theme.spacing.sm;
+    TabBar {
+        for name[i] in SpellsAdapter.books: Tab {
+            text: name;
+            selected: i == SpellsAdapter.book;
+            clicked => { SpellsAdapter.select-book(i); }
+        }
     }
-    HorizontalLayout {
-        padding-left: 6px;
-        spacing: 8px;
-        HeaderCell { text: "Level"; width: 60px; }
-        HeaderCell { text: "Memorized"; width: 90px; }
-        HeaderCell { text: "Spell"; horizontal-stretch: 1; }
-        HeaderCell { text: "Resource"; width: 96px; }
-        Rectangle { width: 72px; }
-    }
-    ListView {
+    VerticalLayout {
         vertical-stretch: 1;
-        for row in SpellsAdapter.rows: Rectangle {
-            // Behind the row's inputs.
-            TouchArea {
+        spacing: Theme.spacing.xs;
+        HorizontalLayout {
+            padding-left: Theme.spacing.md;
+            padding-right: Theme.spacing.md + Theme.sizes.scrollbar-width + Theme.spacing.xs;
+            spacing: Theme.spacing.sm;
+            ColumnHeader { text: "Level"; width: Metrics.spell-level-column; }
+            ColumnHeader { text: "Memorized"; width: Metrics.spell-memorized-column; }
+            ColumnHeader { text: "Spell"; horizontal-stretch: 1; }
+            ColumnHeader { text: "Resource"; width: Metrics.spell-resource-column; }
+            Rectangle { width: Theme.sizes.control-height; }
+        }
+        ListView {
+            for row[i] in SpellsAdapter.rows: ListItem {
+                index: i;
                 double-clicked => {
                     BrowsersAdapter.front = BrowserKind.spells;
                     BrowsersAdapter.reveal(BrowserKind.spells, row.resref);
                 }
-            }
-            HorizontalLayout {
-                padding-left: 6px;
-                padding-right: 6px;
-                padding-top: 3px;
-                padding-bottom: 3px;
-                spacing: 8px;
-                Text { text: row.level; width: 60px; vertical-alignment: center; }
-                LineEdit {
-                    width: 90px;
+                Label { text: row.level; width: Metrics.spell-level-column; }
+                TextField {
+                    width: Metrics.spell-memorized-column;
                     text: row.memorized;
                     accepted(t) => { SpellsAdapter.memorize(row.ref-id, t); }
                     changed has-focus => {
@@ -69,11 +72,12 @@ export component SpellsTab inherits VerticalBox {
                         }
                     }
                 }
-                Text { text: row.name; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
-                Text { text: row.resref; width: 96px; vertical-alignment: center; overflow: elide; }
+                Label { text: row.name; horizontal-stretch: 1; overflow: elide; }
+                Label { text: row.resref; width: Metrics.spell-resource-column; overflow: elide; }
                 Button {
-                    width: 72px;
-                    text: "Delete";
+                    icon: Icons.trash;
+                    kind: ButtonKind.ghost;
+                    accessible-label: "Delete";
                     clicked => { SpellsAdapter.delete(row.ref-id); }
                 }
             }

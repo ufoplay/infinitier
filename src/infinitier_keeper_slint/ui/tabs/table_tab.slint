@@ -1,7 +1,7 @@
 // The Local / Global Variables tabs: a read-only Name · Value table.
 
-import { ListView, VerticalBox } from "std-widgets.slint";
-import { HeaderCell } from "../components/components.slint";
+import { Label, ListItem, ListView, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
 export struct VarRow {
     name: string,
@@ -12,24 +12,19 @@ export global TableAdapter {
     in property <[VarRow]> rows;
 }
 
-export component TableTab inherits VerticalBox {
+export component TableTab inherits VerticalLayout {
+    spacing: Theme.spacing.xs;
     HorizontalLayout {
-        padding-left: 6px;
-        padding-right: 6px;
-        spacing: 12px;
-        HeaderCell { text: "Name"; width: 300px; }
-        HeaderCell { text: "Value"; }
+        padding-left: Theme.spacing.md;
+        spacing: Theme.spacing.sm;
+        Label { text: "Name"; role: TextRole.caption; tone: Tone.muted; width: Metrics.variable-name-width; }
+        Label { text: "Value"; role: TextRole.caption; tone: Tone.muted; }
     }
     ListView {
-        vertical-stretch: 1;
-        for row in TableAdapter.rows: HorizontalLayout {
-            padding-left: 6px;
-            padding-right: 6px;
-            padding-top: 3px;
-            padding-bottom: 3px;
-            spacing: 12px;
-            Text { text: row.name; width: 300px; overflow: elide; vertical-alignment: center; }
-            Text { text: row.value; horizontal-stretch: 1; vertical-alignment: center; }
+        for row[i] in TableAdapter.rows: ListItem {
+            index: i;
+            Label { text: row.name; width: Metrics.variable-name-width; overflow: elide; }
+            Label { text: row.value; horizontal-stretch: 1; overflow: elide; }
         }
     }
 }

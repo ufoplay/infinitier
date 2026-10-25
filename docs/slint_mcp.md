@@ -90,7 +90,10 @@ take_screenshot {"windowHandle": <win>}            → eyeball it
 - **`set_element_value` doesn't focus the input.** To commit with Enter, click the input first,
   then set its value, then `dispatch_key_event` `"\n"`.
 - **Clicks land on whatever is on top** at the element's centre — a floating browser window or a
-  modal backdrop swallows clicks meant for the editor beneath. Move / close the window first.
+  modal backdrop swallows clicks meant for the editor beneath. Move / close the window first
+  (shrink it with its grip, then drag it into a corner).
+- **Elements scrolled out of view aren't in the tree** (e.g. the last type checkboxes of a
+  browser's filter list): scroll them into view first, or test with one that's visible.
 - **`get_element_tree` / `take_screenshot` want the right handle kind.** The tree takes an
   `elementHandle`; the screenshot takes a `windowHandle`. Passing a window where an element is
   expected (or vice-versa) errors.

@@ -3,6 +3,7 @@
 // to the editor.
 
 import { BrowserRow, BrowserState, BrowserWindow, TypeFilter } from "browser_window.slint";
+import { Metrics } from "../themes/metrics.slint";
 
 export enum BrowserKind { items, spells }
 
@@ -11,12 +12,12 @@ export global BrowsersAdapter {
     in property <[BrowserRow]> item-rows;
     in property <[TypeFilter]> item-types;
     in-out property <string> item-text;
-    in-out property <bool> item-all-types: true;
+    in property <bool> item-all-types: true;
     in property <BrowserState> spell-state;
     in property <[BrowserRow]> spell-rows;
     in property <[TypeFilter]> spell-types;
     in-out property <string> spell-text;
-    in-out property <bool> spell-all-types: true;
+    in property <bool> spell-all-types: true;
     // The window in front; UI state (whatever was opened or clicked last).
     in-out property <BrowserKind> front: BrowserKind.items;
     callback toggle(BrowserKind);
@@ -43,10 +44,10 @@ export component BrowserLayer inherits Rectangle {
     }
 
     item-browser := BrowserWindow {
-        x: 40px;
-        y: 70px;
-        width: min(780px, root.width - 60px);
-        height: min(600px, root.height - 90px);
+        x: Metrics.browser-x;
+        y: Metrics.browser-y;
+        width: min(Metrics.item-browser-width, root.width - Metrics.browser-x * 2);
+        height: min(Metrics.browser-height, root.height - Metrics.browser-y - Metrics.browser-x);
         z: BrowsersAdapter.front == BrowserKind.items ? 1 : 0;
         area-width: root.width;
         area-height: root.height;
@@ -57,7 +58,7 @@ export component BrowserLayer inherits Rectangle {
         rows: BrowsersAdapter.item-rows;
         types: BrowsersAdapter.item-types;
         text <=> BrowsersAdapter.item-text;
-        all-types <=> BrowsersAdapter.item-all-types;
+        all-types: BrowsersAdapter.item-all-types;
         raise => { BrowsersAdapter.front = BrowserKind.items; }
         close => { BrowsersAdapter.close(BrowserKind.items); }
         search(t) => { BrowsersAdapter.search(BrowserKind.items, t); }
@@ -68,10 +69,10 @@ export component BrowserLayer inherits Rectangle {
         set-type(t, on) => { BrowsersAdapter.type-shown(BrowserKind.items, t, on); }
     }
     spell-browser := BrowserWindow {
-        x: 70px;
-        y: 90px;
-        width: min(820px, root.width - 90px);
-        height: min(600px, root.height - 110px);
+        x: Metrics.browser-x + Metrics.browser-cascade;
+        y: Metrics.browser-y + Metrics.browser-cascade;
+        width: min(Metrics.spell-browser-width, root.width - Metrics.browser-x * 2 - Metrics.browser-cascade);
+        height: min(Metrics.browser-height, root.height - Metrics.browser-y - Metrics.browser-x - Metrics.browser-cascade);
         z: BrowsersAdapter.front == BrowserKind.spells ? 1 : 0;
         area-width: root.width;
         area-height: root.height;
@@ -83,7 +84,7 @@ export component BrowserLayer inherits Rectangle {
         rows: BrowsersAdapter.spell-rows;
         types: BrowsersAdapter.spell-types;
         text <=> BrowsersAdapter.spell-text;
-        all-types <=> BrowsersAdapter.spell-all-types;
+        all-types: BrowsersAdapter.spell-all-types;
         raise => { BrowsersAdapter.front = BrowserKind.spells; }
         close => { BrowsersAdapter.close(BrowserKind.spells); }
         search(t) => { BrowsersAdapter.search(BrowserKind.spells, t); }

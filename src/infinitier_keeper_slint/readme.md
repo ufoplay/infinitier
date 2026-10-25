@@ -2,7 +2,17 @@
 
 A [Slint](https://slint.dev) reimplementation of `infinitier_keeper`'s GUI. It reuses the entire
 data layer from `infinitier_core` (game-data indexing, save discovery, GAM/CRE parse + export,
-engine caps) and swaps only the *view*: vanilla `std-widgets` Slint in place of egui.
+engine caps) and swaps only the *view*: Slint in place of egui, built entirely on the
+[slint-themekit](https://github.com/ufoscout/slint-themekit) component library (no
+`std-widgets`), so one `Theme` value styles everything.
+
+## Build prerequisite: slint-themekit
+
+The UI is moving onto [slint-themekit](https://github.com/ufoscout/slint-themekit) (see
+`THEMEKIT_MIGRATION.md`). For now it's a path dependency on a sibling checkout, so clone it next
+to this repository: the workspace `Cargo.toml` expects
+`../../../github_ufoscout/slint-themekit` (relative to the workspace root). `.vscode/settings.json`
+points the Slint language server at the same checkout.
 
 ## Build prerequisite (Linux)
 
@@ -48,7 +58,7 @@ screenshot + portrait preview and Delete) + **multi-save tab strip** (open sever
 switch/close), party **portraits**, and **Save** (copies the save folder into a new
 `… (Edited NNNN)` folder and re-exports the edited GAM into it, never touching the original).
 
-One egui nicety is still missing (see `PORT_STATUS.md`): a wrapping character tab strip.
+What's left versus the egui keeper is presentation only (see `PORT_STATUS.md`).
 
 ## Verifying the UI
 
@@ -64,9 +74,11 @@ cargo run -p infinitier_keeper_slint --features mcp -- --config config_test/infi
 
 The UI is split like Slint's demo apps, and mirrors the egui keeper's modules:
 
-- `ui/app.slint` — the window: composes the parts below (plain `std-widgets`, coloured from their
-  `Palette` so the dark / light theme applies); `ui/theme.slint` — the few extra colours.
-- `ui/components/` — reusable widgets (list rows, chip strip, modal frame, floating window, field
+- `ui/app.slint` — the window: composes the parts below and switches the themekit's `Theme`
+  between its Light and Dark presets; `ui/themes/metrics.slint` — the keeper's own layout values
+  (the only `.slint` file with literal sizes; `tests/ui_tokens.rs` enforces it, and that nothing
+  imports `std-widgets`).
+- `ui/components/` — the keeper's own widgets on themekit components (floating window, field
   card); `ui/shell/` — header, save tabs, party list, character panel; `ui/tabs/` — the character
   tabs' pages; `ui/browser/` — the Item / Spell Browser windows; `ui/dialogs/` — the modal
   dialogs. Each part reads and calls its `*Adapter` global.

@@ -4257,6 +4257,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "slint-themekit",
  "tempfile",
  "thiserror 2.0.21",
  "toml",
@@ -6887,6 +6888,10 @@ dependencies = [
  "quote",
  "spin_on",
 ]
+
+[[package]]
+name = "slint-themekit"
+version = "0.1.0"
 
 [[package]]
 name = "slotmap"

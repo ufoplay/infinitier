@@ -1,41 +1,30 @@
 // Shown while a game loads: a spinner, and the whole UI blocked — clicks by
-// the backdrop, keys by grabbing the focus.
+// the dialog's scrim, keys by grabbing the focus.
 
-import { Palette, Spinner } from "std-widgets.slint";
-import { DialogTitle, ModalFrame } from "../components/components.slint";
+import { Dialog, Label, Spinner, Theme } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
 export global LoadingAdapter {
     in property <bool> active;
     in property <string> text;
 }
 
-export component LoadingOverlay inherits ModalFrame {
-    panel-width: 600px;
-    panel-height: 120px;
+export component LoadingOverlay inherits Dialog {
+    title: "Loading game";
+    panel-width: Metrics.loading-dialog-width;
 
     FocusScope {
         init => { self.focus(); }
         key-pressed(event) => { accept }
         key-released(event) => { accept }
     }
-    VerticalLayout {
-        padding: 16px;
-        spacing: 12px;
-        DialogTitle { text: "Loading game"; }
-        HorizontalLayout {
-            spacing: 12px;
-            Spinner {
-                indeterminate: true;
-                width: 28px;
-                height: 28px;
-            }
-            Text {
-                text: LoadingAdapter.text;
-                color: Palette.foreground;
-                vertical-alignment: center;
-                overflow: elide;
-                horizontal-stretch: 1;
-            }
+    HorizontalLayout {
+        spacing: Theme.spacing.md;
+        Spinner { }
+        Label {
+            text: LoadingAdapter.text;
+            horizontal-stretch: 1;
+            overflow: elide;
         }
     }
 }

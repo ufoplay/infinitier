@@ -3,30 +3,26 @@
 // grip, closed by its ×. Pressing anywhere on it asks to `raise` it over
 // its siblings. Its children fill the area below the title bar.
 
-import { Palette } from "std-widgets.slint";
-import { Theme } from "../theme.slint";
-
-global FloatingStyle {
-    out property <length> title-height: 28px;
-    out property <length> grip-size: 16px;
-}
+import { Button, ButtonKind, Icons, Label, TextRole, Theme, Tone } from "@themekit";
 
 export component FloatingWindow inherits Rectangle {
     in property <string> title;
     // The area the window is kept inside while dragged / resized.
     in property <length> area-width;
     in property <length> area-height;
-    in property <length> min-window-width: 400px;
-    in property <length> min-window-height: 300px;
+    // The smallest size the grip resizes the window to (0: no minimum).
+    in property <length> min-window-width;
+    in property <length> min-window-height;
     callback raise();
     callback close();
 
-    background: Palette.background;
-    border-radius: 6px;
-    border-width: 1px;
-    border-color: Palette.border;
-    drop-shadow-blur: 12px;
-    drop-shadow-color: Theme.shadow;
+    background: Theme.palette.surface;
+    border-radius: Theme.radii.md;
+    border-width: Theme.sizes.border-width;
+    border-color: Theme.palette.border;
+    drop-shadow-blur: Theme.elevation.blur;
+    drop-shadow-offset-y: Theme.elevation.offset;
+    drop-shadow-color: Theme.palette.shadow;
 
     // Clicks on the window's empty areas stay on it (and bring it forward).
     TouchArea {
@@ -40,8 +36,7 @@ export component FloatingWindow inherits Rectangle {
     VerticalLayout {
         // Title bar: drag to move, × to close.
         Rectangle {
-            height: FloatingStyle.title-height;
-            background: Palette.alternate-background;
+            background: Theme.palette.surface-variant;
             border-top-left-radius: root.border-radius;
             border-top-right-radius: root.border-radius;
             TouchArea {
@@ -57,31 +52,17 @@ export component FloatingWindow inherits Rectangle {
                 }
             }
             HorizontalLayout {
-                padding-left: 10px;
-                Text {
+                padding-left: Theme.spacing.md;
+                Label {
                     text: root.title;
-                    font-weight: 700;
-                    color: Palette.foreground;
-                    vertical-alignment: center;
+                    role: TextRole.heading;
                     horizontal-stretch: 1;
                 }
-                Rectangle {
-                    width: FloatingStyle.title-height;
-                    background: close-area.has-hover ? Palette.border : transparent;
-                    border-top-right-radius: root.border-radius;
-                    accessible-role: button;
+                Button {
+                    icon: Icons.close;
+                    kind: ButtonKind.ghost;
                     accessible-label: "Close " + root.title;
-                    accessible-action-default => { root.close(); }
-                    Text {
-                        text: "×";
-                        font-size: 16px;
-                        color: Palette.foreground;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                    close-area := TouchArea {
-                        clicked => { root.close(); }
-                    }
+                    clicked => { root.close(); }
                 }
             }
         }
@@ -96,19 +77,20 @@ export component FloatingWindow inherits Rectangle {
     TouchArea {
         x: root.width - self.width;
         y: root.height - self.height;
-        width: FloatingStyle.grip-size;
-        height: FloatingStyle.grip-size;
+        width: Theme.sizes.icon;
+        height: Theme.sizes.icon;
         mouse-cursor: nwse-resize;
         moved => {
             root.width = max(root.min-window-width, min(root.area-width - root.x, root.width + self.mouse-x - self.pressed-x));
             root.height = max(root.min-window-height, min(root.area-height - root.y, root.height + self.mouse-y - self.pressed-y));
         }
-        Text {
+        Label {
             text: "◢";
-            font-size: 10px;
-            color: Theme.muted;
+            role: TextRole.caption;
+            tone: Tone.muted;
             horizontal-alignment: right;
             vertical-alignment: bottom;
+            accessible-role: none;
         }
     }
 }

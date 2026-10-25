@@ -1,8 +1,9 @@
-// The Appearance tab: the animation's name and the colour swatches. A
-// ScrollView like the card tabs: the fixed-width swatch rows would
+// The Appearance tab: the animation's name and the colour swatches. In a
+// ScrollArea like the card tabs: the fixed-width swatch rows would
 // otherwise cap the panel's (and so the window's) width.
 
-import { GroupBox, ScrollView } from "std-widgets.slint";
+import { Card, Label, ScrollArea, TextRole, Theme } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
 // One labelled colour slot and its pre-rendered gradient swatch.
 export struct ColorSwatch {
@@ -15,32 +16,27 @@ export global AppearanceAdapter {
     in property <[ColorSwatch]> swatches;
 }
 
-export component AppearanceTab inherits ScrollView {
-    VerticalLayout {
-        alignment: start;
-        spacing: 8px;
-        HorizontalLayout {
-            padding: 6px;
-            spacing: 10px;
-            Text { text: "Appearance"; width: 130px; vertical-alignment: center; }
-            Text { text: AppearanceAdapter.animation-name; font-weight: 700; vertical-alignment: center; }
+export component AppearanceTab inherits ScrollArea {
+    content-spacing: Theme.spacing.sm;
+    HorizontalLayout {
+        spacing: Theme.spacing.md;
+        Label { text: "Appearance"; width: Metrics.appearance-label-width; }
+        Label {
+            text: AppearanceAdapter.animation-name;
+            font-weight: Theme.typography.strong-weight;
         }
-        GroupBox {
-            title: "Colors";
-            vertical-stretch: 0;
-            VerticalLayout {
-                alignment: start;
-                spacing: 6px;
-                for swatch in AppearanceAdapter.swatches: HorizontalLayout {
-                    spacing: 10px;
-                    Text { text: swatch.label; width: 130px; vertical-alignment: center; }
-                    Image {
-                        source: swatch.image;
-                        width: 24px;
-                        height: 24px;
-                        image-rendering: pixelated;
-                    }
-                }
+    }
+    Card {
+        content-spacing: Theme.spacing.sm;
+        Label { text: "Colors"; role: TextRole.heading; }
+        for swatch in AppearanceAdapter.swatches: HorizontalLayout {
+            spacing: Theme.spacing.md;
+            Label { text: swatch.label; width: Metrics.appearance-label-width; }
+            Image {
+                source: swatch.image;
+                width: Metrics.swatch-size;
+                height: Metrics.swatch-size;
+                image-rendering: pixelated;
             }
         }
     }

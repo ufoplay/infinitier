@@ -131,6 +131,14 @@ egui-components = { git = "https://github.com/ufoscout/egui-components.git", bra
 # one may be enabled at a time; the constant name stays the same.
 ttf-inter = { version = "0.1", default-features = false, features = ["regular"] }
 
+# Slint UI
+# The Slint keeper's component library (`@themekit`), used from its build
+# script and its token-lint test. Local dev: path to the sibling
+# slint-themekit checkout so new components take effect without pushing.
+# Switch to the git dep (and pin the pushed rev) before pushing: CI can't see
+# this path.
+slint-themekit = { path = "../../../github_ufoscout/slint-themekit/crates/slint-themekit" }
+
 # Build-time git info (tag/branch) baked into the binary. `default-features
 # = false` keeps only the git emitter — the build/cargo/rustc/si emitters
 # stay off. Uses the pure-Rust `gix` backend, so no system `git` is required

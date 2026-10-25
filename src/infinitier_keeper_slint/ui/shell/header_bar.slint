@@ -1,13 +1,12 @@
 // The header bar: Load / Save, the browser toggles, the selected
 // character's name, the status line, the theme toggle and Settings.
 
-import { Button, HorizontalBox } from "std-widgets.slint";
+import { Button, ButtonKind, Icons, Label, TextRole, Theme, Tone } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
-import { Theme } from "../theme.slint";
 import { ShellAdapter } from "shell_adapter.slint";
 
-export component HeaderBar inherits HorizontalBox {
-    spacing: 8px;
+export component HeaderBar inherits HorizontalLayout {
+    spacing: Theme.spacing.sm;
     Button {
         text: "Load";
         enabled: ShellAdapter.has-game;
@@ -34,30 +33,30 @@ export component HeaderBar inherits HorizontalBox {
             BrowsersAdapter.toggle(BrowserKind.spells);
         }
     }
-    Text {
+    Label {
         text: ShellAdapter.character-name;
-        font-size: 18px;
-        font-weight: 700;
-        vertical-alignment: center;
+        role: TextRole.heading;
     }
     // Takes only the space left over, so it never squeezes the name.
-    Text {
+    Label {
         text: ShellAdapter.status;
-        color: Theme.muted;
-        font-size: 12px;
+        role: TextRole.caption;
+        tone: Tone.muted;
         horizontal-stretch: 1;
         preferred-width: 0px;
         horizontal-alignment: right;
-        vertical-alignment: center;
         overflow: elide;
     }
     // Labelled with the theme it switches to.
     Button {
         text: ShellAdapter.dark-theme ? "Light" : "Dark";
+        icon: Icons.contrast;
+        kind: ButtonKind.ghost;
         clicked => { ShellAdapter.theme-toggle(); }
     }
     Button {
         text: "Settings";
+        kind: ButtonKind.ghost;
         clicked => { ShellAdapter.settings-clicked(); }
     }
 }

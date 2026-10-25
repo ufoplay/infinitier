@@ -1,18 +1,20 @@
-// The Infinitier Keeper's main window (Slint edition). Kept deliberately
-// plain: only std-widgets, coloured from their Palette so the dark / light
-// theme applies everywhere.
+// The Infinitier Keeper's main window (Slint edition), built on
+// slint-themekit (`@themekit`): widgets and design values come from its
+// components and `Theme` tokens (see THEMEKIT_MIGRATION.md).
 //
 // The UI is split like Slint's demo apps (and like the egui keeper's
 // `components/`, `ui/` and `ui/tabs/`):
-//   components/ — reusable widgets, unaware of the keeper's state
+//   components/ — the keeper's own widgets (themekit-based), stateless
 //   shell/      — the window's chrome: header, save tabs, party, tab strip
 //   tabs/       — the character tabs' pages
 //   browser/    — the floating Item / Spell Browser windows
 //   dialogs/    — the modal dialogs
+//   themes/     — the keeper's own layout values (`Metrics`)
 // Each part reads and calls its `*Adapter` global, which the Rust side
 // fills and handles; this file only composes the parts.
 
-import { HorizontalBox, Palette, VerticalBox } from "std-widgets.slint";
+import { Theme, ThemePresets } from "@themekit";
+import { Metrics } from "themes/metrics.slint";
 import { FieldCard, FieldRow } from "components/components.slint";
 import {
     CharacterAdapter,
@@ -91,16 +93,21 @@ export {
 
 export component AppWindow inherits Window {
     title: ShellAdapter.title;
-    background: Palette.background;
-    preferred-width: 1100px;
-    preferred-height: 760px;
-    min-width: 820px;
-    min-height: 520px;
+    background: Theme.palette.background;
+    preferred-width: Metrics.window-width;
+    preferred-height: Metrics.window-height;
+    min-width: Metrics.window-min-width;
+    min-height: Metrics.window-min-height;
 
-    // The colour theme, applied to the std-widgets Palette.
+    // The colour theme.
     property <bool> dark-theme: ShellAdapter.dark-theme;
-    changed dark-theme => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
-    init => { Palette.color-scheme = root.dark-theme ? ColorScheme.dark : ColorScheme.light; }
+    changed dark-theme => { root.apply-theme(); }
+    init => { root.apply-theme(); }
+
+    function apply-theme() {
+        Theme.current = root.dark-theme ? ThemePresets.dark : ThemePresets.light;
+    }
+
 
     // Scroll browser `kind`'s list so `row` is in view. (A global's callback
     // can't be implemented in .slint, so the Rust side calls this instead.)
@@ -108,14 +115,14 @@ export component AppWindow inherits Window {
         browsers.scroll-to(kind, row);
     }
 
-    VerticalBox {
-        padding: 8px;
-        spacing: 8px;
+    VerticalLayout {
+        padding: Theme.spacing.md;
+        spacing: Theme.spacing.sm;
         HeaderBar { }
         if SaveTabsAdapter.names.length > 0: SaveTabStrip { }
         if !ShellAdapter.has-save: EmptyState { vertical-stretch: 1; }
-        if ShellAdapter.has-save: HorizontalBox {
-            spacing: 8px;
+        if ShellAdapter.has-save: HorizontalLayout {
+            spacing: Theme.spacing.sm;
             PartyList { }
             CharacterPanel { horizontal-stretch: 1; }
         }

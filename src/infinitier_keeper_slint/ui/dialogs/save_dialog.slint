@@ -1,8 +1,7 @@
 // The Save dialog: the edited save's new folder name.
 
-import { Button, LineEdit, Palette } from "std-widgets.slint";
-import { DialogTitle, ErrorText, ModalFrame } from "../components/components.slint";
-import { Theme } from "../theme.slint";
+import { Button, ButtonKind, Dialog, Label, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
 export global SaveAdapter {
     in property <bool> open;
@@ -13,38 +12,35 @@ export global SaveAdapter {
     callback cancel();
 }
 
-export component SaveDialog inherits ModalFrame {
-    panel-width: 520px;
-    panel-height: 240px;
+export component SaveDialog inherits Dialog {
+    title: "Save edited save game";
+    panel-width: Metrics.save-dialog-width;
 
-    VerticalLayout {
-        padding: 16px;
-        spacing: 8px;
-        DialogTitle { text: "Save edited save game"; }
-        Text {
-            text: "Save the current save game (GAM, SAV, BMP, WMP) into a new sibling folder.";
-            color: Palette.foreground;
-            wrap: word-wrap;
+    Label {
+        text: "Save the current save game (GAM, SAV, BMP, WMP) into a new sibling folder.";
+        wrap: word-wrap;
+    }
+    Label { text: "Folder name"; role: TextRole.caption; tone: Tone.muted; }
+    TextField {
+        text <=> SaveAdapter.folder-name;
+        accepted(t) => { SaveAdapter.confirm(t); }
+    }
+    if SaveAdapter.error != "": Label {
+        text: SaveAdapter.error;
+        tone: Tone.danger;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Cancel";
+            kind: ButtonKind.secondary;
+            clicked => { SaveAdapter.cancel(); }
         }
-        Text { text: "Folder name:"; color: Theme.muted; }
-        LineEdit {
-            text <=> SaveAdapter.folder-name;
-            accepted(t) => { SaveAdapter.confirm(t); }
-        }
-        if SaveAdapter.error != "": ErrorText { text: SaveAdapter.error; }
-        Rectangle { vertical-stretch: 1; }
-        HorizontalLayout {
-            alignment: end;
-            spacing: 8px;
-            Button {
-                text: "Cancel";
-                clicked => { SaveAdapter.cancel(); }
-            }
-            Button {
-                text: "Save";
-                primary: true;
-                clicked => { SaveAdapter.confirm(SaveAdapter.folder-name); }
-            }
+        Button {
+            text: "Save";
+            clicked => { SaveAdapter.confirm(SaveAdapter.folder-name); }
         }
     }
 }

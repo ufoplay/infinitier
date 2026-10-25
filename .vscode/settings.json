@@ -1,0 +1,8 @@
+{
+    // The Slint language server doesn't run build.rs: tell it where the Slint
+    // keeper's `@themekit` library lives (the same sibling checkout as the
+    // path dependency in Cargo.toml).
+    "slint.libraryPaths": {
+        "themekit": "../../../github_ufoscout/slint-themekit/crates/slint-themekit/ui/lib.slint"
+    }
+}

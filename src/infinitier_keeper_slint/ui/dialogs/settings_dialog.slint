@@ -1,9 +1,8 @@
 // The Settings dialog: the configured games (select + close, or
 // double-click, to load one) and a form to add a game.
 
-import { Button, ComboBox, LineEdit, ListView, Palette } from "std-widgets.slint";
-import { DialogTitle, ErrorText, HeaderCell, ListFrame, ModalFrame, RowText, SelectableRow } from "../components/components.slint";
-import { Theme } from "../theme.slint";
+import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
 
 // One row of the games list.
 export struct GameRowUi {
@@ -32,106 +31,128 @@ export global SettingsAdapter {
     callback close();
 }
 
-export component SettingsDialog inherits ModalFrame {
-    panel-width: 760px;
-    panel-height: 620px;
+component ColumnHeader inherits Label {
+    role: TextRole.caption;
+    tone: Tone.muted;
+}
 
+component FormLabel inherits Label {
+    width: Metrics.settings-label-width;
+}
+
+export component SettingsDialog inherits Dialog {
+    title: "Settings";
+    panel-width: Metrics.settings-dialog-width;
+    panel-height: Metrics.settings-dialog-height;
+
+    if SettingsAdapter.file-error != "": Label {
+        text: SettingsAdapter.file-error;
+        tone: Tone.danger;
+        wrap: word-wrap;
+    }
+
+    Label { text: "Games"; role: TextRole.heading; }
     VerticalLayout {
-        padding: 16px;
-        spacing: 8px;
-        DialogTitle { text: "Settings"; }
-        if SettingsAdapter.file-error != "": ErrorText { text: SettingsAdapter.file-error; }
-
-        HeaderCell { text: "Games"; }
+        vertical-stretch: 1;
+        spacing: Theme.spacing.xs;
         HorizontalLayout {
-            padding-left: 8px;
-            padding-right: 8px;
-            spacing: 8px;
-            HeaderCell { text: "Game type"; width: 200px; }
-            HeaderCell { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
-            HeaderCell { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }
+            padding-left: Theme.spacing.md;
+            padding-right: Theme.spacing.md;
+            spacing: Theme.spacing.sm;
+            ColumnHeader { text: "Game type"; width: Metrics.settings-type-column; }
+            ColumnHeader { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
+            ColumnHeader { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }
         }
         Rectangle {
             vertical-stretch: 1;
-            min-height: 120px;
-            if SettingsAdapter.rows.length == 0: Text {
+            min-height: Metrics.settings-list-min-height;
+            if SettingsAdapter.rows.length == 0: Label {
                 text: "No games configured yet — add one below.";
-                color: Theme.muted;
+                tone: Tone.muted;
             }
             ListView {
-                for row[i] in SettingsAdapter.rows: SelectableRow {
+                for row[i] in SettingsAdapter.rows: ListItem {
                     index: i;
                     selected: i == SettingsAdapter.selected;
                     clicked => { SettingsAdapter.select(i); }
                     double-clicked => { SettingsAdapter.pick(i); }
-                    RowText { text: row.type-label; width: 200px; selected: i == SettingsAdapter.selected; }
-                    RowText { text: row.game-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == SettingsAdapter.selected; }
-                    RowText { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; selected: i == SettingsAdapter.selected; }
+                    Label { text: row.type-label; width: Metrics.settings-type-column; overflow: elide; }
+                    Label { text: row.game-path; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
+                    Label { text: row.save-path; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
                 }
             }
-            ListFrame { }
-        }
-        HorizontalLayout {
-            alignment: start;
-            spacing: 8px;
-            Button {
-                text: "Remove";
-                enabled: SettingsAdapter.selected >= 0;
-                clicked => { SettingsAdapter.remove(); }
-            }
-            Text {
-                text: "Select a game and close this dialog to load it.";
-                color: Theme.muted;
-                vertical-alignment: center;
+            // The list's frame, drawn over the rows' stripes.
+            Rectangle {
+                border-width: Theme.sizes.border-width;
+                border-color: Theme.palette.border;
             }
         }
+    }
+    HorizontalLayout {
+        alignment: start;
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Remove";
+            kind: ButtonKind.danger;
+            enabled: SettingsAdapter.selected >= 0;
+            clicked => { SettingsAdapter.remove(); }
+        }
+        Label {
+            text: "Select a game and close this dialog to load it.";
+            tone: Tone.muted;
+        }
+    }
 
-        HeaderCell { text: "Add a game"; }
-        GridLayout {
-            spacing: 8px;
-            Row {
-                Text { text: "Game path"; width: 130px; vertical-alignment: center; color: Palette.foreground; }
-                LineEdit {
-                    text <=> SettingsAdapter.form-game-path;
-                    placeholder-text: "Folder containing CHITIN.KEY";
-                }
+    Label { text: "Add a game"; role: TextRole.heading; }
+    GridLayout {
+        spacing: Theme.spacing.sm;
+        Row {
+            FormLabel { text: "Game path"; }
+            TextField {
+                text <=> SettingsAdapter.form-game-path;
+                placeholder: "Folder containing CHITIN.KEY";
             }
-            Row {
-                Text { text: "Savegame path"; vertical-alignment: center; color: Palette.foreground; }
-                LineEdit {
-                    text <=> SettingsAdapter.form-save-path;
-                    placeholder-text: "Optional — folder containing save/, if outside the game folder";
-                }
+        }
+        Row {
+            FormLabel { text: "Savegame path"; }
+            TextField {
+                text <=> SettingsAdapter.form-save-path;
+                placeholder: "Optional — folder containing save/, if outside the game folder";
             }
-            Row {
-                Text { text: "Game type"; vertical-alignment: center; color: Palette.foreground; }
-                ComboBox {
-                    model: SettingsAdapter.game-types;
-                    current-index <=> SettingsAdapter.form-game-type;
-                }
+        }
+        Row {
+            FormLabel { text: "Game type"; }
+            Select {
+                options: SettingsAdapter.game-types;
+                current-index: SettingsAdapter.form-game-type;
+                selected(index) => { SettingsAdapter.form-game-type = index; }
             }
-            Row {
-                Rectangle { }
-                HorizontalLayout {
-                    alignment: start;
-                    Button {
-                        text: "Add";
-                        clicked => {
-                            SettingsAdapter.add(SettingsAdapter.form-game-path, SettingsAdapter.form-save-path, SettingsAdapter.form-game-type);
-                        }
+        }
+        Row {
+            Rectangle { }
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: "Add";
+                    kind: ButtonKind.secondary;
+                    clicked => {
+                        SettingsAdapter.add(SettingsAdapter.form-game-path, SettingsAdapter.form-save-path, SettingsAdapter.form-game-type);
                     }
                 }
             }
         }
-        if SettingsAdapter.error != "": ErrorText { text: SettingsAdapter.error; }
+    }
+    if SettingsAdapter.error != "": Label {
+        text: SettingsAdapter.error;
+        tone: Tone.danger;
+        wrap: word-wrap;
+    }
 
-        HorizontalLayout {
-            alignment: end;
-            Button {
-                text: "Close";
-                primary: true;
-                clicked => { SettingsAdapter.close(); }
-            }
+    HorizontalLayout {
+        alignment: end;
+        Button {
+            text: "Close";
+            clicked => { SettingsAdapter.close(); }
         }
     }
 }
