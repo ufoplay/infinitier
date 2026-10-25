@@ -1,18 +1,21 @@
 //! Memorization tab for the Slint keeper (editable, AD&D only).
 //!
-//! Ports the egui keeper's `ui/tabs/memorization/`. One row per spell-
-//! memorisation slot (`spell_memorization_info`): a type + level label and
-//! the editable "Max Can Memorise" count (`num_memorizable_total`), committed
-//! by slot index via `Cre::set_spell_memorization_total`. IWD2 (V2.2) stores
-//! per-class spell tables instead and hides this tab.
+//! Ports the egui keeper's `ui/tabs/memorization/`: EEKeeper's three-column
+//! table (Type · Level · Max Can Memorize), one row per spell-memorisation
+//! slot (`spell_memorization_info`). The type and level are fixed; the
+//! "Max Can Memorize" count (`num_memorizable_total`) is editable, committed
+//! by slot index via `Cre::set_spell_memorization_total`. IWD2 (V2.2)
+//! stores per-class spell tables instead and hides this tab.
 //!
-//! Field-id across the Slint boundary = the slot index.
+//! Cell id across the Slint boundary = the slot index.
 
 use infinitier_core::resource::cre::{Cre, SpellType, SubSections};
 
-use crate::FieldCard;
-use crate::components::field_card::{card, editable_row};
+use crate::components::edit_table::{EditTable, editable_cell, row, value_cell};
 use crate::state::Model;
+
+const NAME_HEADER: &str = "Type";
+const HEADERS: &[&str] = &["Level", "Max Can Memorize"];
 
 struct MemRow {
     type_name: &'static str,
@@ -43,30 +46,32 @@ fn spell_type_name(spell_type: SpellType) -> &'static str {
     }
 }
 
-/// Build the Memorization-tab cards for the selected creature.
-pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
+/// Build the Memorization table for the selected creature.
+pub fn build(model: &Model) -> EditTable {
     let Some(cre) = model.selected_cre() else {
-        return [Vec::new(), Vec::new(), Vec::new()];
+        return EditTable::empty(NAME_HEADER, HEADERS);
     };
     let rows = memorization_rows(cre)
         .into_iter()
         .enumerate()
-        .map(|(i, r)| {
-            editable_row(
-                i as i32,
-                &format!("{} L{}", r.type_name, r.level),
-                &r.max.to_string(),
+        .map(|(slot, r)| {
+            row(
+                r.type_name,
+                vec![
+                    value_cell(&r.level.to_string()),
+                    editable_cell(i32::try_from(slot).unwrap_or(i32::MAX), &r.max.to_string()),
+                ],
             )
         })
         .collect();
-    [
-        vec![card("Spell Memorization (Max Can Memorise)", 0, rows)],
-        Vec::new(),
-        Vec::new(),
-    ]
+    EditTable {
+        name_header: NAME_HEADER,
+        headers: HEADERS,
+        rows,
+    }
 }
 
-/// Commit an edited "Max Can Memorise" cell (parsed to u16) by slot index.
+/// Commit an edited "Max Can Memorize" cell (parsed to u16) by slot index.
 pub fn commit(model: &mut Model, id: i32, value: &str) {
     let Ok(index) = usize::try_from(id) else {
         return;

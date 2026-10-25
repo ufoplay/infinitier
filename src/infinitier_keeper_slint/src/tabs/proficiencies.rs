@@ -1,53 +1,73 @@
 //! Proficiencies tab for the Slint keeper (editable, AD&D only).
 //!
-//! Ports the egui keeper's `ui/tabs/proficiencies/`. The proficiency *list*
-//! (which `IE_PROFICIENCY*` stats + names) comes from `engine_caps`
-//! (WEAPPROF.2DA); each row pairs it with the creature's first/second-class
-//! points (`Cre::proficiency`) and commits via `Cre::set_proficiency`.
-//! Rendered as editable cards: one row per proficiency's first-class points,
-//! plus a "(2nd)" row for dual-classed characters. IWD2 has no block and
-//! hides this tab.
+//! Ports the egui keeper's `ui/tabs/proficiencies/`: EEKeeper's
+//! three-column table (Proficiency · First Class · Second Class). The
+//! proficiency *list* (which `IE_PROFICIENCY*` stats + names) comes from
+//! `engine_caps` (WEAPPROF.2DA); each row pairs it with the creature's
+//! first/second-class points (`Cre::proficiency`) and commits via
+//! `Cre::set_proficiency`. The first class is always editable; the second
+//! only for a dual-classed character's weapons, read-only (blank when
+//! zero) elsewhere. IWD2 has no block and hides this tab.
 //!
-//! Field-id encoding across the Slint boundary: `stat` for the first-class
+//! Cell-id encoding across the Slint boundary: `stat` for the first-class
 //! slot, `stat + 256` for the second-class slot.
 
 use infinitier_core::resource::cre::WeaponProficiency;
 
-use crate::FieldCard;
-use crate::components::field_card::{card, editable_row};
+use crate::components::edit_table::{EditTable, editable_cell, row, value_cell};
 use crate::state::Model;
+
+const NAME_HEADER: &str = "Proficiency";
+const HEADERS: &[&str] = &["First Class", "Second Class"];
 
 /// EEKeeper's proficiency-point cap.
 const MAX_POINTS: u8 = 5;
 /// Offset added to a stat to encode the second-class slot id.
 const SECOND_SLOT_OFFSET: i32 = 256;
 
-/// Build the Proficiencies-tab cards for the selected creature.
-pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
+/// Build the Proficiencies table for the selected creature.
+pub fn build(model: &Model) -> EditTable {
     let Some(cre) = model.selected_cre() else {
-        return [Vec::new(), Vec::new(), Vec::new()];
+        return EditTable::empty(NAME_HEADER, HEADERS);
     };
-    let mut rows = Vec::new();
-    for p in model.engine_caps.proficiencies() {
-        let points = cre.proficiency(p.stat);
-        rows.push(editable_row(
-            i32::from(p.stat),
-            &p.name,
-            &points.first_class.to_string(),
-        ));
-        if cre.proficiency_has_second_class(p.stat) {
-            rows.push(editable_row(
-                i32::from(p.stat) + SECOND_SLOT_OFFSET,
-                &format!("{} (2nd)", p.name),
-                &points.second_class.to_string(),
-            ));
-        }
+    let rows = model
+        .engine_caps
+        .proficiencies()
+        .iter()
+        .map(|p| {
+            let points = cre.proficiency(p.stat);
+            let second = if cre.proficiency_has_second_class(p.stat) {
+                editable_cell(
+                    i32::from(p.stat) + SECOND_SLOT_OFFSET,
+                    &points.second_class.to_string(),
+                )
+            } else {
+                // Matches EEKeeper, which leaves untrained slots empty.
+                value_cell(&points_text(points.second_class))
+            };
+            row(
+                &p.name,
+                vec![
+                    editable_cell(i32::from(p.stat), &points.first_class.to_string()),
+                    second,
+                ],
+            )
+        })
+        .collect();
+    EditTable {
+        name_header: NAME_HEADER,
+        headers: HEADERS,
+        rows,
     }
-    [
-        vec![card("Weapon Proficiencies", 0, rows)],
-        Vec::new(),
-        Vec::new(),
-    ]
+}
+
+/// A read-only point count: blank for zero.
+fn points_text(points: u8) -> String {
+    if points == 0 {
+        String::new()
+    } else {
+        points.to_string()
+    }
 }
 
 /// Commit an edited proficiency-point cell. Parses + clamps to 0..=5,

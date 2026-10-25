@@ -13,7 +13,7 @@
 // Each part reads and calls its `*Adapter` global, which the Rust side
 // fills and handles; this file only composes the parts.
 
-import { Theme, ThemePresets } from "@themekit";
+import { Divider, Theme, ThemePresets } from "@themekit";
 import { Metrics } from "themes/metrics.slint";
 import { FieldCard, FieldRow } from "components/components.slint";
 import {
@@ -33,6 +33,9 @@ import {
     AppearanceAdapter,
     CardsAdapter,
     ColorSwatch,
+    EditCell,
+    EditRow,
+    EditTableAdapter,
     GridAdapter,
     GridRow,
     InventoryAdapter,
@@ -68,6 +71,9 @@ export {
     CardsAdapter,
     FieldCard,
     FieldRow,
+    EditTableAdapter,
+    EditRow,
+    EditCell,
     TableAdapter,
     VarRow,
     GridAdapter,
@@ -120,6 +126,8 @@ export component AppWindow inherits Window {
         spacing: Theme.spacing.sm;
         HeaderBar { }
         if SaveTabsAdapter.names.length > 0: SaveTabStrip { }
+        // Sets the open saves apart from the page below.
+        if SaveTabsAdapter.names.length > 0: Divider { }
         if !ShellAdapter.has-save: EmptyState { vertical-stretch: 1; }
         if ShellAdapter.has-save: HorizontalLayout {
             spacing: Theme.spacing.sm;

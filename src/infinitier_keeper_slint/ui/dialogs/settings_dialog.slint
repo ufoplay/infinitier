@@ -2,6 +2,7 @@
 // double-click, to load one) and a form to add a game.
 
 import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
 // One row of the games list.
@@ -31,11 +32,6 @@ export global SettingsAdapter {
     callback close();
 }
 
-component ColumnHeader inherits Label {
-    role: TextRole.caption;
-    tone: Tone.muted;
-}
-
 component FormLabel inherits Label {
     width: Metrics.settings-label-width;
 }
@@ -55,10 +51,7 @@ export component SettingsDialog inherits Dialog {
     VerticalLayout {
         vertical-stretch: 1;
         spacing: Theme.spacing.xs;
-        HorizontalLayout {
-            padding-left: Theme.spacing.md;
-            padding-right: Theme.spacing.md;
-            spacing: Theme.spacing.sm;
+        TableHeader {
             ColumnHeader { text: "Game type"; width: Metrics.settings-type-column; }
             ColumnHeader { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
             ColumnHeader { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }

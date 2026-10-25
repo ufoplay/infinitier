@@ -79,7 +79,7 @@ The UI is split like Slint's demo apps, and mirrors the egui keeper's modules:
   (the only `.slint` file with literal sizes; `tests/ui_tokens.rs` enforces it, and that nothing
   imports `std-widgets`).
 - `ui/components/` — the keeper's own widgets on themekit components (floating window, field
-  card); `ui/shell/` — header, save tabs, party list, character panel; `ui/tabs/` — the character
+  card, the tables' header row); `ui/shell/` — header, save tabs, party list, character panel; `ui/tabs/` — the character
   tabs' pages; `ui/browser/` — the Item / Spell Browser windows; `ui/dialogs/` — the modal
   dialogs. Each part reads and calls its `*Adapter` global.
 - `build.rs` — compiles the `.slint` via `slint-build`.

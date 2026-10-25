@@ -4,6 +4,7 @@
 use slint::{ComponentHandle, SharedString};
 
 use super::{index_or_none, rows_model};
+use crate::components::edit_table::EditTable;
 use crate::components::editable_fields::AttacksOption;
 use crate::state::Model;
 use crate::tabs::{
@@ -12,8 +13,8 @@ use crate::tabs::{
 };
 use crate::{
     AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent, ColorSwatch,
-    FieldCard, GridAdapter, GridRow, InvRow, InventoryAdapter, SpellRowUi, SpellsAdapter,
-    TableAdapter, VarRow,
+    EditTableAdapter, FieldCard, GridAdapter, GridRow, InvRow, InventoryAdapter, SpellRowUi,
+    SpellsAdapter, TableAdapter, VarRow,
 };
 
 /// Repaint the tab strip and the active tab's page. Takes `&mut Model`
@@ -37,8 +38,8 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
         CharacterTab::Levels => show_cards(ui, model, levels::build(model)),
         CharacterTab::Characteristics => show_cards(ui, model, characteristics::build(model)),
         CharacterTab::Feats => show_cards(ui, model, feats::build(model)),
-        CharacterTab::Memorization => show_cards(ui, model, memorization::build(model)),
-        CharacterTab::Proficiencies => show_cards(ui, model, proficiencies::build(model)),
+        CharacterTab::Memorization => show_edit_table(ui, memorization::build(model)),
+        CharacterTab::Proficiencies => show_edit_table(ui, proficiencies::build(model)),
         CharacterTab::Resistances => show_cards(ui, model, resistances::build(model)),
         CharacterTab::Miscellaneous => show_cards(ui, model, miscellaneous::build(model)),
         CharacterTab::Appearance => {
@@ -96,6 +97,21 @@ fn show_cards(ui: &AppWindow, model: &Model, cards: [Vec<FieldCard>; 3]) {
     show(ui, CharacterContent::Cards);
 }
 
+/// The Memorization / Proficiencies table.
+fn show_edit_table(ui: &AppWindow, table: EditTable) {
+    let EditTable {
+        name_header,
+        headers,
+        rows,
+    } = table;
+    let adapter = ui.global::<EditTableAdapter>();
+    adapter.set_name_header(name_header.into());
+    let headers: Vec<SharedString> = headers.iter().map(|h| (*h).into()).collect();
+    adapter.set_headers(rows_model(headers));
+    adapter.set_rows(rows_model(rows));
+    show(ui, CharacterContent::EditTable);
+}
+
 /// The read-only Name · Value table.
 fn show_table(ui: &AppWindow, rows: Vec<VarRow>) {
     ui.global::<TableAdapter>().set_rows(rows_model(rows));
@@ -115,6 +131,7 @@ fn show_grid(ui: &AppWindow, headers: &[&str], widths: &[f32], rows: Vec<GridRow
     let headers: Vec<SharedString> = headers.iter().map(|h| (*h).into()).collect();
     adapter.set_headers(rows_model(headers));
     adapter.set_widths(rows_model(widths.to_vec()));
+    adapter.set_columns_width(widths.iter().sum());
     adapter.set_rows(rows_model(rows));
     adapter.set_wrap(match text {
         GridText::Elide => false,

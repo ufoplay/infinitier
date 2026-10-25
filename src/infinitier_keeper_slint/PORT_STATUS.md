@@ -84,11 +84,13 @@ The DONE log below predates the restructure: its file paths and property names a
   content mode** (`show-appearance`/`animation-name`/`color-swatches`/`ColorSwatch{label,image}`):
   ANIMATE.IDS name + 7 palette-BMP gradient swatches rendered as Slint `Image`s via
   `SharedPixelBuffer`.
-- `src/proficiencies.rs` — Proficiencies (EDITABLE cards, AD&D). One row per weapon (first-class),
-  plus a "(2nd)" row for dual-class. id = stat (first) / stat+256 (second); clamp 0..=5 via
+- `src/proficiencies.rs` — Proficiencies (EDITABLE table, AD&D). EEKeeper's Proficiency · First
+  Class · Second Class table; the second class is editable only for a dual-classed character's
+  weapons (blank when zero elsewhere). id = stat (first) / stat+256 (second); clamp 0..=5 via
   `Cre::set_proficiency`. Verified: 9→5 clamp.
-- `src/memorization.rs` — Memorization (EDITABLE cards, AD&D). One row per spell slot
-  ("{type} L{level}"); id = slot index; `Cre::set_spell_memorization_total` (u16).
+- `src/memorization.rs` — Memorization (EDITABLE table, AD&D). EEKeeper's Type · Level · Max Can
+  Memorize table, one row per spell slot; id = slot index; `Cre::set_spell_memorization_total`
+  (u16).
 - `src/levels.rs` — Levels & Kits (EDITABLE cards, IWD2). Left: 11 class-level `EditableField`
   rows + Total; right: editable kit checkboxes (`Iwd2Kits`). id = EditableField index / kit toggle
   `1000+i`; class levels route to `abilities::commit`, kits flip `set_iwd2_kits`.
@@ -132,11 +134,19 @@ all ported, clippy+fmt clean, verified on classic BG (AD&D) and Icewind Dale 2 (
 ## Character pages (`CharacterAdapter.content`)
 `view/character.rs` picks the page per tab and fills its adapter:
 - **cards** — `CardsAdapter.column0..2` (`[FieldCard]`) + the Attacks dropdown. Abilities, Levels &
-  Kits, Characteristics, Feats, Memorization, Proficiencies, Resistances, Miscellaneous.
+  Kits, Characteristics, Feats, Resistances, Miscellaneous.
+- **edit-table** — `EditTableAdapter` (`name-header`, `headers`, `[EditRow]` of `[EditCell]`), a
+  striped table whose value cells may be editable; `commit(id, value)` goes to the active tab.
+  Memorization, Proficiencies.
 - **table** — `TableAdapter.rows` (`[VarRow]`), a virtualised Name · Value list. Local / Global
   Variables.
-- **grid** — `GridAdapter` headers / widths / rows (`GridRow{cells}`) / wrap: a wide read-only grid,
-  scrollable both ways, not virtualised. Effects, Journal Entries (wrapped).
+- **grid** — `GridAdapter` headers / widths (and their sum) / rows (`GridRow{cells}`) / wrap: a wide
+  read-only table, virtualised, that scrolls sideways under a header following the list's
+  `content-x`. Effects, Journal Entries (wrapped).
+
+Every table (these pages, the Load and Settings dialogs, the browsers) is a `TableHeader` of
+`ColumnHeader`s (`ui/components/table.slint`) over a `ListView` of striped `ListItem`s, so they all
+look alike.
 - **appearance**, **inventory**, **spells** — their own pages and adapters.
 - **none** — no character selected.
 

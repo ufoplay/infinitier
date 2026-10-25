@@ -1,10 +1,12 @@
-// The character tabs' pages. The fifteen tabs share six layouts: the card
-// grid serves the eight stat tabs, the table both variable tabs, the grid
-// Effects and Journal Entries; Appearance, Inventory and Spells have their
-// own. Each page reads its adapter global, which the Rust side fills.
+// The character tabs' pages. The fifteen tabs share seven layouts: the card
+// grid serves the six stat tabs, the editable table Memorization and
+// Proficiencies, the table both variable tabs, the grid Effects and Journal
+// Entries; Appearance, Inventory and Spells have their own. Each page reads
+// its adapter global, which the Rust side fills.
 
 export { CardsTab, CardsAdapter } from "cards_tab.slint";
 export { TableTab, TableAdapter, VarRow } from "table_tab.slint";
+export { EditTableTab, EditTableAdapter, EditRow, EditCell } from "edit_table_tab.slint";
 export { GridTab, GridAdapter, GridRow } from "grid_tab.slint";
 export { AppearanceTab, AppearanceAdapter, ColorSwatch } from "appearance_tab.slint";
 export { InventoryTab, InventoryAdapter, InvRow } from "inventory_tab.slint";

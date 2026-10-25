@@ -4,7 +4,7 @@
 // usable behind it.
 
 import { Button, Checkbox, Label, ListItem, ListView, Menu, MenuItem, ScrollArea, TextField, TextRole, Theme, Tone } from "@themekit";
-import { FloatingWindow } from "../components/components.slint";
+import { ColumnHeader, FloatingWindow, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
 // One row of the list. `level` / `script` are empty for items.
@@ -38,13 +38,6 @@ export struct BrowserState {
     // spell can go into.
     book-menu: bool,
     placements: [string],
-}
-
-// A column header, aligned with the rows' cells.
-component ColumnHeader inherits Label {
-    role: TextRole.caption;
-    tone: Tone.muted;
-    overflow: elide;
 }
 
 export component BrowserWindow inherits FloatingWindow {
@@ -103,12 +96,7 @@ export component BrowserWindow inherits FloatingWindow {
             VerticalLayout {
                 horizontal-stretch: 1;
                 spacing: Theme.spacing.xs;
-                // Padded like the rows, whose width leaves room for the
-                // list's scroll indicator.
-                HorizontalLayout {
-                    padding-left: Theme.spacing.md;
-                    padding-right: Theme.spacing.md + Theme.sizes.scrollbar-width + Theme.spacing.xs;
-                    spacing: Theme.spacing.sm;
+                TableHeader {
                     ColumnHeader { text: "Type"; width: Metrics.browser-type-column; }
                     if root.spell-columns: ColumnHeader { text: "Lvl"; width: Metrics.browser-level-column; }
                     ColumnHeader { text: "Name"; horizontal-stretch: 2; preferred-width: 0px; }

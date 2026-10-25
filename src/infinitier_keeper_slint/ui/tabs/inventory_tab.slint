@@ -2,8 +2,9 @@
 // item name, resref and Delete. Clicking a slot selects it as the Item
 // Browser's add target; double-clicking a filled one reveals its item there.
 
-import { Button, ButtonKind, Icons, Label, ListItem, ListView, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Button, ButtonKind, Icons, Label, ListItem, ListView, TextField, Theme } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
 // One slot. `slot` is routed back on select / quantity edit / delete.
@@ -41,17 +42,9 @@ component QuantityEdit inherits TextField {
     }
 }
 
-component ColumnHeader inherits Label {
-    role: TextRole.caption;
-    tone: Tone.muted;
-}
-
 export component InventoryTab inherits VerticalLayout {
     spacing: Theme.spacing.xs;
-    HorizontalLayout {
-        padding-left: Theme.spacing.md;
-        padding-right: Theme.spacing.md + Theme.sizes.scrollbar-width + Theme.spacing.xs;
-        spacing: Theme.spacing.sm;
+    TableHeader {
         Rectangle { width: Metrics.inventory-icon; }
         ColumnHeader { text: "Position"; width: Metrics.inventory-position-column; }
         ColumnHeader { text: "Quantity"; width: Metrics.inventory-quantity-column; }
@@ -60,7 +53,8 @@ export component InventoryTab inherits VerticalLayout {
         Rectangle { width: Theme.sizes.control-height; }
     }
     ListView {
-        for row in InventoryAdapter.rows: ListItem {
+        for row[i] in InventoryAdapter.rows: ListItem {
+            index: i;
             selected: row.slot == InventoryAdapter.selected;
             clicked => {
                 InventoryAdapter.selected = row.slot;

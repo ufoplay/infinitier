@@ -1,6 +1,7 @@
 // The Local / Global Variables tabs: a read-only Name · Value table.
 
-import { Label, ListItem, ListView, TextRole, Theme, Tone } from "@themekit";
+import { Label, ListItem, ListView, Theme } from "@themekit";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
 export struct VarRow {
@@ -14,11 +15,9 @@ export global TableAdapter {
 
 export component TableTab inherits VerticalLayout {
     spacing: Theme.spacing.xs;
-    HorizontalLayout {
-        padding-left: Theme.spacing.md;
-        spacing: Theme.spacing.sm;
-        Label { text: "Name"; role: TextRole.caption; tone: Tone.muted; width: Metrics.variable-name-width; }
-        Label { text: "Value"; role: TextRole.caption; tone: Tone.muted; }
+    TableHeader {
+        ColumnHeader { text: "Name"; width: Metrics.variable-name-width; }
+        ColumnHeader { text: "Value"; horizontal-stretch: 1; }
     }
     ListView {
         for row[i] in TableAdapter.rows: ListItem {

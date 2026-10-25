@@ -1,0 +1,75 @@
+// The Memorization / Proficiencies tabs: a short striped table. Its first
+// column names each row; the other columns hold values, some of them
+// editable (committed on Enter and on focus loss).
+
+import { Label, ListItem, ListView, TextField, Theme } from "@themekit";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
+import { Metrics } from "../themes/metrics.slint";
+
+// A value cell. An editable one routes `id` back with the new text.
+export struct EditCell {
+    text: string,
+    editable: bool,
+    id: int,
+}
+
+export struct EditRow {
+    name: string,
+    // One per value column.
+    cells: [EditCell],
+}
+
+export global EditTableAdapter {
+    // The first column's header, then the value columns' headers.
+    in property <string> name-header;
+    in property <[string]> headers;
+    in property <[EditRow]> rows;
+    callback commit(int /* cell id */, string /* value */);
+}
+
+export component EditTableTab inherits HorizontalLayout {
+    VerticalLayout {
+        // Not stretched across the whole tab, like the egui keeper's table:
+        // it grows up to its widest, and the filler after it takes the rest.
+        max-width: Metrics.edit-table-width;
+        horizontal-stretch: 1;
+        spacing: Theme.spacing.xs;
+
+        TableHeader {
+            ColumnHeader {
+                text: EditTableAdapter.name-header;
+                horizontal-stretch: 1;
+            }
+            for header in EditTableAdapter.headers: ColumnHeader {
+                text: header;
+                width: Metrics.edit-table-value-column;
+            }
+        }
+        ListView {
+            for row[i] in EditTableAdapter.rows: ListItem {
+                index: i;
+                Label {
+                    text: row.name;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                for cell in row.cells: HorizontalLayout {
+                    width: Metrics.edit-table-value-column;
+                    alignment: start;
+                    if cell.editable: TextField {
+                        width: Metrics.field-input-width;
+                        text: cell.text;
+                        accepted(t) => { EditTableAdapter.commit(cell.id, t); }
+                        changed has-focus => {
+                            if (!self.has-focus) {
+                                EditTableAdapter.commit(cell.id, self.text);
+                            }
+                        }
+                    }
+                    if !cell.editable: Label { text: cell.text; }
+                }
+            }
+        }
+    }
+    Rectangle { horizontal-stretch: 0; }
+}

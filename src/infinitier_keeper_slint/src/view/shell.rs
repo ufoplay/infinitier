@@ -34,9 +34,6 @@ pub(super) fn refresh(ui: &AppWindow, app: &App) {
 /// The open saves' tabs, and the active save's party and selected member.
 /// Set on every refresh: they change when the active save is switched.
 fn refresh_saves(ui: &AppWindow, model: &Model) {
-    ui.global::<ShellAdapter>()
-        .set_character_name(model.character_name().into());
-
     let tabs = ui.global::<SaveTabsAdapter>();
     let names: Vec<SharedString> = model.save_tab_names().into_iter().map(Into::into).collect();
     tabs.set_names(rows_model(names));
@@ -56,10 +53,8 @@ fn refresh_saves(ui: &AppWindow, model: &Model) {
     party.set_selected(i32::try_from(model.selected.unwrap_or(0)).unwrap_or(0));
 }
 
-/// No save open: no tabs, party or character.
+/// No save open: no tabs or party.
 fn clear_saves(ui: &AppWindow) {
-    ui.global::<ShellAdapter>()
-        .set_character_name(SharedString::new());
     ui.global::<SaveTabsAdapter>()
         .set_names(rows_model(Vec::new()));
     ui.global::<PartyAdapter>()

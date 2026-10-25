@@ -3,7 +3,7 @@
 // grip, closed by its ×. Pressing anywhere on it asks to `raise` it over
 // its siblings. Its children fill the area below the title bar.
 
-import { Button, ButtonKind, Icons, Label, TextRole, Theme, Tone } from "@themekit";
+import { Button, ButtonKind, Icons, Label, ResizeGrip, Shadow, TextRole, Theme } from "@themekit";
 
 export component FloatingWindow inherits Rectangle {
     in property <string> title;
@@ -16,13 +16,19 @@ export component FloatingWindow inherits Rectangle {
     callback raise();
     callback close();
 
-    background: Theme.palette.surface;
-    border-radius: Theme.radii.md;
-    border-width: Theme.sizes.border-width;
-    border-color: Theme.palette.border;
-    drop-shadow-blur: Theme.elevation.blur;
-    drop-shadow-offset-y: Theme.elevation.offset;
-    drop-shadow-color: Theme.palette.shadow;
+    // Floats over the editor, like a dialog: its shadow, then its face
+    // (the root draws nothing itself, or it would cover the shadow).
+    Shadow {
+        width: root.width;
+        height: root.height;
+        radius: face.border-radius;
+    }
+    face := Rectangle {
+        background: Theme.palette.surface;
+        border-radius: Theme.radii.md;
+        border-width: Theme.sizes.border-width;
+        border-color: Theme.palette.border;
+    }
 
     // Clicks on the window's empty areas stay on it (and bring it forward).
     TouchArea {
@@ -37,8 +43,8 @@ export component FloatingWindow inherits Rectangle {
         // Title bar: drag to move, × to close.
         Rectangle {
             background: Theme.palette.surface-variant;
-            border-top-left-radius: root.border-radius;
-            border-top-right-radius: root.border-radius;
+            border-top-left-radius: face.border-radius;
+            border-top-right-radius: face.border-radius;
             TouchArea {
                 mouse-cursor: move;
                 pointer-event(event) => {
@@ -73,24 +79,13 @@ export component FloatingWindow inherits Rectangle {
         }
     }
 
-    // Resize grip.
-    TouchArea {
+    ResizeGrip {
         x: root.width - self.width;
         y: root.height - self.height;
-        width: Theme.sizes.icon;
-        height: Theme.sizes.icon;
-        mouse-cursor: nwse-resize;
-        moved => {
-            root.width = max(root.min-window-width, min(root.area-width - root.x, root.width + self.mouse-x - self.pressed-x));
-            root.height = max(root.min-window-height, min(root.area-height - root.y, root.height + self.mouse-y - self.pressed-y));
-        }
-        Label {
-            text: "◢";
-            role: TextRole.caption;
-            tone: Tone.muted;
-            horizontal-alignment: right;
-            vertical-alignment: bottom;
-            accessible-role: none;
+        accessible-label: "Resize " + root.title;
+        dragged(dx, dy) => {
+            root.width = max(root.min-window-width, min(root.area-width - root.x, root.width + dx));
+            root.height = max(root.min-window-height, min(root.area-height - root.y, root.height + dy));
         }
     }
 }

@@ -1,7 +1,7 @@
-// The header bar: Load / Save, the browser toggles, the selected
-// character's name, the status line, the theme toggle and Settings.
+// The header bar: Load / Save, the browser toggles, the status line, the
+// theme toggle and Settings.
 
-import { Button, ButtonKind, Icons, Label, TextRole, Theme, Tone } from "@themekit";
+import { Button, ButtonKind, Icons, Label, TextRole, Theme, Tone, VerticalDivider } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
 import { ShellAdapter } from "shell_adapter.slint";
 
@@ -9,16 +9,20 @@ export component HeaderBar inherits HorizontalLayout {
     spacing: Theme.spacing.sm;
     Button {
         text: "Load";
+        icon: Icons.open;
         enabled: ShellAdapter.has-game;
         clicked => { ShellAdapter.load-clicked(); }
     }
     Button {
         text: "Save";
+        icon: Icons.save;
         enabled: ShellAdapter.has-save;
         clicked => { ShellAdapter.save-clicked(); }
     }
+    VerticalDivider { }
     Button {
         text: "Items";
+        icon: Icons.inventory;
         enabled: ShellAdapter.has-game;
         clicked => {
             BrowsersAdapter.front = BrowserKind.items;
@@ -27,17 +31,14 @@ export component HeaderBar inherits HorizontalLayout {
     }
     Button {
         text: "Spells";
+        icon: Icons.magic;
         enabled: ShellAdapter.has-game;
         clicked => {
             BrowsersAdapter.front = BrowserKind.spells;
             BrowsersAdapter.toggle(BrowserKind.spells);
         }
     }
-    Label {
-        text: ShellAdapter.character-name;
-        role: TextRole.heading;
-    }
-    // Takes only the space left over, so it never squeezes the name.
+    // Takes only the space left over, so it never squeezes the buttons.
     Label {
         text: ShellAdapter.status;
         role: TextRole.caption;

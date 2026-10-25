@@ -1,7 +1,8 @@
 // The Load dialog: the game's saves (newest first) with a screenshot +
 // portrait preview, and the prompt confirming a save's deletion.
 
-import { Button, ButtonKind, Dialog, Label, ListItem, ListView, TextRole, Theme, Tone } from "@themekit";
+import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Theme, Tone } from "@themekit";
+import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 import { ConfirmDialog } from "confirm_dialog.slint";
 
@@ -30,11 +31,6 @@ export global LoadAdapter {
     callback delete-cancel();
 }
 
-component ColumnHeader inherits Label {
-    role: TextRole.caption;
-    tone: Tone.muted;
-}
-
 export component LoadDialog inherits Dialog {
     title: "Open Single Player Saved Game";
     panel-width: Metrics.load-dialog-width;
@@ -46,10 +42,7 @@ export component LoadDialog inherits Dialog {
         VerticalLayout {
             horizontal-stretch: 1;
             spacing: Theme.spacing.xs;
-            HorizontalLayout {
-                padding-left: Theme.spacing.md;
-                padding-right: Theme.spacing.md;
-                spacing: Theme.spacing.sm;
+            TableHeader {
                 ColumnHeader { text: "Game Name"; width: Metrics.load-name-column; }
                 ColumnHeader { text: "Time Saved"; horizontal-stretch: 1; }
             }

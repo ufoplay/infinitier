@@ -11,12 +11,14 @@ use crate::tabs::{
 };
 use crate::view;
 use crate::{
-    AppWindow, CardsAdapter, CharacterAdapter, InventoryAdapter, PartyAdapter, SpellsAdapter,
+    AppWindow, CardsAdapter, CharacterAdapter, EditTableAdapter, InventoryAdapter, PartyAdapter,
+    SpellsAdapter,
 };
 
 pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_party(ui, app);
     wire_cards(ui, app);
+    wire_edit_table(ui, app);
     wire_inventory(ui, app);
     wire_spells(ui, app);
 }
@@ -64,13 +66,13 @@ fn wire_cards(ui: &AppWindow, app: &AppRc) {
                 match m.selected_tab {
                     CharacterTab::Abilities => abilities::commit(m, id, value),
                     CharacterTab::Resistances => resistances::commit(m, id, value),
-                    CharacterTab::Proficiencies => proficiencies::commit(m, id, value),
-                    CharacterTab::Memorization => memorization::commit(m, id, value),
                     CharacterTab::Levels => levels::commit(m, id, value),
                     CharacterTab::Feats => feats::commit(m, id, value),
                     // Read-only cards, or not a card tab.
                     CharacterTab::Characteristics
                     | CharacterTab::Miscellaneous
+                    | CharacterTab::Memorization
+                    | CharacterTab::Proficiencies
                     | CharacterTab::Appearance
                     | CharacterTab::Inventory
                     | CharacterTab::Spells
@@ -89,6 +91,36 @@ fn wire_cards(ui: &AppWindow, app: &AppRc) {
             on_model(&ui, &app, |m| abilities::commit_attacks(m, idx));
         });
     }
+}
+
+/// The Memorization / Proficiencies table: commit an edited cell (clamp +
+/// write + re-read).
+fn wire_edit_table(ui: &AppWindow, app: &AppRc) {
+    let (app, weak) = (app.clone(), ui.as_weak());
+    ui.global::<EditTableAdapter>().on_commit(move |id, value| {
+        let Some(ui) = weak.upgrade() else { return };
+        on_model(&ui, &app, |m| {
+            // Cell ids are tab-local: the active tab commits.
+            let value = value.as_str();
+            match m.selected_tab {
+                CharacterTab::Memorization => memorization::commit(m, id, value),
+                CharacterTab::Proficiencies => proficiencies::commit(m, id, value),
+                CharacterTab::Abilities
+                | CharacterTab::Levels
+                | CharacterTab::Characteristics
+                | CharacterTab::Appearance
+                | CharacterTab::Inventory
+                | CharacterTab::Spells
+                | CharacterTab::Feats
+                | CharacterTab::Resistances
+                | CharacterTab::Effects
+                | CharacterTab::LocalVariables
+                | CharacterTab::GlobalVariables
+                | CharacterTab::JournalEntries
+                | CharacterTab::Miscellaneous => {}
+            }
+        });
+    });
 }
 
 /// Inventory: select a slot / edit a quantity / delete an item.
