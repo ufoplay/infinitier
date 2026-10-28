@@ -12,32 +12,48 @@ on:
 
 jobs:
   build:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: Build and Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # Windows builds are considerably slower.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
 
     env:
       CARGO_TERM_COLOR: always
 
     steps:
       - name: prepare image
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           # ALSA for the explorer's audio; fontconfig for Slint's text
           # stack (a build-time linker requirement).
           sudo apt-get install -y libasound2-dev libfontconfig1-dev
 
+      # The Windows runner's Git checks text files out with CRLF, which
+      # would change the bytes of the text test fixtures (2DA, BCS, ...).
+      - name: keep line endings as committed
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+
       - uses: actions/checkout@v4
-     
+
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install Just command runner
         uses: extractions/setup-just@v1
-        
+
+      # Formatting and lints don't depend on the OS: check them once.
       - name: check rust code style
+        if: runner.os == 'Linux'
         run: |
           just check_code
 

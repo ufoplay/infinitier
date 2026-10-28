@@ -15,6 +15,8 @@
 
 use std::f32::consts::PI;
 
+use libm::{cosf, sinf};
+
 use crate::rdft::InverseRdft;
 
 /// Inverse DCT-III context for a fixed `len = 2^bits` (= bink audio
@@ -38,14 +40,16 @@ impl Dct3 {
     pub fn new(nbits: u32) -> Self {
         let len = 1usize << nbits;
         let freq = PI / (2.0 * len as f32);
+        // `libm` rather than `f32::cos`/`sin`, so the table is
+        // bit-identical on every OS.
         let mut cos_tab = vec![0f32; len + len / 2];
         for (i, slot) in cos_tab[..len].iter_mut().enumerate() {
-            *slot = (i as f32 * freq).cos();
+            *slot = cosf(i as f32 * freq);
         }
         // Inverse-direction post-shuffle factors. FFmpeg uses
         // `0.5 / sin((2i+1) * freq)` here.
         for (i, slot) in cos_tab[len..].iter_mut().enumerate() {
-            *slot = 0.5 / ((2 * i + 1) as f32 * freq).sin();
+            *slot = 0.5 / sinf((2 * i + 1) as f32 * freq);
         }
         let rdft = InverseRdft::new(nbits);
         Self { len, cos_tab, rdft }

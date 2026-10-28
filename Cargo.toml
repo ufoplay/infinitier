@@ -79,6 +79,10 @@ itertools = "0.15"
 # Date/time formatting for the save-game picker's "Time Saved" column
 # (local timezone + weekday/month names). Already in the lock graph.
 jiff = "0.2"
+# Pure-Rust (musl) float math. The Bink audio decoder builds its transform
+# tables with it: `f32::cos` & co. call the platform libm, whose last-bit
+# rounding differs between OSes, so the decoded PCM would too.
+libm = "0.2"
 log = "0.4"
 parking_lot = "0.13"
 rand = "0.10"

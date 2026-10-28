@@ -3565,6 +3565,7 @@ dependencies = [
  "hound",
  "infinitier_datasource",
  "infinitier_test_utils",
+ "libm",
  "log",
  "serde",
  "serde_json",

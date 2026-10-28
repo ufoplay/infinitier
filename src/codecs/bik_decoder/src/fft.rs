@@ -10,6 +10,8 @@
 
 use std::f32::consts::PI;
 
+use libm::{cosf, sinf};
+
 #[derive(Debug, Clone, Copy)]
 pub struct ComplexF32 {
     pub re: f32,
@@ -59,10 +61,12 @@ impl Fft {
             *slot = rev;
         }
         let sign = if inverse { 1.0f32 } else { -1.0f32 };
+        // `libm` rather than `f32::cos`/`sin`, so the twiddles are
+        // bit-identical on every OS.
         let mut twiddle = vec![ComplexF32::ZERO; n / 2];
         for (k, slot) in twiddle.iter_mut().enumerate() {
             let theta = sign * 2.0 * PI * k as f32 / n as f32;
-            *slot = ComplexF32::new(theta.cos(), theta.sin());
+            *slot = ComplexF32::new(cosf(theta), sinf(theta));
         }
         Self {
             n,

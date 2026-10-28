@@ -305,11 +305,10 @@ fn rescan_filtered(
         if current.is_dir() {
             recurse(root, current, results)?;
         }
-        if let Ok(rel) = current.strip_prefix(root)
-            && let Some(s) = rel.to_str()
-            && !s.is_empty()
+        if let Some(key) = index_key(root, current)
+            && !key.is_empty()
         {
-            results.insert(s.to_lowercase(), current.to_path_buf());
+            results.insert(key, current.to_path_buf());
         }
         return Ok(());
     };
@@ -342,12 +341,8 @@ fn recurse(root: &Path, path: &Path, results: &mut BTreeMap<String, PathBuf>) ->
             Err(_) => continue,
         };
         // Skip entries that resolve outside the root (e.g. Wine symlinks to system paths).
-        let relative_path = match entry_path.strip_prefix(root) {
-            Ok(rel) => match rel.to_str() {
-                Some(s) => s.to_lowercase(),
-                None => continue,
-            },
-            Err(_) => continue,
+        let Some(relative_path) = index_key(root, &entry_path) else {
+            continue;
         };
 
         let metadata = entry.metadata()?;
@@ -360,6 +355,15 @@ fn recurse(root: &Path, path: &Path, results: &mut BTreeMap<String, PathBuf>) ->
     }
 
     Ok(())
+}
+
+/// The index key of `path`: its path relative to `root`, normalised the
+/// same way as every lookup. On Windows the relative path is joined with
+/// `\`, so merely lowercasing it would never match the `/`-separated
+/// lookup keys. `None` when `path` is outside `root` or isn't UTF-8.
+fn index_key(root: &Path, path: &Path) -> Option<String> {
+    let relative = path.strip_prefix(root).ok()?.to_str()?;
+    Some(CiPath::normalize(relative))
 }
 
 #[cfg(test)]
@@ -419,13 +423,10 @@ mod tests {
 
         let cifs = CaseInsensitiveFS::new(vec![root_a.path(), root_b.path()]).unwrap();
 
-        // Both roots are recorded, in order.
+        // Both roots are recorded as given, in order.
         assert_eq!(
             cifs.get_roots(),
-            &[
-                root_a.path().canonicalize().unwrap(),
-                root_b.path().canonicalize().unwrap(),
-            ]
+            &[root_a.path().to_path_buf(), root_b.path().to_path_buf()]
         );
 
         // Files unique to each root are reachable case-insensitively, and the
@@ -451,6 +452,23 @@ mod tests {
             root_b.path().join("shared.TXT").canonicalize().unwrap()
         );
         assert_eq!(fs::read_to_string(shared.path()).unwrap(), "from_b");
+    }
+
+    #[test]
+    fn nested_paths_are_keyed_with_forward_slashes() {
+        // Regression: on Windows the index keys used to keep `\`, so no
+        // file below the root (e.g. a KEY's `data\*.bif`) was ever found.
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path().join("Data").join("Sub");
+        fs::create_dir_all(&data).unwrap();
+        File::create(data.join("Default.BIF")).unwrap();
+        let cifs = CaseInsensitiveFS::new(temp.path()).unwrap();
+
+        let path = cifs.get_path("data\\sub\\default.bif").unwrap();
+        assert_eq!(path.as_str(), "data/sub/default.bif");
+        assert_eq!(path.base_name(), "default.bif");
+        assert!(cifs.get_path_opt("DATA/Sub").is_some());
+        assert_eq!(cifs.list_files("data/sub", Some("bif"), false).len(), 1);
     }
 
     #[test]
@@ -638,7 +656,10 @@ mod tests {
 
         let fs = CaseInsensitiveFS::new(root).unwrap();
 
+        // Indexed paths are canonical (`\\?\C:\…` on Windows), so compare
+        // against the canonical form of the expected file.
         fn has(files: &[CiPath], p: PathBuf) -> bool {
+            let p = p.canonicalize().expect("expected file exists");
             files.iter().any(|f| f.path() == p)
         }
 

@@ -31,6 +31,8 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use libm::expf;
+
 use crate::bitreader::BitReader;
 use crate::container::{AudioFlags, AudioTrack, parse_header};
 use crate::dct3::Dct3;
@@ -142,10 +144,11 @@ impl AudioDecoder {
             2.0 / ((frame_len as f32).sqrt() * 32768.0)
         };
 
-        // 96-entry quantizer log scale (constant from binkaudio.c).
+        // 96-entry quantizer log scale (constant from binkaudio.c). `libm`
+        // rather than `f32::exp`, so the table is bit-identical on every OS.
         let mut quant_table = [0f32; 96];
         for (i, slot) in quant_table.iter_mut().enumerate() {
-            *slot = (i as f32 * 0.152_891_65f32).exp() * root;
+            *slot = expf(i as f32 * 0.152_891_65f32) * root;
         }
 
         // Number of bands: count up until sample_rate_half ≤ critical freq.

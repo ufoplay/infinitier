@@ -1118,7 +1118,10 @@ mod tests {
         let expected_path = get_assets_path()
             .join("KEY")
             .join(BG2_RESOURCES_DIR.0)
-            .join("override/AbClasRq.2DA");
+            .join("override/AbClasRq.2DA")
+            // Indexed paths are canonical (`\\?\C:\…` on Windows).
+            .canonicalize()
+            .unwrap();
         let DataOrigin::Dir { name, path } = &resource.data_origin else {
             panic!("expected DataOrigin::Dir, got {:?}", resource.data_origin);
         };
@@ -1150,7 +1153,10 @@ mod tests {
         let expected_path = get_assets_path()
             .join("KEY")
             .join(BG2_RESOURCES_DIR.0)
-            .join("override/AbClasRq.2DA");
+            .join("override/AbClasRq.2DA")
+            // Indexed paths are canonical (`\\?\C:\…` on Windows).
+            .canonicalize()
+            .unwrap();
         let DataOrigin::Dir { name, path } = &resource.data_origin else {
             panic!("expected DataOrigin::Dir, got {:?}", resource.data_origin);
         };

@@ -14,6 +14,7 @@ keywords = ["video", "bink", "decoder", "bik", "iwd2"]
 infinitier_datasource = { workspace = true }
 bitflags = { workspace = true }
 hound = { workspace = true }
+libm = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 

@@ -21,6 +21,8 @@
 
 use std::f32::consts::PI;
 
+use libm::{cosf, sinf};
+
 use crate::fft::{ComplexF32, Fft};
 
 /// Inverse-RDFT context for a fixed length `N = 2^nbits`.
@@ -53,11 +55,12 @@ impl InverseRdft {
         // Theta for IRDFT: 2π/N (positive sign in the old enum). The
         // sign_convention adjustment is folded into the unmangling pass
         // below — we pick `sign = -1` (IRDFT) which means we negate the
-        // central imaginary slot at the end.
+        // central imaginary slot at the end. `libm` rather than
+        // `f32::cos`/`sin`, so the tables are bit-identical on every OS.
         for i in 0..quarter {
             let theta = 2.0 * PI * i as f32 / n as f32;
-            tcos[i] = theta.cos();
-            tsin[i] = theta.sin();
+            tcos[i] = cosf(theta);
+            tsin[i] = sinf(theta);
         }
         // Internal complex FFT runs INVERSE (matches IRDFT in the old
         // enum: `complex_inverse = trans == IRDFT || trans == RIDFT`).

@@ -1,6 +1,6 @@
 [settings]
-active = 3
-theme = "light"
+active = 8
+theme = "dark"
 
 [[games]]
 game_path = "/home/ufo/Temp/Games/bg/Baldur's Gate"
