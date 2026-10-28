@@ -16,10 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # macos-latest is Apple Silicon (aarch64).
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # Windows builds are considerably slower.
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
+    # The Windows and macOS runners build considerably slower.
+    timeout-minutes: ${{ matrix.os == 'ubuntu-latest' && 30 || 60 }}
 
     env:
       CARGO_TERM_COLOR: always
