@@ -15,9 +15,7 @@ use infinitier_core::game::GameData;
 use infinitier_core::imported_resource::image::ImportedImage;
 use infinitier_core::resource::bmp::BmpImporter;
 use infinitier_core::save_games::SaveGame;
-use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
-
-use crate::LoadRowUi;
+use slint::{Image, Rgba8Pixel, SharedPixelBuffer, SharedString};
 
 /// One discovered save game, with its display timestamp precomputed.
 struct SaveEntry {
@@ -143,13 +141,11 @@ impl LoadDialog {
             .unwrap_or_default()
     }
 
-    pub fn rows(&self) -> Vec<LoadRowUi> {
+    /// The saves list's rows: the game name and the time saved.
+    pub fn rows(&self) -> Vec<[SharedString; 2]> {
         self.entries
             .iter()
-            .map(|e| LoadRowUi {
-                name: e.save.display_name().into(),
-                time: e.time_label.as_str().into(),
-            })
+            .map(|e| [e.save.display_name().into(), e.time_label.as_str().into()])
             .collect()
     }
 

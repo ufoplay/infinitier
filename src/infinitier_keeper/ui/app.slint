@@ -12,7 +12,7 @@
 // Each part reads and calls its `*Adapter` global, which the Rust side
 // fills and handles; this file only composes the parts.
 
-import { Divider, Theme, ThemePresets } from "@themekit";
+import { Divider, Icons, TableCell, TableCellKind, TableColumn, Theme, ThemePresets } from "@themekit";
 import { Metrics } from "themes/metrics.slint";
 import { FieldCard, FieldRow } from "components/components.slint";
 import {
@@ -32,27 +32,20 @@ import {
     AppearanceAdapter,
     CardsAdapter,
     ColorSwatch,
-    EditCell,
-    EditRow,
     EditTableAdapter,
     GridAdapter,
-    GridRow,
     InventoryAdapter,
-    InvRow,
-    SpellRowUi,
     SpellsAdapter,
     TableAdapter,
-    VarRow,
 } from "tabs/tabs.slint";
-import { BrowserKind, BrowserLayer, BrowserRow, BrowsersAdapter, BrowserState, TypeFilter } from "browser/browser.slint";
+import { BrowserKind, BrowserLayer, BrowsersAdapter, BrowserState, TypeFilter } from "browser/browser.slint";
 import {
     DeleteSaveDialog,
-    GameRowUi,
+    FormFolder,
     LoadAdapter,
     LoadDialog,
     LoadingAdapter,
     LoadingOverlay,
-    LoadRowUi,
     SaveAdapter,
     SaveDialog,
     SettingsAdapter,
@@ -71,29 +64,28 @@ export {
     FieldCard,
     FieldRow,
     EditTableAdapter,
-    EditRow,
-    EditCell,
     TableAdapter,
-    VarRow,
     GridAdapter,
-    GridRow,
     AppearanceAdapter,
     ColorSwatch,
     InventoryAdapter,
-    InvRow,
     SpellsAdapter,
-    SpellRowUi,
     BrowsersAdapter,
     BrowserKind,
-    BrowserRow,
     BrowserState,
     TypeFilter,
     SettingsAdapter,
-    GameRowUi,
+    FormFolder,
     LoadAdapter,
-    LoadRowUi,
     SaveAdapter,
     LoadingAdapter,
+    // The tables' cells and columns, the delete icon and the layout values
+    // the Rust side builds them with.
+    TableCell,
+    TableCellKind,
+    TableColumn,
+    Icons,
+    Metrics,
 }
 
 export component AppWindow inherits Window {

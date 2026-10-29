@@ -3,8 +3,9 @@
 
 use slint::ComponentHandle;
 
-use super::{index_or_none, rows_changed, rows_model};
+use super::{index_or_none, rows_model, sync_table};
 use crate::app::App;
+use crate::components::table;
 use crate::{AppWindow, LoadAdapter, LoadingAdapter, SaveAdapter, SettingsAdapter};
 
 pub(super) fn refresh(ui: &AppWindow, app: &App) {
@@ -12,9 +13,8 @@ pub(super) fn refresh(ui: &AppWindow, app: &App) {
     let adapter = ui.global::<SettingsAdapter>();
     adapter.set_open(settings.is_open());
     if settings.is_open() {
-        let rows = settings.rows();
-        if rows_changed(&adapter.get_rows(), &rows) {
-            adapter.set_rows(rows_model(rows));
+        if let Some(rows) = sync_table(&adapter.get_rows(), table::text_rows(settings.rows())) {
+            adapter.set_rows(rows);
         }
         adapter.set_selected(index_or_none(settings.selected()));
         adapter.set_file_error(settings.file_error().unwrap_or_default().into());
@@ -25,9 +25,8 @@ pub(super) fn refresh(ui: &AppWindow, app: &App) {
     let adapter = ui.global::<LoadAdapter>();
     adapter.set_open(load.is_open());
     if load.is_open() {
-        let rows = load.rows();
-        if rows_changed(&adapter.get_rows(), &rows) {
-            adapter.set_rows(rows_model(rows));
+        if let Some(rows) = sync_table(&adapter.get_rows(), table::text_rows(load.rows())) {
+            adapter.set_rows(rows);
         }
         adapter.set_selected(index_or_none(load.selected()));
         adapter.set_screenshot(load.screenshot());

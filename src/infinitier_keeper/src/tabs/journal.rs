@@ -10,9 +10,8 @@ mod calendar;
 
 use infinitier_core::imported_resource::gam::ImportedGam;
 use infinitier_core::resource::gam::GameTicks;
-use slint::{ModelRc, SharedString, VecModel};
+use slint::SharedString;
 
-use crate::GridRow;
 use crate::state::Model;
 use calendar::Calendar;
 
@@ -59,14 +58,8 @@ fn time_text(calendar: Option<&Calendar>, time: GameTicks) -> String {
     format!("Day {}, {:02}:{:02}", dhm.day, dhm.hour, dhm.minute)
 }
 
-fn grid_row(cells: Vec<SharedString>) -> GridRow {
-    GridRow {
-        cells: ModelRc::new(VecModel::from(cells)),
-    }
-}
-
 /// Build the Journal-tab grid rows for the save.
-pub fn build(model: &Model) -> Vec<GridRow> {
+pub fn build(model: &Model) -> Vec<Vec<SharedString>> {
     let gam = model.gam.as_ref();
     let rows = journal_rows(gam);
     // Resolve TLK text + build the calendar once per build.
@@ -79,12 +72,12 @@ pub fn build(model: &Model) -> Vec<GridRow> {
                 .as_ref()
                 .and_then(|t| t.get(r.strref))
                 .unwrap_or_default();
-            grid_row(vec![
+            vec![
                 r.type_label.into(),
                 text.into(),
                 r.chapter.to_string().into(),
                 time_text(calendar.as_ref(), r.time).into(),
-            ])
+            ]
         })
         .collect()
 }

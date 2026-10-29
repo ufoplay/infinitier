@@ -2,7 +2,7 @@
 // (Abilities, Characteristics, Resistances, …): each row a label, an
 // optional "(effective: …)" hint, and an editor or a read-only value.
 
-import { Card, Checkbox, Label, NumberField, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Card, Checkbox, ControlSize, Label, NumberField, Select, TextField, TextRole, Theme, Tone } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 // One editable / read-only row inside a card. `id` is the index into the
@@ -87,6 +87,7 @@ export component FieldCardView inherits Card {
 
             if row.is-attacks: Select {
                 width: Metrics.field-input-width;
+                size: ControlSize.small;
                 options: root.attacks-options;
                 current-index: root.attacks-index;
                 selected(index) => { root.commit-attacks(index); }
@@ -94,6 +95,7 @@ export component FieldCardView inherits Card {
 
             if row.editable && row.numeric && !row.is-attacks: NumberField {
                 width: Metrics.field-input-width;
+                size: ControlSize.small;
                 value: row.value.to-float();
                 minimum: row.minimum;
                 maximum: row.maximum;
@@ -111,6 +113,7 @@ export component FieldCardView inherits Card {
                 }
 
                 width: Metrics.field-input-width;
+                size: ControlSize.small;
                 text: row.value;
                 // Commit on Enter and on focus loss (clamp-on-blur).
                 accepted(t) => {

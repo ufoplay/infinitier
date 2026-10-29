@@ -1,10 +1,8 @@
 //! The Memorization / Proficiencies tables (`ui/tabs/edit_table_tab.slint`):
-//! the [`EditTable`] a tab builds, and small constructors for its Slint
-//! `EditRow` / `EditCell` structs.
+//! the [`EditTable`] a tab builds, and small constructors for its rows and
+//! cells.
 
-use slint::{ModelRc, VecModel};
-
-use crate::{EditCell, EditRow};
+use slint::SharedString;
 
 /// A table page: the first column's header, the value columns' headers and
 /// the rows (one cell per value column).
@@ -23,36 +21,58 @@ impl EditTable {
             rows: Vec::new(),
         }
     }
+
+    /// The id of the editable cell at `row`, `column` of the table as shown
+    /// (column 0 holds the rows' names).
+    pub fn cell_id(&self, row: usize, column: usize) -> Option<i32> {
+        let cell = self.rows.get(row)?.cells.get(column.checked_sub(1)?)?;
+        match cell {
+            EditCell::Editable { id, .. } => Some(*id),
+            EditCell::Value(_) => None,
+        }
+    }
+}
+
+/// A named row of value cells.
+pub struct EditRow {
+    pub name: SharedString,
+    pub cells: Vec<EditCell>,
+}
+
+/// One value of a row.
+pub enum EditCell {
+    /// A number the user edits, from `minimum` to `maximum`. `id` is the
+    /// tab-local cell id its commits carry (dispatched to the active tab by
+    /// `callbacks::character`).
+    Editable {
+        id: i32,
+        value: i64,
+        minimum: i32,
+        maximum: i32,
+    },
+    /// A read-only text.
+    Value(SharedString),
 }
 
 /// A row named `name`.
 pub fn row(name: &str, cells: Vec<EditCell>) -> EditRow {
     EditRow {
         name: name.into(),
-        cells: ModelRc::new(VecModel::from(cells)),
+        cells,
     }
 }
 
-/// An editable number cell, from `minimum` to `maximum`. `id` is the
-/// tab-local cell id routed back with each change (dispatched to the active
-/// tab by `callbacks::character`).
+/// An editable number cell, from `minimum` to `maximum`.
 pub fn editable_cell(id: i32, value: i64, minimum: i32, maximum: i32) -> EditCell {
-    EditCell {
-        text: value.to_string().into(),
-        editable: true,
+    EditCell::Editable {
         id,
+        value,
         minimum,
         maximum,
     }
 }
 
-/// A read-only cell (id `-1`, never committed).
+/// A read-only cell.
 pub fn value_cell(text: &str) -> EditCell {
-    EditCell {
-        text: text.into(),
-        editable: false,
-        id: -1,
-        minimum: 0,
-        maximum: 0,
-    }
+    EditCell::Value(text.into())
 }

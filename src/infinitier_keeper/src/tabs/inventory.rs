@@ -9,10 +9,26 @@
 
 use infinitier_core::resource::itm::{Itm, ItmHeader};
 use infinitier_core::resource::tlk::Tlk;
-use slint::Image;
+use slint::{Image, SharedString};
 
+use crate::icons;
 use crate::state::Model;
-use crate::{InvRow, icons};
+
+/// One equipment slot, in slot order.
+pub struct InvRow {
+    pub icon: Image,
+    pub position: SharedString,
+    /// `None` for an empty slot.
+    pub item: Option<InvItem>,
+}
+
+/// The item in a slot.
+pub struct InvItem {
+    /// Quantity / charges of the item's three abilities.
+    pub quantities: [u16; 3],
+    pub name: SharedString,
+    pub resref: SharedString,
+}
 
 /// The inventory-icon BAM resref (same offset in every ITM header version).
 fn icon_resref(itm: &Itm) -> &str {
@@ -45,32 +61,23 @@ pub fn build(model: &Model) -> Vec<InvRow> {
     let rows = imported.inventory(model.game_data.game());
     let tlk = model.game_data.dialog_tlk().ok();
     rows.into_iter()
-        .enumerate()
-        .map(|(i, r)| match r.item {
+        .map(|r| match r.item {
             Some(item) => {
                 let (name, icon) = item_display(model, tlk.as_deref(), &item.item);
                 InvRow {
-                    slot: i as i32,
                     icon,
                     position: r.position.into(),
-                    filled: true,
-                    q1: item.quantity1.to_string().into(),
-                    q2: item.quantity2.to_string().into(),
-                    q3: item.quantity3.to_string().into(),
-                    name: name.into(),
-                    resref: item.item.as_str().into(),
+                    item: Some(InvItem {
+                        quantities: [item.quantity1, item.quantity2, item.quantity3],
+                        name: name.into(),
+                        resref: item.item.as_str().into(),
+                    }),
                 }
             }
             None => InvRow {
-                slot: i as i32,
                 icon: Image::default(),
                 position: r.position.into(),
-                filled: false,
-                q1: Default::default(),
-                q2: Default::default(),
-                q3: Default::default(),
-                name: Default::default(),
-                resref: Default::default(),
+                item: None,
             },
         })
         .collect()

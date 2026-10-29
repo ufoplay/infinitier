@@ -2,19 +2,20 @@
 // dialogs, driven by BrowsersAdapter. The layer itself lets clicks through
 // to the editor.
 
-import { BrowserRow, BrowserState, BrowserWindow, TypeFilter } from "browser_window.slint";
+import { TableCell } from "@themekit";
+import { BrowserState, BrowserWindow, TypeFilter } from "browser_window.slint";
 import { Metrics } from "../themes/metrics.slint";
 
 export enum BrowserKind { items, spells }
 
 export global BrowsersAdapter {
     in property <BrowserState> item-state;
-    in property <[BrowserRow]> item-rows;
+    in property <[[TableCell]]> item-rows;
     in property <[TypeFilter]> item-types;
     in-out property <string> item-text;
     in property <bool> item-all-types: true;
     in property <BrowserState> spell-state;
-    in property <[BrowserRow]> spell-rows;
+    in property <[[TableCell]]> spell-rows;
     in property <[TypeFilter]> spell-types;
     in-out property <string> spell-text;
     in property <bool> spell-all-types: true;
@@ -23,7 +24,7 @@ export global BrowsersAdapter {
     callback toggle(BrowserKind);
     callback close(BrowserKind);
     callback search(BrowserKind, string);
-    callback select(BrowserKind, string /* resref */);
+    callback select(BrowserKind, int /* row */);
     callback step(BrowserKind, int /* -1 up, 1 down */);
     callback add(BrowserKind, int /* IWD2 placement, -1 for a plain add */);
     callback all-types(BrowserKind, bool);

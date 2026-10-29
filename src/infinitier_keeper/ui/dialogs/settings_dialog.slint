@@ -1,20 +1,16 @@
 // The Settings dialog: the configured games (select + close, or
 // double-click, to load one) and a form to add a game.
 
-import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Select, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
-import { ColumnHeader, TableHeader } from "../components/components.slint";
+import { Button, ButtonKind, Dialog, Icons, Label, Select, Table, TableCell, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
-// One row of the games list.
-export struct GameRowUi {
-    type-label: string,
-    game-path: string,
-    save-path: string,
-}
+// The add form's folder fields, each picked with its Browse button.
+export enum FormFolder { game, save }
 
 export global SettingsAdapter {
     in property <bool> open;
-    in property <[GameRowUi]> rows;
+    // Each game's type, game path and savegame path.
+    in property <[[TableCell]]> rows;
     in property <int> selected: -1;
     // The settings file couldn't be read / written.
     in property <string> file-error;
@@ -25,15 +21,29 @@ export global SettingsAdapter {
     in-out property <string> form-game-path;
     in-out property <string> form-save-path;
     in-out property <int> form-game-type: 0;
+    // A folder picker is open: the Browse buttons wait for it.
+    in property <bool> browsing;
     callback select(int /* row */);
     callback pick(int /* row, double-clicked */);
     callback remove();
     callback add(string /* game path */, string /* save path */, int /* game type */);
+    // Pick the folder with the OS's folder picker.
+    callback browse(FormFolder);
     callback close();
 }
 
 component FormLabel inherits Label {
     width: Metrics.settings-label-width;
+}
+
+component BrowseButton inherits Button {
+    in property <FormFolder> folder;
+
+    text: "Browse…";
+    icon: Icons.open;
+    kind: ButtonKind.secondary;
+    enabled: !SettingsAdapter.browsing;
+    clicked => { SettingsAdapter.browse(root.folder); }
 }
 
 export component SettingsDialog inherits Dialog {
@@ -48,54 +58,24 @@ export component SettingsDialog inherits Dialog {
     }
 
     Label { text: "Games"; role: TextRole.heading; }
-    VerticalLayout {
+    // A path too long for its column is cut off: hovering it shows it whole.
+    Rectangle {
         vertical-stretch: 1;
-        spacing: Theme.spacing.xs;
-        TableHeader {
-            ColumnHeader { text: "Game type"; width: Metrics.settings-type-column; }
-            ColumnHeader { text: "Game path"; horizontal-stretch: 1; preferred-width: 0px; }
-            ColumnHeader { text: "Savegame path"; horizontal-stretch: 1; preferred-width: 0px; }
+        min-height: Metrics.settings-list-min-height;
+        Table {
+            columns: [
+                { title: "Game type", width: Metrics.settings-type-column },
+                { title: "Game path" },
+                { title: "Savegame path" },
+            ];
+            rows: SettingsAdapter.rows;
+            selected-row: SettingsAdapter.selected;
+            row-clicked(row) => { SettingsAdapter.select(row); }
+            row-double-clicked(row) => { SettingsAdapter.pick(row); }
         }
-        Rectangle {
-            vertical-stretch: 1;
-            min-height: Metrics.settings-list-min-height;
-            if SettingsAdapter.rows.length == 0: Label {
-                text: "No games configured yet — add one below.";
-                tone: Tone.muted;
-            }
-            ListView {
-                for row[i] in SettingsAdapter.rows: ListItem {
-                    index: i;
-                    selected: i == SettingsAdapter.selected;
-                    clicked => { SettingsAdapter.select(i); }
-                    double-clicked => { SettingsAdapter.pick(i); }
-                    Label { text: row.type-label; width: Metrics.settings-type-column; overflow: elide; }
-                    // The paths elide: hovering one shows it whole.
-                    Label {
-                        text: row.game-path;
-                        horizontal-stretch: 1;
-                        preferred-width: 0px;
-                        overflow: elide;
-                        if row.game-path != "": Tooltip {
-                            TooltipText { text: row.game-path; }
-                        }
-                    }
-                    Label {
-                        text: row.save-path;
-                        horizontal-stretch: 1;
-                        preferred-width: 0px;
-                        overflow: elide;
-                        if row.save-path != "": Tooltip {
-                            TooltipText { text: row.save-path; }
-                        }
-                    }
-                }
-            }
-            // The list's frame, drawn over the rows' stripes.
-            Rectangle {
-                border-width: Theme.sizes.border-width;
-                border-color: Theme.palette.border;
-            }
+        if SettingsAdapter.rows.length == 0: Label {
+            text: "No games configured yet — add one below.";
+            tone: Tone.muted;
         }
     }
     HorizontalLayout {
@@ -114,20 +94,35 @@ export component SettingsDialog inherits Dialog {
     }
 
     Label { text: "Add a game"; role: TextRole.heading; }
+    // A path too long for its field is cut off: hovering it shows it whole.
     GridLayout {
         spacing: Theme.spacing.sm;
         Row {
             FormLabel { text: "Game path"; }
-            TextField {
-                text <=> SettingsAdapter.form-game-path;
-                placeholder: "Folder containing CHITIN.KEY";
+            HorizontalLayout {
+                spacing: Theme.spacing.sm;
+                game-path := TextField {
+                    text <=> SettingsAdapter.form-game-path;
+                    placeholder: "Folder containing CHITIN.KEY";
+                    if game-path.overflowing: Tooltip {
+                        TooltipText { text: SettingsAdapter.form-game-path; }
+                    }
+                }
+                BrowseButton { folder: FormFolder.game; }
             }
         }
         Row {
             FormLabel { text: "Savegame path"; }
-            TextField {
-                text <=> SettingsAdapter.form-save-path;
-                placeholder: "Optional — folder containing save/, if outside the game folder";
+            HorizontalLayout {
+                spacing: Theme.spacing.sm;
+                save-path := TextField {
+                    text <=> SettingsAdapter.form-save-path;
+                    placeholder: "Optional — folder containing save/, if outside the game folder";
+                    if save-path.overflowing: Tooltip {
+                        TooltipText { text: SettingsAdapter.form-save-path; }
+                    }
+                }
+                BrowseButton { folder: FormFolder.save; }
             }
         }
         Row {

@@ -19,8 +19,10 @@ log = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
-# Software renderer + winit (see the workspace manifest).
-slint = { workspace = true }
+rfd = { workspace = true }
+# Software renderer + winit (see the workspace manifest); the window handle
+# parents the folder picker to the keeper's window.
+slint = { workspace = true, features = ["raw-window-handle-06"] }
 
 [dev-dependencies]
 # The token lint, run on the keeper's own UI (tests/ui_tokens.rs).

@@ -60,12 +60,20 @@ game folder and, for an Enhanced Edition, its savegame folder, then click
 **Add**. Leave **Game type** on *Autodetect* unless detection gets it wrong;
 the list shows the detected type next to each game.
 
+**Browse…** next to a path opens your system's folder picker instead. On
+Linux that is your desktop's own picker, through the XDG desktop portal
+(`xdg-desktop-portal-gnome`, `-kde` or `-gtk`; Sway and Hyprland need `-gtk`
+next to their own portal), with `zenity` as the fallback.
+
 **Why a separate savegame folder?** The original games write their saves into
 a `save/` folder inside the install folder, so the game path is all the keeper
 needs. The Enhanced Editions instead keep saves (with portraits and other
 per-user files) in a folder in your user profile, away from the install. Point
-**Savegame path** at that folder (the one *containing* `save/`, not `save/`
-itself), or the keeper finds no saves to load.
+**Savegame path** at that folder, the one containing `save/`; picking `save/`
+itself works too, and the keeper keeps the folder above it. It reads every
+save folder in there: `save/`, `mpsave/` (multiplayer), `sodsave/` (Siege of
+Dragonspear) and the others, plus your exported characters. A folder with no
+save folder in it is refused.
 
 | Game | Windows | Linux |
 | --- | --- | --- |
@@ -130,10 +138,10 @@ The UI is split like Slint's demo apps:
   `.slint` file with literal sizes; `tests/ui_tokens.rs` enforces it, and
   that nothing imports `std-widgets`).
 - `ui/components/` — the keeper's own widgets on themekit components
-  (floating window, field card, the tables' header row); `ui/shell/` —
-  header, save tabs, party list, character panel; `ui/tabs/` — the character
-  tabs' pages; `ui/browser/` — the Item / Spell Browser windows;
-  `ui/dialogs/` — the modal dialogs. Each part reads and calls its
+  (floating window, field card; every table is a themekit `Table`);
+  `ui/shell/` — header, save tabs, party list, character panel; `ui/tabs/` —
+  the character tabs' pages; `ui/browser/` — the Item / Spell Browser
+  windows; `ui/dialogs/` — the modal dialogs. Each part reads and calls its
   `*Adapter` global.
 - `build.rs` — compiles the `.slint` via `slint-build` and bakes in the git
   version.
@@ -141,8 +149,8 @@ The UI is split like Slint's demo apps:
   (no game / game / open saves) and background game loading; `src/view/` —
   fills the adapters, per UI part; `src/callbacks/` — handles their
   callbacks, per UI part; `src/tabs/` — one module per character tab;
-  `src/components/` — the shared field logic; `src/dialogs/` — the dialogs'
-  state; `src/browser/` — the browsers' indexes and add logic;
-  `src/settings.rs` — the settings file.
+  `src/components/` — the shared field logic and the tables' cells;
+  `src/dialogs/` — the dialogs' state; `src/browser/` — the browsers'
+  indexes and add logic; `src/settings.rs` — the settings file.
 
 `PORT_STATUS.md` and `THEMEKIT_MIGRATION.md` record how this UI was built.

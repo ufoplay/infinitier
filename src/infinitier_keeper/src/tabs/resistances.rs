@@ -375,11 +375,11 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
                 erow(RField::SaveSpells, "Spells", s.spells),
             ];
             [
+                vec![card("Resistances", 0, resist_rows)],
                 vec![
-                    card("Resistances", 0, resist_rows),
-                    card("Armor Class Modifiers", 0, ac_rows),
+                    card("Saving Throws", 1, save_rows),
+                    card("Armor Class Modifiers", 1, ac_rows),
                 ],
-                vec![card("Saving Throws", 1, save_rows)],
                 Vec::new(),
             ]
         }

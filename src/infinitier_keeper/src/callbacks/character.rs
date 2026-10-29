@@ -4,7 +4,8 @@
 use slint::ComponentHandle;
 
 use super::{AppRc, on_model};
-use crate::state;
+use crate::components::edit_table::EditTable;
+use crate::state::{self, Model};
 use crate::tabs::{
     CharacterTab, abilities, feats, inventory, levels, memorization, proficiencies, resistances,
     spells,
@@ -97,30 +98,36 @@ fn wire_cards(ui: &AppWindow, app: &AppRc) {
 /// write + re-read).
 fn wire_edit_table(ui: &AppWindow, app: &AppRc) {
     let (app, weak) = (app.clone(), ui.as_weak());
-    ui.global::<EditTableAdapter>().on_commit(move |id, value| {
-        let Some(ui) = weak.upgrade() else { return };
-        on_model(&ui, &app, |m| {
-            // Cell ids are tab-local: the active tab commits.
-            let value = value.as_str();
-            match m.selected_tab {
-                CharacterTab::Memorization => memorization::commit(m, id, value),
-                CharacterTab::Proficiencies => proficiencies::commit(m, id, value),
-                CharacterTab::Abilities
-                | CharacterTab::Levels
-                | CharacterTab::Characteristics
-                | CharacterTab::Appearance
-                | CharacterTab::Inventory
-                | CharacterTab::Spells
-                | CharacterTab::Feats
-                | CharacterTab::Resistances
-                | CharacterTab::Effects
-                | CharacterTab::LocalVariables
-                | CharacterTab::GlobalVariables
-                | CharacterTab::JournalEntries
-                | CharacterTab::Miscellaneous => {}
-            }
+    ui.global::<EditTableAdapter>()
+        .on_commit(move |row, column, value| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| {
+                // The active tab's table, as shown, says which cell was edited.
+                let (table, commit): (EditTable, fn(&mut Model, i32, &str)) = match m.selected_tab {
+                    CharacterTab::Memorization => (memorization::build(m), memorization::commit),
+                    CharacterTab::Proficiencies => (proficiencies::build(m), proficiencies::commit),
+                    CharacterTab::Abilities
+                    | CharacterTab::Levels
+                    | CharacterTab::Characteristics
+                    | CharacterTab::Appearance
+                    | CharacterTab::Inventory
+                    | CharacterTab::Spells
+                    | CharacterTab::Feats
+                    | CharacterTab::Resistances
+                    | CharacterTab::Effects
+                    | CharacterTab::LocalVariables
+                    | CharacterTab::GlobalVariables
+                    | CharacterTab::JournalEntries
+                    | CharacterTab::Miscellaneous => return,
+                };
+                let (Ok(row), Ok(column)) = (usize::try_from(row), usize::try_from(column)) else {
+                    return;
+                };
+                if let Some(id) = table.cell_id(row, column) {
+                    commit(m, id, value.as_str());
+                }
+            });
         });
-    });
 }
 
 /// Inventory: select a slot / edit a quantity / delete an item.
@@ -170,18 +177,18 @@ fn wire_spells(ui: &AppWindow, app: &AppRc) {
     }
     {
         let (app, weak) = (app.clone(), ui.as_weak());
-        spells.on_memorize(move |ref_id, value| {
+        spells.on_memorize(move |row, value| {
             let Some(ui) = weak.upgrade() else { return };
             on_model(&ui, &app, |m| {
-                spells::commit_memorized(m, ref_id, value.as_str());
+                spells::commit_memorized(m, row, value.as_str());
             });
         });
     }
     {
         let (app, weak) = (app.clone(), ui.as_weak());
-        spells.on_delete(move |ref_id| {
+        spells.on_delete(move |row| {
             let Some(ui) = weak.upgrade() else { return };
-            on_model(&ui, &app, |m| spells::delete(m, ref_id));
+            on_model(&ui, &app, |m| spells::delete(m, row));
         });
     }
 }

@@ -10,8 +10,8 @@ mod shell;
 
 use slint::{Model as _, ModelRc, VecModel};
 
-use crate::AppWindow;
 use crate::app::{App, Session};
+use crate::{AppWindow, TableCell};
 
 pub use browsers::refresh_browsers;
 
@@ -64,8 +64,7 @@ fn sync_rows<T: Clone + PartialEq + 'static>(
     None
 }
 
-/// A row holding a list of its own (a card's fields, a table row's cells),
-/// for [`sync_nested`].
+/// A row holding a list of its own (a card's fields), for [`sync_nested`].
 trait NestedRows: Clone + 'static {
     type Item: Clone + PartialEq + 'static;
     /// Whether `other` is the same row with other contents: then its nested
@@ -81,16 +80,6 @@ impl NestedRows for crate::FieldCard {
     }
     fn nested(&self) -> &ModelRc<crate::FieldRow> {
         &self.rows
-    }
-}
-
-impl NestedRows for crate::EditRow {
-    type Item = crate::EditCell;
-    fn same_row(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-    fn nested(&self) -> &ModelRc<crate::EditCell> {
-        &self.cells
     }
 }
 
@@ -120,4 +109,27 @@ fn sync_nested<T: NestedRows>(current: &ModelRc<T>, rows: Vec<T>) -> Option<Mode
 /// A Slint row index for `index`, `-1` for none.
 fn index_or_none(index: Option<usize>) -> i32 {
     index.and_then(|i| i32::try_from(i).ok()).unwrap_or(-1)
+}
+
+/// A themekit `Table`'s rows: each row's cells, one per column.
+type TableRows = ModelRc<ModelRc<TableCell>>;
+
+/// Show `rows` in a `Table` whose rows model is `current`: when it has as
+/// many rows, each row's cells are synced in place (see [`sync_rows`]), so a
+/// number being edited survives and a double-click registers.
+#[must_use]
+fn sync_table(current: &TableRows, rows: Vec<Vec<TableCell>>) -> Option<TableRows> {
+    let model = current
+        .as_any()
+        .downcast_ref::<VecModel<ModelRc<TableCell>>>()
+        .filter(|model| model.row_count() == rows.len());
+    let Some(model) = model else {
+        return Some(rows_model(rows.into_iter().map(rows_model).collect()));
+    };
+    for (i, cells) in rows.into_iter().enumerate() {
+        if let Some(cells) = model.row_data(i).and_then(|old| sync_rows(&old, cells)) {
+            model.set_row_data(i, cells);
+        }
+    }
+    None
 }

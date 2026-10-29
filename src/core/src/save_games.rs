@@ -29,10 +29,12 @@ use log::debug;
 /// Save-game subdirectories scanned by [`scan_save_games`]. Lifted
 /// from NearInfinity's per-engine save-folder lists; covers every
 /// shipped IE engine's set — vanilla games only ever use `Save` and
-/// `MPSave`, the Enhanced Editions add the rest.
+/// `MPSave`, the Enhanced Editions add the rest (BG:EE keeps its Siege
+/// of Dragonspear campaign in `SoDSave`). Matched in any letter case.
 pub const SAVE_DIRS: &[&str] = &[
     "Save",
     "MPSave",
+    "SoDSave",
     "BPSave",
     "CloudSave",
     "ImportSave",
@@ -393,50 +395,43 @@ mod tests {
     }
 
     #[test]
-    fn excludes_save_dirs_outside_the_known_list() {
-        // BG:EE fixture has a `sodsave/` directory with valid SAV
-        // files in it. `sodsave` isn't in `SAVE_DIRS`, so its
-        // contents must not appear in the result.
+    fn discovers_bg_ee_saves_under_save_and_sodsave() {
+        // BG:EE fixture: 7 saves under `save/`, 10 under `sodsave/`
+        // (Siege of Dragonspear), some with the same name in both.
         let fs = fixture_fs("bg_ee");
         let saves = scan_save_games(&fs);
-        // Names of saves under sodsave/ — must not show up:
-        let sod_only_names = ["000000001-Salvataggio Rapido"];
-        // (Note: this name also exists under save/ for BG:EE; we'll
-        // check the count instead of relying on name uniqueness.)
-        let saves_under_save = std::fs::read_dir(get_assets_path().join("SAV_GAM/bg_ee/save"))
-            .unwrap()
-            .filter_map(Result::ok)
-            .filter(|e| e.path().is_dir())
-            .count();
-        assert_eq!(
-            saves.len(),
-            saves_under_save,
-            "scanner picked up entries from outside SAVE_DIRS — got {} vs {saves_under_save} under save/. Names = {:?}",
-            saves.len(),
-            saves
-                .saves()
-                .iter()
-                .map(|s| s.folder_name.as_str())
-                .collect::<Vec<_>>(),
+        assert_eq!(saves.len(), 17);
+        let sod_only = saves
+            .by_name("000000015-Inizio Prologo")
+            .expect("SoD save discovered");
+        assert!(
+            sod_only.folder_path.parent().is_some_and(|dir| dir
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("sodsave"))),
+            "{} isn't under sodsave/",
+            sod_only.folder_path.display()
         );
-        // Each `sod_only_names` entry whose name doesn't appear
-        // under save/ must be absent from the results.
-        let save_dir_names: std::collections::HashSet<String> =
-            std::fs::read_dir(get_assets_path().join("SAV_GAM/bg_ee/save"))
-                .unwrap()
-                .filter_map(Result::ok)
-                .filter(|e| e.path().is_dir())
-                .map(|e| e.file_name().to_string_lossy().into_owned())
-                .collect();
-        for sod_only in sod_only_names {
-            if save_dir_names.contains(sod_only) {
-                continue;
-            }
-            assert!(
-                saves.by_name(sod_only).is_none(),
-                "{sod_only} from sodsave/ leaked into the results"
-            );
+    }
+
+    #[test]
+    fn excludes_save_dirs_outside_the_known_list() {
+        // The same save under `save/` and under a folder that isn't in
+        // `SAVE_DIRS`: only the first is found.
+        let root = tempfile::tempdir().unwrap();
+        for dir in ["save", "backup"] {
+            let save = root.path().join(dir).join("000000001-Quick-Save");
+            std::fs::create_dir_all(&save).unwrap();
+            std::fs::write(save.join("BALDUR.SAV"), b"").unwrap();
+            std::fs::write(save.join("BALDUR.GAM"), b"").unwrap();
         }
+        let fs = CaseInsensitiveFS::new(root.path().to_path_buf()).expect("open temp FS");
+        let saves = scan_save_games(&fs);
+        assert_eq!(saves.len(), 1);
+        assert!(
+            saves.saves()[0]
+                .folder_path
+                .starts_with(root.path().join("save"))
+        );
     }
 
     #[test]

@@ -4,18 +4,21 @@
 use infinitier_core::imported_resource::gam::NpcCre;
 use slint::{ComponentHandle, SharedString};
 
-use super::{index_or_none, rows_model, sync_nested, sync_rows};
-use crate::components::edit_table::EditTable;
+use super::{index_or_none, rows_model, sync_nested, sync_rows, sync_table};
+use crate::components::edit_table::{EditCell, EditTable};
 use crate::components::editable_fields::AttacksOption;
+use crate::components::table::{self, Overflow};
 use crate::state::Model;
+use crate::tabs::inventory::InvRow;
+use crate::tabs::spells::SpellRow;
 use crate::tabs::{
     CharacterTab, abilities, appearance, characteristics, effects, feats, inventory, journal,
     levels, memorization, miscellaneous, proficiencies, resistances, spells, variables,
 };
 use crate::{
     AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent, ColorSwatch,
-    EditTableAdapter, FieldCard, GridAdapter, GridRow, InvRow, InventoryAdapter, SpellRowUi,
-    SpellsAdapter, TableAdapter, VarRow,
+    EditTableAdapter, FieldCard, GridAdapter, Icons, InventoryAdapter, Metrics, SpellsAdapter,
+    TableAdapter,
 };
 
 /// Repaint the tab strip and the active tab's page. Takes `&mut Model`
@@ -68,7 +71,7 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
             effects::HEADERS,
             effects::WIDTHS,
             effects::build(model),
-            GridText::Elide,
+            Overflow::Elide,
             "",
         ),
         CharacterTab::JournalEntries => show_grid(
@@ -76,7 +79,7 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
             journal::HEADERS,
             journal::WIDTHS,
             journal::build(model),
-            GridText::Wrap,
+            Overflow::Wrap,
             "This save has no journal entries.",
         ),
     }
@@ -142,7 +145,7 @@ fn show_unavailable(ui: &AppWindow, message: &str) {
 }
 
 /// The Memorization / Proficiencies table, synced in place (see
-/// [`sync_rows`]).
+/// [`sync_table`]).
 fn show_edit_table(ui: &AppWindow, table: EditTable) {
     let EditTable {
         name_header,
@@ -150,26 +153,44 @@ fn show_edit_table(ui: &AppWindow, table: EditTable) {
         rows,
     } = table;
     let adapter = ui.global::<EditTableAdapter>();
-    adapter.set_name_header(name_header.into());
-    let headers: Vec<SharedString> = headers.iter().map(|h| (*h).into()).collect();
-    adapter.set_headers(rows_model(headers));
-    if let Some(rows) = sync_nested(&adapter.get_rows(), rows) {
+    let value_width = ui.global::<Metrics>().get_edit_table_value_column();
+    let columns: Vec<_> = std::iter::once(table::column(name_header, 0.0, Overflow::Elide))
+        .chain(
+            headers
+                .iter()
+                .map(|header| table::column(header, value_width, Overflow::Elide)),
+        )
+        .collect();
+    adapter.set_columns(rows_model(columns));
+    let rows = rows
+        .into_iter()
+        .map(|row| {
+            std::iter::once(table::text(row.name))
+                .chain(row.cells.into_iter().map(|cell| match cell {
+                    EditCell::Editable {
+                        id: _,
+                        value,
+                        minimum,
+                        maximum,
+                    } => table::number(value as f32, minimum as f32, maximum as f32),
+                    EditCell::Value(text) => table::text(text),
+                }))
+                .collect()
+        })
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
         adapter.set_rows(rows);
     }
     show(ui, CharacterContent::EditTable);
 }
 
 /// The read-only Name · Value table.
-fn show_table(ui: &AppWindow, rows: Vec<VarRow>) {
-    ui.global::<TableAdapter>().set_rows(rows_model(rows));
+fn show_table(ui: &AppWindow, rows: Vec<variables::VarRow>) {
+    let adapter = ui.global::<TableAdapter>();
+    if let Some(rows) = sync_table(&adapter.get_rows(), table::text_rows(rows)) {
+        adapter.set_rows(rows);
+    }
     show(ui, CharacterContent::Table);
-}
-
-/// How the grid fits a cell's text in its column.
-enum GridText {
-    Elide,
-    /// Onto more lines, the row growing to fit (full journal entries).
-    Wrap,
 }
 
 /// The wide read-only grid: headers, per-column widths and rows, or
@@ -178,20 +199,24 @@ fn show_grid(
     ui: &AppWindow,
     headers: &[&str],
     widths: &[f32],
-    rows: Vec<GridRow>,
-    text: GridText,
+    rows: Vec<Vec<SharedString>>,
+    overflow: Overflow,
     empty_text: &str,
 ) {
     let adapter = ui.global::<GridAdapter>();
-    let headers: Vec<SharedString> = headers.iter().map(|h| (*h).into()).collect();
-    adapter.set_headers(rows_model(headers));
-    adapter.set_widths(rows_model(widths.to_vec()));
-    adapter.set_columns_width(widths.iter().sum());
-    adapter.set_rows(rows_model(rows));
-    adapter.set_wrap(match text {
-        GridText::Elide => false,
-        GridText::Wrap => true,
-    });
+    let columns: Vec<_> = headers
+        .iter()
+        .zip(widths)
+        .map(|(header, width)| table::column(header, *width, overflow))
+        .collect();
+    adapter.set_columns(rows_model(columns));
+    let rows = rows
+        .into_iter()
+        .map(|cells| cells.into_iter().map(table::text).collect())
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
+        adapter.set_rows(rows);
+    }
     adapter.set_empty_text(empty_text.into());
     show(ui, CharacterContent::Grid);
 }
@@ -205,26 +230,90 @@ fn show_appearance(ui: &AppWindow, name: SharedString, swatches: Vec<ColorSwatch
 }
 
 /// The slot rows, `selected` highlighted; synced in place (see
-/// [`sync_rows`]).
+/// [`sync_table`]).
 fn show_inventory(ui: &AppWindow, rows: Vec<InvRow>, selected: Option<usize>) {
     let adapter = ui.global::<InventoryAdapter>();
-    if let Some(rows) = sync_rows(&adapter.get_rows(), rows) {
+    let delete = ui.global::<Icons>().get_trash();
+    let resrefs: Vec<SharedString> = rows
+        .iter()
+        .map(|row| {
+            row.item
+                .as_ref()
+                .map(|item| item.resref.clone())
+                .unwrap_or_default()
+        })
+        .collect();
+    let rows = rows
+        .into_iter()
+        .map(
+            |InvRow {
+                 icon,
+                 position,
+                 item,
+             }| {
+                let mut cells = vec![table::image(icon), table::text(position)];
+                match item {
+                    Some(item) => {
+                        cells.extend(
+                            item.quantities
+                                .map(|q| table::number(f32::from(q), 0.0, f32::from(u16::MAX))),
+                        );
+                        cells.push(table::text(item.name));
+                        cells.push(table::text(item.resref));
+                        cells.push(table::button(delete.clone(), "Delete"));
+                    }
+                    // No quantities, name, resref or Delete.
+                    None => cells.extend(std::iter::repeat_n(table::text(""), 6)),
+                }
+                cells
+            },
+        )
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
         adapter.set_rows(rows);
+    }
+    if let Some(resrefs) = sync_rows(&adapter.get_resrefs(), resrefs) {
+        adapter.set_resrefs(resrefs);
     }
     adapter.set_selected(index_or_none(selected));
     show(ui, CharacterContent::Inventory);
 }
 
 /// The spellbook strip and the selected book's spells; synced in place (see
-/// [`sync_rows`]).
-fn show_spells(ui: &AppWindow, books: Vec<SharedString>, book: i32, rows: Vec<SpellRowUi>) {
+/// [`sync_table`]).
+fn show_spells(ui: &AppWindow, books: Vec<SharedString>, book: i32, rows: Vec<SpellRow>) {
     let adapter = ui.global::<SpellsAdapter>();
     if let Some(books) = sync_rows(&adapter.get_books(), books) {
         adapter.set_books(books);
     }
     adapter.set_book(book);
-    if let Some(rows) = sync_rows(&adapter.get_rows(), rows) {
+    let delete = ui.global::<Icons>().get_trash();
+    let resrefs: Vec<SharedString> = rows.iter().map(|row| row.resref.clone()).collect();
+    let rows = rows
+        .into_iter()
+        .map(
+            |SpellRow {
+                 level,
+                 memorized,
+                 name,
+                 resref,
+             }| {
+                vec![
+                    table::text(level.to_string()),
+                    // 0 to 99, as `spells::commit_memorized` keeps it.
+                    table::number(memorized as f32, 0.0, 99.0),
+                    table::text(name),
+                    table::text(resref),
+                    table::button(delete.clone(), "Delete"),
+                ]
+            },
+        )
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
         adapter.set_rows(rows);
+    }
+    if let Some(resrefs) = sync_rows(&adapter.get_resrefs(), resrefs) {
+        adapter.set_resrefs(resrefs);
     }
     show(ui, CharacterContent::Spells);
 }

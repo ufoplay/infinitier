@@ -2,26 +2,17 @@
 // item name, resref and Delete. Clicking a slot selects it as the Item
 // Browser's add target; double-clicking a filled one reveals its item there.
 
-import { Button, ButtonKind, Icons, Label, ListItem, ListView, NumberField, Theme, Tone } from "@themekit";
+import { ControlSize, Label, Table, TableCell, Theme, Tone } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
-import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
-// One slot. `slot` is routed back on select / quantity edit / delete.
-export struct InvRow {
-    slot: int,
-    icon: image,
-    position: string,
-    filled: bool,
-    q1: string,
-    q2: string,
-    q3: string,
-    name: string,
-    resref: string,
-}
-
 export global InventoryAdapter {
-    in property <[InvRow]> rows;
+    // One row per slot, in slot order: icon, position, the three quantities
+    // / charges (a `u16` each), item name, resref and Delete. An empty slot
+    // has no quantities and no Delete.
+    in property <[[TableCell]]> rows;
+    // Each slot's item resref, "" for an empty slot.
+    in property <[string]> resrefs;
     // The selected slot, -1 for none. Set here on click, so the rows aren't
     // rebuilt (which would drop the slot's double-click).
     in-out property <int> selected: -1;
@@ -30,14 +21,7 @@ export global InventoryAdapter {
     callback delete(int /* slot */);
 }
 
-// A quantity / charges (a `u16`), dragged or typed; each change commits.
-component QuantityEdit inherits NumberField {
-    width: Metrics.quantity-width;
-    maximum: 65535;
-}
-
 export component InventoryTab inherits VerticalLayout {
-    spacing: Theme.spacing.xs;
     // A creature format without an inventory has no slots at all.
     if InventoryAdapter.rows.length == 0: Label {
         text: "Inventory is unavailable for this creature's format.";
@@ -45,60 +29,32 @@ export component InventoryTab inherits VerticalLayout {
         vertical-stretch: 1;
         vertical-alignment: top;
     }
-    if InventoryAdapter.rows.length > 0: TableHeader {
-        Rectangle { width: Metrics.inventory-icon; }
-        ColumnHeader { text: "Position"; width: Metrics.inventory-position-column; }
-        ColumnHeader { text: "Quantity"; width: Metrics.inventory-quantity-column; }
-        ColumnHeader { text: "Item"; horizontal-stretch: 1; }
-        ColumnHeader { text: "Resource"; width: Metrics.inventory-resource-column; }
-        Rectangle { width: Theme.sizes.control-height; }
-    }
-    if InventoryAdapter.rows.length > 0: ListView {
-        for row[i] in InventoryAdapter.rows: ListItem {
-            index: i;
-            selected: row.slot == InventoryAdapter.selected;
-            clicked => {
-                InventoryAdapter.selected = row.slot;
-                InventoryAdapter.select(row.slot);
-            }
-            double-clicked => {
-                if (row.filled) {
-                    BrowsersAdapter.front = BrowserKind.items;
-                    BrowsersAdapter.reveal(BrowserKind.items, row.resref);
-                }
-            }
-            Image {
-                width: Metrics.inventory-icon;
-                height: Metrics.inventory-icon;
-                source: row.icon;
-                image-fit: contain;
-            }
-            Label { text: row.position; width: Metrics.inventory-position-column; overflow: elide; }
-            HorizontalLayout {
-                width: Metrics.inventory-quantity-column;
-                spacing: Theme.spacing.xs;
-                if row.filled: QuantityEdit {
-                    value: row.q1.to-float();
-                    changed(value) => { InventoryAdapter.quantity(row.slot, 0, value); }
-                }
-                if row.filled: QuantityEdit {
-                    value: row.q2.to-float();
-                    changed(value) => { InventoryAdapter.quantity(row.slot, 1, value); }
-                }
-                if row.filled: QuantityEdit {
-                    value: row.q3.to-float();
-                    changed(value) => { InventoryAdapter.quantity(row.slot, 2, value); }
-                }
-            }
-            Label { text: row.name; horizontal-stretch: 1; overflow: elide; }
-            Label { text: row.resref; width: Metrics.inventory-resource-column; overflow: elide; }
-            if row.filled: Button {
-                icon: Icons.trash;
-                kind: ButtonKind.ghost;
-                accessible-label: "Delete";
-                clicked => { InventoryAdapter.delete(row.slot); }
-            }
-            if !row.filled: Rectangle { width: Theme.sizes.control-height; }
+    if InventoryAdapter.rows.length > 0: Table {
+        columns: [
+            { width: Metrics.inventory-icon },
+            { title: "Position", width: Metrics.inventory-position-column },
+            { title: "Qty 1", width: Metrics.quantity-width },
+            { title: "Qty 2", width: Metrics.quantity-width },
+            { title: "Qty 3", width: Metrics.quantity-width },
+            { title: "Item" },
+            { title: "Resource", width: Metrics.inventory-resource-column },
+            { width: Theme.control-height(ControlSize.small) },
+        ];
+        rows: InventoryAdapter.rows;
+        size: ControlSize.small;
+        selected-row: InventoryAdapter.selected;
+        row-clicked(slot) => {
+            InventoryAdapter.selected = slot;
+            InventoryAdapter.select(slot);
         }
+        row-double-clicked(slot) => {
+            if (InventoryAdapter.resrefs[slot] != "") {
+                BrowsersAdapter.front = BrowserKind.items;
+                BrowsersAdapter.reveal(BrowserKind.items, InventoryAdapter.resrefs[slot]);
+            }
+        }
+        // The quantities are columns 2 to 4.
+        number-changed(slot, column, value) => { InventoryAdapter.quantity(slot, column - 2, value); }
+        button-clicked(slot) => { InventoryAdapter.delete(slot); }
     }
 }

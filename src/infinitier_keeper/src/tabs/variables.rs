@@ -6,13 +6,16 @@
 //! * **Global** — the save's `GLOBAL` variables from the GAM, sorted with
 //!   EEKeeper's collation (case-insensitive, `_` before letters).
 //!
-//! Rendered via a virtualised Slint `ListView` (the global list runs to
-//! ~2000 entries). Display-only — no `commit`.
+//! Rendered in a themekit `Table`, which only creates the rows in view (the
+//! global list runs to ~2000 entries). Display-only — no `commit`.
 
 use infinitier_core::imported_resource::gam::ImportedGam;
+use slint::SharedString;
 
-use crate::VarRow;
 use crate::state::Model;
+
+/// A variable's row: its name and value.
+pub type VarRow = [SharedString; 2];
 
 /// The selected creature's LOCALS variables, in CRE file order.
 pub fn local(model: &Model) -> Vec<VarRow> {
@@ -20,10 +23,7 @@ pub fn local(model: &Model) -> Vec<VarRow> {
         return Vec::new();
     };
     cre.local_variables()
-        .map(|v| VarRow {
-            name: v.name.as_str().into(),
-            value: v.value.to_string().into(),
-        })
+        .map(|v| [v.name.as_str().into(), v.value.to_string().into()])
         .collect()
 }
 
@@ -40,10 +40,7 @@ fn global_rows(gam: &ImportedGam) -> Vec<VarRow> {
         .collect();
     rows.sort_by_cached_key(|(name, _)| collation_key(name));
     rows.into_iter()
-        .map(|(name, value)| VarRow {
-            name: name.into(),
-            value: value.to_string().into(),
-        })
+        .map(|(name, value)| [name.into(), value.to_string().into()])
         .collect()
 }
 

@@ -25,9 +25,8 @@ export global Metrics {
     out property <length> browser-height: 600px;
     out property <length> browser-min-width: 660px;
     out property <length> browser-min-height: 400px;
-    // Inside a browser: the list's rows and fixed columns, the filter
-    // column, the entry's icon and the detail area's height range.
-    out property <length> browser-row-height: 28px;
+    // Inside a browser: the list's fixed columns, the filter column, the
+    // entry's icon and the detail area's height range.
     out property <length> browser-type-column: 96px;
     out property <length> browser-level-column: 30px;
     out property <length> browser-resource-column: 86px;
@@ -46,13 +45,13 @@ export global Metrics {
     // Local / Global Variables: the names' column.
     out property <length> variable-name-width: 300px;
     // Memorization / Proficiencies: the table's widest, and its value
-    // columns.
+    // columns (read by the Rust side, which builds the columns).
     out property <length> edit-table-width: 480px;
     out property <length> edit-table-value-column: 120px;
-    // Inventory: the item icon and the fixed columns.
+    // Inventory: the item icon and the fixed columns (each quantity has
+    // its own).
     out property <length> inventory-icon: 40px;
     out property <length> inventory-position-column: 120px;
-    out property <length> inventory-quantity-column: 164px;
     out property <length> quantity-width: 52px;
     out property <length> inventory-resource-column: 96px;
     // Spells: the fixed columns.

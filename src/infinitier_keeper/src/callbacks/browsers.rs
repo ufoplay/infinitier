@@ -36,10 +36,10 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     }
     {
         let (app, weak) = (app.clone(), ui.as_weak());
-        browsers.on_select(move |kind, resref| {
+        browsers.on_select(move |kind, row| {
             let Some(ui) = weak.upgrade() else { return };
             on_browser(&ui, &app, kind, |browser, game_data| {
-                browser.select(game_data, &resref);
+                browser.select_row(game_data, row);
             });
         });
     }

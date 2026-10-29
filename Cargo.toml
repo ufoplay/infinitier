@@ -125,8 +125,11 @@ slint = { version = "1.18.1", default-features = false, features = [
 ] }
 slint-build = "1.18.1"
 
-# slint-themekit = { path = "../../../github_ufoscout/slint-themekit/crates/slint-themekit" }
-slint-themekit = "0.2"
+# Native folder picker (the keeper's Settings "Browse…" buttons).
+rfd = "0.17"
+
+slint-themekit = { path = "../../../github_ufoscout/slint-themekit/crates/slint-themekit" }
+# slint-themekit = "0.2"
 
 # Build-time git info (tag/branch) baked into the binary.
 vergen-gix = { version = "10", default-features = false }

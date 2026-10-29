@@ -1,20 +1,14 @@
 // The Load dialog: the game's saves (newest first) with a screenshot +
 // portrait preview, and the prompt confirming a save's deletion.
 
-import { Button, ButtonKind, Dialog, Label, ListItem, ListView, Theme, Tone } from "@themekit";
-import { ColumnHeader, TableHeader } from "../components/components.slint";
+import { Button, ButtonKind, Dialog, Label, Table, TableCell, Theme, Tone } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 import { ConfirmDialog } from "confirm_dialog.slint";
 
-// One row of the saves list.
-export struct LoadRowUi {
-    name: string,
-    time: string,
-}
-
 export global LoadAdapter {
     in property <bool> open;
-    in property <[LoadRowUi]> rows;
+    // Each save's name and the time it was saved.
+    in property <[[TableCell]]> rows;
     in property <int> selected: -1;
     in property <image> screenshot;
     in property <[image]> portraits;
@@ -39,34 +33,21 @@ export component LoadDialog inherits Dialog {
     HorizontalLayout {
         vertical-stretch: 1;
         spacing: Theme.spacing.md;
-        VerticalLayout {
+        Rectangle {
             horizontal-stretch: 1;
-            spacing: Theme.spacing.xs;
-            TableHeader {
-                ColumnHeader { text: "Game Name"; width: Metrics.load-name-column; }
-                ColumnHeader { text: "Time Saved"; horizontal-stretch: 1; }
+            Table {
+                columns: [
+                    { title: "Game Name", width: Metrics.load-name-column },
+                    { title: "Time Saved" },
+                ];
+                rows: LoadAdapter.rows;
+                selected-row: LoadAdapter.selected;
+                row-clicked(row) => { LoadAdapter.select(row); }
+                row-double-clicked(row) => { LoadAdapter.pick(row); }
             }
-            Rectangle {
-                vertical-stretch: 1;
-                if LoadAdapter.rows.length == 0: Label {
-                    text: "No saved games found.";
-                    tone: Tone.muted;
-                }
-                ListView {
-                    for row[i] in LoadAdapter.rows: ListItem {
-                        index: i;
-                        selected: i == LoadAdapter.selected;
-                        clicked => { LoadAdapter.select(i); }
-                        double-clicked => { LoadAdapter.pick(i); }
-                        Label { text: row.name; width: Metrics.load-name-column; overflow: elide; }
-                        Label { text: row.time; horizontal-stretch: 1; overflow: elide; }
-                    }
-                }
-                // The list's frame, drawn over the rows' stripes.
-                Rectangle {
-                    border-width: Theme.sizes.border-width;
-                    border-color: Theme.palette.border;
-                }
+            if LoadAdapter.rows.length == 0: Label {
+                text: "No saved games found.";
+                tone: Tone.muted;
             }
         }
         VerticalLayout {

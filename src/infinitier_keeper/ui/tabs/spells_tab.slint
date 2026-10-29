@@ -3,29 +3,22 @@
 // Memorized (editable), Spell, Resource, Delete. Double-clicking a row
 // reveals its spell in the Spell Browser.
 
-import { Button, ButtonKind, Icons, Label, ListItem, ListView, NumberField, Tab, TabBar, Theme } from "@themekit";
+import { ControlSize, Label, Tab, TabBar, Table, TableCell, Theme } from "@themekit";
 import { BrowserKind, BrowsersAdapter } from "../browser/browser.slint";
-import { ColumnHeader, TableHeader } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
-
-// One spell. `ref-id` is the display-order row, routed back on memorize /
-// delete.
-export struct SpellRowUi {
-    ref-id: int,
-    level: string,
-    memorized: string,
-    name: string,
-    resref: string,
-}
 
 export global SpellsAdapter {
     // The spellbooks, with their spell counts.
     in property <[string]> books;
     in property <int> book;
-    in property <[SpellRowUi]> rows;
+    // The book's spells: level, memorized count (0 to 99), name, resref and
+    // Delete.
+    in property <[[TableCell]]> rows;
+    // Each spell's resref.
+    in property <[string]> resrefs;
     callback select-book(int);
-    callback memorize(int /* ref-id */, string /* value */);
-    callback delete(int /* ref-id */);
+    callback memorize(int /* row */, string /* value */);
+    callback delete(int /* row */);
 }
 
 export component SpellsTab inherits VerticalLayout {
@@ -43,40 +36,21 @@ export component SpellsTab inherits VerticalLayout {
         vertical-stretch: 1;
         vertical-alignment: top;
     }
-    if SpellsAdapter.rows.length > 0: VerticalLayout {
-        vertical-stretch: 1;
-        spacing: Theme.spacing.xs;
-        TableHeader {
-            ColumnHeader { text: "Level"; width: Metrics.spell-level-column; }
-            ColumnHeader { text: "Memorized"; width: Metrics.spell-memorized-column; }
-            ColumnHeader { text: "Spell"; horizontal-stretch: 1; }
-            ColumnHeader { text: "Resource"; width: Metrics.spell-resource-column; }
-            Rectangle { width: Theme.sizes.control-height; }
+    if SpellsAdapter.rows.length > 0: Table {
+        columns: [
+            { title: "Level", width: Metrics.spell-level-column },
+            { title: "Memorized", width: Metrics.spell-memorized-column },
+            { title: "Spell" },
+            { title: "Resource", width: Metrics.spell-resource-column },
+            { width: Theme.control-height(ControlSize.small) },
+        ];
+        rows: SpellsAdapter.rows;
+        size: ControlSize.small;
+        row-double-clicked(row) => {
+            BrowsersAdapter.front = BrowserKind.spells;
+            BrowsersAdapter.reveal(BrowserKind.spells, SpellsAdapter.resrefs[row]);
         }
-        ListView {
-            for row[i] in SpellsAdapter.rows: ListItem {
-                index: i;
-                double-clicked => {
-                    BrowsersAdapter.front = BrowserKind.spells;
-                    BrowsersAdapter.reveal(BrowserKind.spells, row.resref);
-                }
-                Label { text: row.level; width: Metrics.spell-level-column; }
-                // Dragged or typed, 0 to 99; each change commits.
-                NumberField {
-                    width: Metrics.spell-memorized-column;
-                    value: row.memorized.to-float();
-                    maximum: 99;
-                    changed(value) => { SpellsAdapter.memorize(row.ref-id, value); }
-                }
-                Label { text: row.name; horizontal-stretch: 1; overflow: elide; }
-                Label { text: row.resref; width: Metrics.spell-resource-column; overflow: elide; }
-                Button {
-                    icon: Icons.trash;
-                    kind: ButtonKind.ghost;
-                    accessible-label: "Delete";
-                    clicked => { SpellsAdapter.delete(row.ref-id); }
-                }
-            }
-        }
+        number-changed(row, column, value) => { SpellsAdapter.memorize(row, value); }
+        button-clicked(row) => { SpellsAdapter.delete(row); }
     }
 }

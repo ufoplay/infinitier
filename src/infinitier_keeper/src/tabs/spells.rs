@@ -14,8 +14,16 @@ use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, Iwd2Table, SpellType, S
 use infinitier_core::resource::two_da::TwoDA;
 use slint::SharedString;
 
-use crate::SpellRowUi;
 use crate::state::{Model, SPELL_TAB_AUTO, SpellRefKey};
+
+/// One spell as the tab lists it; its index is its row (see
+/// `Model::spell_refs`).
+pub struct SpellRow {
+    pub level: u16,
+    pub memorized: u32,
+    pub name: SharedString,
+    pub resref: SharedString,
+}
 
 // ── Inner-tab definitions ─────────────────────────────────────────────
 
@@ -242,7 +250,7 @@ fn label(name: &str, count: usize) -> String {
 
 /// Build the Spells tab: inner-tab labels, selected index, and the displayed
 /// rows for that tab. Records the per-row `SpellRef` on `model.spell_refs`.
-pub fn build(model: &mut Model) -> (Vec<SharedString>, i32, Vec<SpellRowUi>) {
+pub fn build(model: &mut Model) -> (Vec<SharedString>, i32, Vec<SpellRow>) {
     let Some(cre) = model.selected_cre() else {
         model.spell_refs.clear();
         return (Vec::new(), 0, Vec::new());
@@ -305,12 +313,11 @@ pub fn build(model: &mut Model) -> (Vec<SharedString>, i32, Vec<SpellRowUi>) {
 
     let mut refs = Vec::with_capacity(order.len());
     let mut ui_rows = Vec::with_capacity(order.len());
-    for (display_i, &i) in order.iter().enumerate() {
+    for &i in &order {
         refs.push(rows[i].key.clone());
-        ui_rows.push(SpellRowUi {
-            ref_id: display_i as i32,
-            level: rows[i].level.to_string().into(),
-            memorized: rows[i].memorized.to_string().into(),
+        ui_rows.push(SpellRow {
+            level: rows[i].level,
+            memorized: rows[i].memorized,
             name: names[i].as_str().into(),
             resref: rows[i].resref.as_str().into(),
         });
@@ -330,9 +337,9 @@ pub fn select_tab(model: &mut Model, idx: i32) {
     }
 }
 
-/// Commit an edited "Memorized" count for the row `ref_id`.
-pub fn commit_memorized(model: &mut Model, ref_id: i32, value: &str) {
-    let Some(key) = usize::try_from(ref_id)
+/// Commit an edited "Memorized" count for the spell in `row`.
+pub fn commit_memorized(model: &mut Model, row: i32, value: &str) {
+    let Some(key) = usize::try_from(row)
         .ok()
         .and_then(|i| model.spell_refs.get(i).cloned())
     else {
@@ -344,9 +351,9 @@ pub fn commit_memorized(model: &mut Model, ref_id: i32, value: &str) {
     }
 }
 
-/// Delete the spell in row `ref_id`.
-pub fn delete(model: &mut Model, ref_id: i32) {
-    let Some(key) = usize::try_from(ref_id)
+/// Delete the spell in `row`.
+pub fn delete(model: &mut Model, row: i32) {
+    let Some(key) = usize::try_from(row)
         .ok()
         .and_then(|i| model.spell_refs.get(i).cloned())
     else {

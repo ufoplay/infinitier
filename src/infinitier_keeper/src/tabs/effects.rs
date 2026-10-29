@@ -12,9 +12,8 @@ mod opcode_names;
 
 use infinitier_core::resource::cre::{Cre, EffectList, EffectV2, SubSections};
 use infinitier_core::resource::ids::Ids;
-use slint::{ModelRc, SharedString, VecModel};
+use slint::SharedString;
 
-use crate::GridRow;
 use crate::state::Model;
 use opcode_names::effect_name;
 
@@ -175,14 +174,8 @@ fn title_case(symbol: &str) -> String {
 
 // ── Build ────────────────────────────────────────────────────────────
 
-fn grid_row(cells: Vec<SharedString>) -> GridRow {
-    GridRow {
-        cells: ModelRc::new(VecModel::from(cells)),
-    }
-}
-
 /// Build the Effects-tab grid rows for the selected creature.
-pub fn build(model: &Model) -> Vec<GridRow> {
+pub fn build(model: &Model) -> Vec<Vec<SharedString>> {
     let Some(cre) = model.selected_cre() else {
         return Vec::new();
     };
@@ -204,7 +197,7 @@ pub fn build(model: &Model) -> Vec<GridRow> {
             cells.push(r.time.to_string().into());
             cells.push(timing_text(r.timing_mode).into());
             cells.push(target_text(r.target).into());
-            grid_row(cells)
+            cells
         })
         .collect()
 }

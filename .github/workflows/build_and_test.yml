@@ -40,7 +40,7 @@ jobs:
         if: runner.os == 'Windows'
         run: git config --global core.autocrlf false
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -50,7 +50,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install Just command runner
-        uses: extractions/setup-just@v1
+        uses: extractions/setup-just@v4
 
       # Formatting and lints don't depend on the OS: check them once.
       - name: check rust code style

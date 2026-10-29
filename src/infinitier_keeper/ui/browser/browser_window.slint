@@ -3,18 +3,9 @@
 // description above an Add button. A FloatingWindow, so the editor stays
 // usable behind it.
 
-import { Button, Checkbox, Label, ListItem, ListView, Menu, MenuItem, ScrollArea, TextField, TextRole, Theme, Tone } from "@themekit";
-import { ColumnHeader, FloatingWindow, TableHeader } from "../components/components.slint";
+import { Button, Checkbox, Label, Menu, MenuItem, ScrollArea, Table, TableCell, TextField, TextRole, Theme, Tone } from "@themekit";
+import { FloatingWindow } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
-
-// One row of the list. `level` / `script` are empty for items.
-export struct BrowserRow {
-    resref: string,
-    name: string,
-    category: string,
-    level: string,
-    script: string,
-}
 
 // One type-filter checkbox.
 export struct TypeFilter {
@@ -46,13 +37,15 @@ export component BrowserWindow inherits FloatingWindow {
     in property <string> search-hint;
     in property <string> select-hint;
     in property <BrowserState> state;
-    in property <[BrowserRow]> rows;
+    // Each entry's type, name and resref; a spell's level too, after its
+    // type, and its script name last.
+    in property <[[TableCell]]> rows;
     in property <[TypeFilter]> types;
     // The search box's text (the user's draft, reset from outside).
     in-out property <string> text;
     in property <bool> all-types: true;
     callback search(string);
-    callback select(string /* resref */);
+    callback select(int /* row */);
     callback step(int /* -1 up, 1 down */);
     callback add(int /* placement, -1 for a plain add */);
     callback set-all-types(bool);
@@ -60,9 +53,7 @@ export component BrowserWindow inherits FloatingWindow {
 
     // Scroll the list so `row` is in view, centring it when it was off-screen.
     public function scroll-to(row: int) {
-        if (row * Metrics.browser-row-height < -list.content-y || (row + 1) * Metrics.browser-row-height > -list.content-y + list.visible-height) {
-            list.content-y = max(min(0px, list.visible-height - root.rows.length * Metrics.browser-row-height), min(0px, list.visible-height / 2 - (row + 0.5) * Metrics.browser-row-height));
-        }
+        table.scroll-to-row(row);
     }
 
     // Add the selected entry — through the spellbook menu, opened at the
@@ -93,56 +84,44 @@ export component BrowserWindow inherits FloatingWindow {
             vertical-stretch: 1;
             padding: Theme.spacing.sm;
             spacing: Theme.spacing.sm;
-            VerticalLayout {
+            Rectangle {
                 horizontal-stretch: 1;
-                spacing: Theme.spacing.xs;
-                TableHeader {
-                    ColumnHeader { text: "Type"; width: Metrics.browser-type-column; }
-                    if root.spell-columns: ColumnHeader { text: "Lvl"; width: Metrics.browser-level-column; }
-                    ColumnHeader { text: "Name"; horizontal-stretch: 2; preferred-width: 0px; }
-                    ColumnHeader { text: "Resource"; width: Metrics.browser-resource-column; }
-                    if root.spell-columns: ColumnHeader { text: "Script Name"; horizontal-stretch: 1; preferred-width: 0px; }
-                }
-                Rectangle {
-                    vertical-stretch: 1;
-                    // Up / Down move the selection while the list has focus.
-                    keys := FocusScope {
-                        key-pressed(event) => {
-                            if (event.text == Key.UpArrow) {
-                                root.step(-1);
-                                return accept;
-                            }
-                            if (event.text == Key.DownArrow) {
-                                root.step(1);
-                                return accept;
-                            }
-                            return reject;
+                // Up / Down move the selection while the list has focus.
+                keys := FocusScope {
+                    key-pressed(event) => {
+                        if (event.text == Key.UpArrow) {
+                            root.step(-1);
+                            return accept;
                         }
-                        list := ListView {
-                            for row[i] in root.rows: ListItem {
-                                height: Metrics.browser-row-height;
-                                index: i;
-                                selected: i == root.state.selected-row;
-                                clicked => {
-                                    root.raise();
-                                    keys.focus();
-                                    root.select(row.resref);
-                                }
-                                double-clicked => {
-                                    root.request-add(self.absolute-position.x - root.absolute-position.x + self.pointer-x, self.absolute-position.y - root.absolute-position.y + self.pointer-y);
-                                }
-                                Label { text: row.category; width: Metrics.browser-type-column; overflow: elide; }
-                                if root.spell-columns: Label { text: row.level; width: Metrics.browser-level-column; }
-                                Label { text: row.name; horizontal-stretch: 2; preferred-width: 0px; overflow: elide; }
-                                Label { text: row.resref; width: Metrics.browser-resource-column; overflow: elide; }
-                                if root.spell-columns: Label { text: row.script; horizontal-stretch: 1; preferred-width: 0px; overflow: elide; }
-                            }
+                        if (event.text == Key.DownArrow) {
+                            root.step(1);
+                            return accept;
                         }
+                        return reject;
                     }
-                    // The list's frame, drawn over the rows' stripes.
-                    Rectangle {
-                        border-width: Theme.sizes.border-width;
-                        border-color: Theme.palette.border;
+                    table := Table {
+                        columns: root.spell-columns ? [
+                            { title: "Type", width: Metrics.browser-type-column },
+                            { title: "Lvl", width: Metrics.browser-level-column },
+                            { title: "Name" },
+                            { title: "Resource", width: Metrics.browser-resource-column },
+                            { title: "Script Name" },
+                        ] : [
+                            { title: "Type", width: Metrics.browser-type-column },
+                            { title: "Name" },
+                            { title: "Resource", width: Metrics.browser-resource-column },
+                        ];
+                        rows: root.rows;
+                        selected-row: root.state.selected-row;
+                        row-clicked(row) => {
+                            root.raise();
+                            keys.focus();
+                            root.select(row);
+                        }
+                        // The spellbook menu opens where the row was clicked.
+                        row-double-clicked => {
+                            root.request-add(self.absolute-position.x - root.absolute-position.x + self.pointer-x, self.absolute-position.y - root.absolute-position.y + self.pointer-y);
+                        }
                     }
                 }
             }

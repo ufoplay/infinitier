@@ -1,66 +1,25 @@
-// The Effects / Journal Entries tabs: a wide read-only table, striped like
-// the others. Its columns are wider than the tab, so the rows scroll
-// sideways and the header follows them.
+// The Effects / Journal Entries tabs: a wide read-only table. Its columns
+// are wider than the tab, so the rows scroll sideways and the header
+// follows them.
 
-import { Label, ListItem, ListView, Theme, Tone } from "@themekit";
-import { ColumnHeader, TableHeader } from "../components/components.slint";
-
-// One grid row; `cells` line up with the adapter's headers / widths.
-export struct GridRow {
-    cells: [string],
-}
+import { Label, Table, TableCell, TableColumn, Theme, Tone } from "@themekit";
 
 export global GridAdapter {
-    in property <[string]> headers;
-    // Each column's width, and their sum.
-    in property <[length]> widths;
-    in property <length> columns-width;
-    in property <[GridRow]> rows;
-    // Wrap long cells onto more lines (rows grow to fit) instead of eliding
-    // them — the Journal Entries tab's full entry text.
-    in property <bool> wrap;
+    in property <[TableColumn]> columns;
+    in property <[[TableCell]]> rows;
     // Shown instead of the table when it has no rows ("" for none).
     in property <string> empty-text;
 }
 
 export component GridTab inherits VerticalLayout {
-    // A row's width: its columns, the gaps between them and its padding.
-    property <length> rows-width: GridAdapter.columns-width
-        + max(0, GridAdapter.headers.length - 1) * Theme.spacing.sm
-        + Theme.spacing.md * 2;
-
     spacing: Theme.spacing.xs;
 
     if GridAdapter.rows.length == 0 && GridAdapter.empty-text != "": Label {
         text: GridAdapter.empty-text;
         tone: Tone.muted;
     }
-    Rectangle {
-        clip: true;
-        height: header.preferred-height;
-        header := TableHeader {
-            x: list.content-x;
-            // As wide as the rows, plus the scroll indicator's room that
-            // TableHeader pads on the right.
-            width: list.content-width + Theme.sizes.scrollbar-width + Theme.spacing.xs;
-            for title[i] in GridAdapter.headers: ColumnHeader {
-                text: title;
-                width: GridAdapter.widths[i];
-            }
-        }
-    }
-    list := ListView {
-        content-width: max(self.visible-width, root.rows-width);
-        for row[r] in GridAdapter.rows: ListItem {
-            index: r;
-            width: list.content-width;
-            for cell[c] in row.cells: Label {
-                text: cell;
-                width: GridAdapter.widths[c];
-                overflow: GridAdapter.wrap ? clip : elide;
-                wrap: GridAdapter.wrap ? word-wrap : no-wrap;
-                vertical-alignment: top;
-            }
-        }
+    Table {
+        columns: GridAdapter.columns;
+        rows: GridAdapter.rows;
     }
 }

@@ -17,15 +17,17 @@
 //! caller, which loads it in place of the current game.
 
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::thread::{self, JoinHandle};
 
 use infinitier_core::game_detect::detect_game_at;
 use infinitier_core::resource::Game;
+use infinitier_core::save_games::SAVE_DIRS;
+use slint::SharedString;
 use thiserror::Error;
 
-use crate::GameRowUi;
 use crate::settings::{GameConfig, Settings, ThemeSetting};
 
 /// Every game type the add form offers besides autodetection.
@@ -226,20 +228,22 @@ impl SettingsDialog {
         }
     }
 
-    /// The games list as table rows.
-    pub fn rows(&self) -> Vec<GameRowUi> {
+    /// The games list as table rows: each game's type, game path and
+    /// savegame path.
+    pub fn rows(&self) -> Vec<[SharedString; 3]> {
         self.settings
             .games
             .iter()
-            .map(|game| GameRowUi {
-                type_label: game_type_label(game, &self.detections).into(),
-                game_path: game.game_path.display().to_string().into(),
-                save_path: game
-                    .save_path
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default()
-                    .into(),
+            .map(|game| {
+                [
+                    game_type_label(game, &self.detections).into(),
+                    game.game_path.display().to_string().into(),
+                    game.save_path
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default()
+                        .into(),
+                ]
             })
             .collect()
     }
@@ -330,13 +334,7 @@ impl GameForm<'_> {
         }
         let save_path = match self.save_path.trim() {
             "" => None,
-            path => {
-                let path = PathBuf::from(path);
-                if !path.is_dir() {
-                    return Err(FormError::NotAFolder(path));
-                }
-                Some(path)
-            }
+            path => Some(savegame_root(PathBuf::from(path))?),
         };
         let config = GameConfig {
             game_path,
@@ -359,6 +357,8 @@ enum FormError {
     NotAFolder(PathBuf),
     #[error("\"{}\" has no CHITIN.KEY — pick the game's install folder.", .0.display())]
     NoKeyFile(PathBuf),
+    #[error("\"{}\" has no save folder — pick the folder containing save/, or save/ itself.", .0.display())]
+    NoSaveFolder(PathBuf),
     #[error("This game is already in the list.")]
     Duplicate,
 }
@@ -370,6 +370,38 @@ fn has_key_file(dir: &Path) -> bool {
             .flatten()
             .any(|e| e.file_name().eq_ignore_ascii_case("chitin.key"))
     })
+}
+
+/// The savegame path to keep for the picked folder `path`: the folder
+/// holding the save folders ([`SAVE_DIRS`]: `save/`, `mpsave/`, …), as the
+/// game reads its other files from it too. That is the parent when `path`
+/// is a save folder itself, else `path`, if it holds one.
+fn savegame_root(path: PathBuf) -> Result<PathBuf, FormError> {
+    if !path.is_dir() {
+        return Err(FormError::NotAFolder(path));
+    }
+    if path.file_name().is_some_and(is_save_dir_name) {
+        return Ok(match path.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+            // A bare relative `save`: its parent is the current folder.
+            _ => PathBuf::from("."),
+        });
+    }
+    let holds_save_dir = std::fs::read_dir(&path).is_ok_and(|entries| {
+        entries
+            .flatten()
+            .any(|e| is_save_dir_name(&e.file_name()) && e.path().is_dir())
+    });
+    if holds_save_dir {
+        Ok(path)
+    } else {
+        Err(FormError::NoSaveFolder(path))
+    }
+}
+
+/// Whether `name` is one of the [`SAVE_DIRS`], in any letter case.
+fn is_save_dir_name(name: &OsStr) -> bool {
+    SAVE_DIRS.iter().any(|dir| name.eq_ignore_ascii_case(dir))
 }
 
 /// The stored active index once row `removed` is gone: still on the same
@@ -470,6 +502,41 @@ mod tests {
         assert_eq!(
             form(&path, &missing_str).parse(&[]),
             Err(FormError::NotAFolder(missing))
+        );
+    }
+
+    #[test]
+    fn parse_keeps_the_folder_holding_the_save_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("chitin.key"), b"").unwrap();
+        let user = dir.path().join("user");
+        std::fs::create_dir_all(user.join("MPSave")).unwrap();
+        std::fs::create_dir_all(user.join("SODSAVE")).unwrap();
+        let game = dir.path().display().to_string();
+        let save_path = |picked: &Path| {
+            form(&game, &picked.display().to_string())
+                .parse(&[])
+                .map(|config| config.save_path)
+        };
+        // The folder holding a save folder, or a save folder itself, in
+        // any letter case.
+        assert_eq!(save_path(&user), Ok(Some(user.clone())));
+        assert_eq!(save_path(&user.join("MPSave")), Ok(Some(user.clone())));
+        assert_eq!(save_path(&user.join("SODSAVE")), Ok(Some(user.clone())));
+    }
+
+    #[test]
+    fn parse_rejects_a_savegame_folder_without_save_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("chitin.key"), b"").unwrap();
+        let user = dir.path().join("user");
+        std::fs::create_dir_all(user.join("portraits")).unwrap();
+        // A file named like a save folder doesn't count.
+        std::fs::write(user.join("save"), b"").unwrap();
+        let game = dir.path().display().to_string();
+        assert_eq!(
+            form(&game, &user.display().to_string()).parse(&[]),
+            Err(FormError::NoSaveFolder(user))
         );
     }
 

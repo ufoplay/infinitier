@@ -16,7 +16,16 @@ use infinitier_core::resource::Engine;
 use slint::{Image, ModelRc, SharedString, VecModel};
 
 use crate::state::Model;
-use crate::{BrowserKind, BrowserRow, BrowserState, TypeFilter, icons};
+use crate::{BrowserKind, BrowserState, TypeFilter, icons};
+
+/// One row of a browser's list. `level` / `script` are empty for items.
+pub struct BrowserRow {
+    pub resref: SharedString,
+    pub name: SharedString,
+    pub category: SharedString,
+    pub level: SharedString,
+    pub script: SharedString,
+}
 
 impl BrowserKind {
     pub const ALL: [BrowserKind; 2] = [BrowserKind::Items, BrowserKind::Spells];
@@ -143,6 +152,18 @@ impl Browser {
                 .unwrap_or_default(),
         });
         self.selected = Some(resref.to_owned());
+    }
+
+    /// Select the entry in `row` of the filtered list (a click).
+    pub fn select_row(&mut self, game_data: &GameData, row: i32) {
+        let filtered = self.filtered();
+        let resref = usize::try_from(row)
+            .ok()
+            .and_then(|row| filtered.get(row))
+            .map(|entry| entry.resref.clone());
+        if let Some(resref) = resref {
+            self.select(game_data, &resref);
+        }
     }
 
     /// Reveal `resref`: open the window, select it and scroll to it. Clears

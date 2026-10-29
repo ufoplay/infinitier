@@ -1,12 +1,15 @@
 //! Callbacks of the modal dialogs: Load (`LoadAdapter`), Save
 //! (`SaveAdapter`) and Settings (`SettingsAdapter`).
 
+use std::path::Path;
+
+use rfd::AsyncFileDialog;
 use slint::{ComponentHandle, SharedString};
 
 use super::{AppRc, on_app};
 use crate::app::{self, App, Session};
 use crate::view;
-use crate::{AppWindow, LoadAdapter, SaveAdapter, SettingsAdapter};
+use crate::{AppWindow, FormFolder, LoadAdapter, SaveAdapter, SettingsAdapter};
 
 pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_load(ui, app);
@@ -167,6 +170,13 @@ fn wire_settings(ui: &AppWindow, app: &AppRc) {
         });
     }
     {
+        let weak = ui.as_weak();
+        settings.on_browse(move |folder| {
+            let Some(ui) = weak.upgrade() else { return };
+            browse_folder(&ui, folder);
+        });
+    }
+    {
         let (app, weak) = (app.clone(), ui.as_weak());
         settings.on_close(move || {
             let Some(ui) = weak.upgrade() else { return };
@@ -183,6 +193,52 @@ fn wire_settings(ui: &AppWindow, app: &AppRc) {
             }
             close_settings(&ui, &app);
         });
+    }
+}
+
+/// Open the OS's folder picker for one of the add form's folders, starting
+/// at the field's folder, and put the chosen folder into the field. The
+/// picker is awaited on the event loop, so the window keeps repainting; the
+/// Browse buttons wait for it.
+fn browse_folder(ui: &AppWindow, folder: FormFolder) {
+    let form = ui.global::<SettingsAdapter>();
+    let (title, current) = match folder {
+        FormFolder::Game => (
+            "Select the game folder (containing CHITIN.KEY)",
+            form.get_form_game_path(),
+        ),
+        FormFolder::Save => (
+            "Select the savegame folder (containing save/), or save/ itself",
+            form.get_form_save_path(),
+        ),
+    };
+    let dialog = AsyncFileDialog::new()
+        .set_title(title)
+        .set_parent(&ui.window().window_handle());
+    let start = Path::new(current.trim());
+    let dialog = if start.is_dir() {
+        dialog.set_directory(start)
+    } else {
+        dialog
+    };
+    let picked = dialog.pick_folder();
+    form.set_browsing(true);
+    let weak = ui.as_weak();
+    let spawned = slint::spawn_local(async move {
+        let picked = picked.await;
+        let Some(ui) = weak.upgrade() else { return };
+        let form = ui.global::<SettingsAdapter>();
+        form.set_browsing(false);
+        let Some(picked) = picked else { return };
+        let path = SharedString::from(picked.path().to_string_lossy().as_ref());
+        match folder {
+            FormFolder::Game => form.set_form_game_path(path),
+            FormFolder::Save => form.set_form_save_path(path),
+        }
+    });
+    if let Err(e) = spawned {
+        log::error!("[settings] can't open the folder picker: {e}");
+        form.set_browsing(false);
     }
 }
 
