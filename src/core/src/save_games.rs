@@ -427,10 +427,20 @@ mod tests {
         let fs = CaseInsensitiveFS::new(root.path().to_path_buf()).expect("open temp FS");
         let saves = scan_save_games(&fs);
         assert_eq!(saves.len(), 1);
+        // The FS resolves paths canonically (`\\?\C:\…` on Windows,
+        // `/private/var/…` for macOS temp dirs), so compare against the
+        // canonical form of the expected folder.
+        let save_dir = root
+            .path()
+            .join("save")
+            .canonicalize()
+            .expect("canonicalize temp save dir");
+        let found = &saves.saves()[0].folder_path;
         assert!(
-            saves.saves()[0]
-                .folder_path
-                .starts_with(root.path().join("save"))
+            found.starts_with(&save_dir),
+            "{} isn't under {}",
+            found.display(),
+            save_dir.display()
         );
     }
 
