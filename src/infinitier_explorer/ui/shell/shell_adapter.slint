@@ -1,9 +1,14 @@
-// The window-wide state: the title, the theme and the status line.
+// The window-wide state: the title, the loaded game, the theme, the status
+// line and the header's actions.
 
 export global ShellAdapter {
+    // "Infinitier Explorer {version}", then " - {game}" once one is loaded.
     in property <string> title: "Infinitier Explorer";
+    // The loaded game's type and folder, or "No game loaded".
+    in property <string> game;
     in property <bool> dark-theme;
     // What's selected and where it comes from, or "No file selected".
     in property <string> status;
     callback theme-toggle();
+    callback settings-clicked();
 }

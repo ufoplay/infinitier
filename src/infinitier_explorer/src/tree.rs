@@ -71,6 +71,9 @@ pub struct Outcome {
     pub scroll_to: Option<usize>,
 }
 
+/// The tree of a game's resources; empty (the default) while no game is
+/// loaded.
+#[derive(Default)]
 pub struct ResourceTree {
     groups: Vec<Group>,
     expanded: Vec<bool>,
@@ -229,6 +232,12 @@ impl TreeModel {
             tree: RefCell::new(tree),
             notify: ModelNotify::default(),
         }
+    }
+
+    /// Show `tree` in place of the current one (another game was loaded).
+    pub fn replace(&self, tree: ResourceTree) {
+        *self.tree.borrow_mut() = tree;
+        self.notify.reset();
     }
 
     pub fn click(&self, row: usize) -> Outcome {
@@ -484,5 +493,32 @@ mod tests {
         tree.toggle(0);
 
         assert_eq!(tree.navigate(TreeNav::Next).scroll_to, Some(1));
+    }
+
+    #[test]
+    fn the_tree_without_a_game_is_empty() {
+        let mut tree = ResourceTree::default();
+        assert_eq!(tree.row_count(), 0);
+        let outcome = tree.navigate(TreeNav::Next);
+        assert_eq!((outcome.open, outcome.scroll_to), (None, None));
+    }
+
+    #[test]
+    fn replacing_the_tree_shows_the_new_game_from_the_top() {
+        let model = TreeModel::new(ResourceTree::default());
+        model.replace(ResourceTree::new(&sample_game_data()));
+        assert_eq!(Model::row_count(&model), 4);
+
+        model.click(0);
+        model.replace(ResourceTree::new(&make_game_data(vec![(
+            "AR0072",
+            ResourceType::Wed,
+        )])));
+        let rows: Vec<TreeRow> = (0..Model::row_count(&model))
+            .filter_map(|row| model.row_data(row))
+            .collect();
+        assert!(
+            matches!(rows.as_slice(), [row] if row.text == "wed (1)" && !row.selected && !row.expanded)
+        );
     }
 }

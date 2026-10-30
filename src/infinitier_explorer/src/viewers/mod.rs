@@ -57,6 +57,13 @@ impl Viewer {
         Self::message("Select a resource from the panel on the left.")
     }
 
+    /// Before any game is loaded.
+    pub fn no_game() -> Self {
+        Self::message(
+            "No game loaded. Open Settings to add a game, then select it and close the dialog to load it.",
+        )
+    }
+
     fn message(text: impl Into<String>) -> Self {
         Self::Message {
             text: text.into(),

@@ -1,0 +1,36 @@
+// The header bar: the loaded game, the theme toggle and Settings.
+
+import { Button, ButtonKind, Icons, Label, Theme, Tone } from "@themekit";
+import { ShellAdapter } from "shell_adapter.slint";
+
+export component HeaderBar inherits Rectangle {
+    background: Theme.palette.surface;
+
+    HorizontalLayout {
+        padding-left: Theme.spacing.md;
+        padding-right: Theme.spacing.sm;
+        padding-top: Theme.spacing.xs;
+        padding-bottom: Theme.spacing.xs;
+        spacing: Theme.spacing.sm;
+        // Takes only the space left over, so it never squeezes the buttons.
+        Label {
+            text: ShellAdapter.game;
+            tone: Tone.muted;
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            overflow: elide;
+        }
+        // Labelled with the theme it switches to.
+        Button {
+            text: ShellAdapter.dark-theme ? "Light" : "Dark";
+            icon: Icons.contrast;
+            kind: ButtonKind.ghost;
+            clicked => { ShellAdapter.theme-toggle(); }
+        }
+        Button {
+            text: "Settings";
+            kind: ButtonKind.ghost;
+            clicked => { ShellAdapter.settings-clicked(); }
+        }
+    }
+}

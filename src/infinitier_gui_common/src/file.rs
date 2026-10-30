@@ -1,8 +1,8 @@
-//! Persistent keeper settings — the list of configured game installs the
-//! Settings dialog offers to switch between, which of them is active, and
-//! the colour theme.
+//! The persistent settings of an app — the list of configured game installs
+//! the Settings dialog offers to switch between, which of them is active,
+//! and the colour theme.
 //!
-//! Stored as TOML at the `--config` path (default [`SETTINGS_FILE`] in
+//! Stored as TOML at the app's `--config` path (by default its own file in
 //! the current folder), read once at startup and rewritten whenever any of
 //! it changes:
 //!
@@ -27,9 +27,6 @@ use std::path::{Path, PathBuf};
 use infinitier_core::resource::Game;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-/// Default settings file, resolved against the current folder.
-pub const SETTINGS_FILE: &str = "infinitier_keeper.toml";
 
 /// One configured game install.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -64,7 +61,7 @@ pub enum ThemeSetting {
     Dark,
 }
 
-/// The `[settings]` table: keeper-wide preferences.
+/// The `[settings]` table: app-wide preferences.
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Preferences {
     /// Index into [`Settings::games`] of the active game — the last one
@@ -138,6 +135,9 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Name of the settings file the tests write.
+    const SETTINGS_FILE: &str = "settings.toml";
 
     fn sample() -> Settings {
         Settings {

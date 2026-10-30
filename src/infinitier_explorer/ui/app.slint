@@ -4,17 +4,20 @@
 //
 // The UI is split like the keeper's:
 //   components/ — the explorer's own widgets (themekit-based), stateless
-//   shell/      — the window's chrome: the resource tree, the status line
+//   shell/      — the window's chrome: the header bar, the resource tree,
+//                 the status line
 //   viewers/    — one viewer per kind of resource, and their host
+//   dialogs/    — the modal dialogs: Settings, the loading overlay
 //   themes/     — the explorer's own layout values and data colours
 // Each part reads and calls its `*Adapter` global, which the Rust side
 // fills and handles; this file only composes the parts.
 
-import { Divider, Splitter, Theme, ThemePresets } from "@themekit";
+import { Divider, Splitter, TableCell, TableCellKind, Theme, ThemePresets } from "@themekit";
 import { Metrics } from "themes/metrics.slint";
 import { TokenKind } from "themes/colors.slint";
 import { Fonts } from "components/components.slint";
-import { ResourcePanel, ShellAdapter, StatusBar, TreeAdapter, TreeNav, TreeRow } from "shell/shell.slint";
+import { HeaderBar, ResourcePanel, ShellAdapter, StatusBar, TreeAdapter, TreeNav, TreeRow } from "shell/shell.slint";
+import { FormFolder, LoadingAdapter, LoadingOverlay, SettingsAdapter, SettingsDialog } from "dialogs/dialogs.slint";
 import {
     BafLine,
     BafSpan,
@@ -57,6 +60,12 @@ export {
     TokenKind,
     SoundAdapter,
     MovieAdapter,
+    SettingsAdapter,
+    FormFolder,
+    LoadingAdapter,
+    // The Settings table's cells, which the Rust side builds.
+    TableCell,
+    TableCellKind,
 }
 
 export component AppWindow inherits Window {
@@ -78,6 +87,17 @@ export component AppWindow inherits Window {
         Theme.current = root.dark-theme ? ThemePresets.dark : ThemePresets.light;
     }
 
+    // An open dialog takes the keyboard from the resource tree behind it,
+    // which gets it back once the dialogs close.
+    property <bool> modal: SettingsAdapter.open || LoadingAdapter.active;
+    changed modal => {
+        if root.modal {
+            panel.clear-focus();
+        } else {
+            panel.focus();
+        }
+    }
+
     // The resource panel's width: UI state, which the splitter changes.
     property <length> panel-width: Metrics.panel-width;
 
@@ -88,6 +108,8 @@ export component AppWindow inherits Window {
     }
 
     VerticalLayout {
+        HeaderBar { }
+        Divider { }
         HorizontalLayout {
             vertical-stretch: 1;
             panel := ResourcePanel { width: root.panel-width; }
@@ -100,5 +122,16 @@ export component AppWindow inherits Window {
         }
         Divider { }
         StatusBar { }
+    }
+
+    // Over the window: the modal dialog, then the loading overlay (covering
+    // everything, an open dialog included).
+    if SettingsAdapter.open: SettingsDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if LoadingAdapter.active: LoadingOverlay {
+        width: root.width;
+        height: root.height;
     }
 }

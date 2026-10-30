@@ -1,0 +1,30 @@
+// Shown while a game loads: a spinner, and the whole UI blocked — clicks by
+// the dialog's scrim, keys by grabbing the focus.
+
+import { Dialog, Label, Spinner, Theme } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+
+export global LoadingAdapter {
+    in property <bool> active;
+    in property <string> text;
+}
+
+export component LoadingOverlay inherits Dialog {
+    title: "Loading game";
+    panel-width: Metrics.loading-dialog-width;
+
+    FocusScope {
+        init => { self.focus(); }
+        key-pressed(event) => { accept }
+        key-released(event) => { accept }
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing.md;
+        Spinner { }
+        Label {
+            text: LoadingAdapter.text;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+    }
+}

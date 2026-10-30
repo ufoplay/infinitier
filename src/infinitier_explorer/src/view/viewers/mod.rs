@@ -20,8 +20,7 @@ use crate::{AppWindow, ViewerAdapter, ViewerKind};
 pub fn refresh(ui: &AppWindow, app: &App) {
     let adapter = ui.global::<ViewerAdapter>();
     let info = app
-        .selected
-        .and_then(|id| app.game_data.get_by_id(id))
+        .selected_resource()
         .map(|resource| app.viewer.info(resource))
         .unwrap_or_default();
     adapter.set_info(strings_model(info));

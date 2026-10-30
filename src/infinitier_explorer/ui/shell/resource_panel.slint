@@ -1,5 +1,4 @@
-import { Button, ButtonKind, Divider, Label, ListView, TextRole, Theme, TreeItem } from "@themekit";
-import { ShellAdapter } from "shell_adapter.slint";
+import { Divider, Label, ListView, TextRole, Theme, TreeItem } from "@themekit";
 
 // One visible row of the resource tree: a group (one file extension) or a
 // resource inside an open group.
@@ -29,8 +28,8 @@ export global TreeAdapter {
     callback navigate(move: TreeNav);
 }
 
-// The left panel: the theme toggle, the "Resources" heading and the tree of
-// the game's resources, grouped by file extension.
+// The left panel: the "Resources" heading and the tree of the game's
+// resources, grouped by file extension.
 export component ResourcePanel inherits Rectangle {
     background: Theme.palette.surface;
     // The arrow keys move through the tree.
@@ -53,19 +52,9 @@ export component ResourcePanel inherits Rectangle {
         padding: Theme.spacing.sm;
         spacing: Theme.spacing.xs;
 
-        HorizontalLayout {
-            spacing: Theme.spacing.sm;
-            alignment: start;
-            // Names the theme it switches to.
-            Button {
-                text: ShellAdapter.dark-theme ? "Light" : "Dark";
-                kind: ButtonKind.ghost;
-                clicked => { ShellAdapter.theme-toggle(); }
-            }
-            Label {
-                text: "Resources";
-                role: TextRole.heading;
-            }
+        Label {
+            text: "Resources";
+            role: TextRole.heading;
         }
         Divider { }
 

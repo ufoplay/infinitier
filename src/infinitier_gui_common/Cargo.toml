@@ -1,0 +1,21 @@
+[package]
+name = "infinitier_gui_common"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Shared by the Infinitier GUIs: the settings file and the Settings dialog's state"
+publish = false
+
+[dependencies]
+infinitier_core = { workspace = true }
+
+log = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

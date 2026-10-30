@@ -1,0 +1,34 @@
+[settings]
+active = 1
+theme = "light"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Baldur's Gate"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Baldur's Gate - Enhanced Edition"
+save_path = "/home/ufo/Temp/Games/bg/Baldur's Gate - Enhanced Edition/wineprefix/drive_c/users/ufo/Documents/Baldur's Gate - Enhanced Edition"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Baldur's Gate 2"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Baldur's Gate 2 - Enhanced Edition"
+save_path = "/home/ufo/Temp/Games/bg/Baldur's Gate 2 - Enhanced Edition/wineprefix/drive_c/users/ufo/Documents/Baldur's Gate II - Enhanced Edition"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Icewind Dale"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Icewind Dale - Enhanced Edition"
+save_path = "/home/ufo/Temp/Games/bg/Icewind Dale - Enhanced Edition/wineprefix/drive_c/users/ufo/Documents/Icewind Dale - Enhanced Edition"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Icewind Dale 2"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Planescape Torment"
+
+[[games]]
+game_path = "/home/ufo/Temp/Games/bg/Planescape Torment - Enhanced Edition"
+save_path = "/home/ufo/Temp/Games/bg/Planescape Torment - Enhanced Edition/wineprefix/drive_c/users/ufo/Documents/Planescape Torment - Enhanced Edition"

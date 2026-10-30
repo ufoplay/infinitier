@@ -6,11 +6,17 @@
 //! `ui/`: [`viewers`] holds each viewer's state and logic,
 //! [`view`] pushes the state into the adapter globals and [`callbacks`]
 //! handles their callbacks.
+//!
+//! The explorer starts with no game loaded: it loads the settings file's
+//! active game, and the Settings dialog adds games and picks another (the
+//! settings and the dialog's state are shared with the keeper, in
+//! `infinitier_gui_common`).
 
 mod app;
 mod build_data;
 mod callbacks;
 mod fonts;
+mod loading;
 mod ticker;
 mod tree;
 mod view;
@@ -21,8 +27,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use clap::Parser;
-use infinitier_core::game::GameDataBuilder;
-use slint::{ComponentHandle, ModelRc};
+use infinitier_gui_common::{SettingsDialog, game_type_options};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::App;
 use crate::build_data::build_version;
@@ -30,29 +36,20 @@ use crate::ticker::Ticker;
 
 slint::include_modules!();
 
+/// Default settings file, resolved against the current folder.
+const SETTINGS_FILE: &str = "infinitier_explorer.toml";
+
 /// Infinitier Explorer — browse resources from Infinity Engine games.
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
-    /// Comma-separated list of game folders (bg, bg2, bgee, bg2ee, idw, idwee,
-    /// idw2, pst, pstee). At least the first folder must contain a CHITIN.KEY
-    /// file. When multiple folders are given they are merged into a single
-    /// case-insensitive view in input order — later folders override earlier
-    /// ones on path conflicts (mod-overlay style).
-    #[arg(value_delimiter = ',', required = true, num_args = 1..)]
-    game_path: Vec<PathBuf>,
+    /// Settings file holding the games listed in the Settings dialog.
+    /// Created on the first change if it doesn't exist.
+    #[arg(long, default_value = SETTINGS_FILE)]
+    config: PathBuf,
     /// Log filter, e.g. "warn", "debug", "infinitier=debug,warn".
     #[arg(long, default_value = "infinitier=debug,warn")]
     log: String,
-}
-
-/// `paths` as a comma-separated string, for messages.
-fn display_paths(paths: &[PathBuf]) -> String {
-    paths
-        .iter()
-        .map(|p| p.display().to_string())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 fn main() -> Result<(), slint::PlatformError> {
@@ -61,37 +58,27 @@ fn main() -> Result<(), slint::PlatformError> {
 
     log::info!("Infinitier Explorer {}", build_version());
 
-    let game_data = match GameDataBuilder::new(args.game_path.as_slice(), None)
-        .and_then(|builder| builder.build())
-    {
-        Ok(game_data) => game_data,
-        Err(e) => {
-            eprintln!(
-                "Failed to load key file from [{}]: {e}",
-                display_paths(&args.game_path),
-            );
-            std::process::exit(1);
-        }
-    };
-    let title = format!(
-        "Infinitier Explorer {} - {:?}",
-        build_version(),
-        game_data.game()
-    );
+    let settings = SettingsDialog::load(args.config);
+    let startup_game = settings.startup_game();
+    let app = Rc::new(RefCell::new(App::new(settings)));
 
     let ui = AppWindow::new()?;
-    ui.global::<ShellAdapter>().set_title(title.into());
     match fonts::monospace_family() {
         Some(family) => ui.global::<Fonts>().set_mono(family.into()),
         None => log::warn!("no monospace font found: code is shown in the default font"),
     }
+    let game_types: Vec<SharedString> = game_type_options().into_iter().map(Into::into).collect();
+    ui.global::<SettingsAdapter>()
+        .set_game_types(ModelRc::new(VecModel::from(game_types)));
 
-    let app = Rc::new(RefCell::new(App::new(game_data)));
     ui.global::<TreeAdapter>()
         .set_rows(ModelRc::from(app.borrow().tree.clone()));
     let ticker = Rc::new(Ticker::default());
     callbacks::wire(&ui, &app, &ticker);
-    view::refresh(&ui, &app.borrow());
+    match startup_game {
+        Some(config) => loading::start(&ui, &app, &ticker, config),
+        None => view::refresh(&ui, &app.borrow()),
+    }
 
     ui.run()
 }

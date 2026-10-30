@@ -37,4 +37,13 @@ export global Metrics {
     // The sound and movie players' progress bars.
     out property <length> sound-progress-width: 440px;
     out property <length> movie-progress-width: 420px;
+
+    // The dialogs. Settings has a fixed size (its list takes the spare
+    // room); the loading overlay fits its content's height.
+    out property <length> settings-dialog-width: 760px;
+    out property <length> settings-dialog-height: 620px;
+    out property <length> settings-type-column: 200px;
+    out property <length> settings-label-width: 130px;
+    out property <length> settings-list-min-height: 120px;
+    out property <length> loading-dialog-width: 600px;
 }

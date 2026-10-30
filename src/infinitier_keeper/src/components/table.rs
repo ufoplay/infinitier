@@ -70,7 +70,7 @@ pub fn button(icon: Image, label: &str) -> TableCell {
 }
 
 /// Rows of text cells.
-pub fn text_rows<const N: usize>(rows: Vec<[SharedString; N]>) -> Vec<Vec<TableCell>> {
+pub fn text_rows<const N: usize, S: Into<SharedString>>(rows: Vec<[S; N]>) -> Vec<Vec<TableCell>> {
     rows.into_iter()
         .map(|cells| cells.into_iter().map(text).collect())
         .collect()

@@ -3,6 +3,7 @@
 //! [`App`], repaints the UI from it, and lets the [`Ticker`] follow the
 //! viewer's playback.
 
+mod settings;
 mod shell;
 mod tree;
 mod viewers;
@@ -51,6 +52,7 @@ pub fn wire(ui: &AppWindow, app: &AppRc, ticker: &Rc<Ticker>) {
         ticker: ticker.clone(),
     };
     shell::wire(ui, &ctx);
+    settings::wire(ui, &ctx);
     tree::wire(ui, &ctx);
     viewers::wire(ui, &ctx);
 }

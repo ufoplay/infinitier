@@ -3,12 +3,12 @@
 //! (`PartyAdapter`).
 
 use infinitier_core::imported_resource::gam::{ImportedGamNpc, NpcCre};
+use infinitier_gui_common::ThemeSetting;
 use slint::{ComponentHandle, Image, SharedString};
 
 use super::rows_model;
 use crate::app::App;
 use crate::build_data::build_version;
-use crate::settings::ThemeSetting;
 use crate::state::Model;
 use crate::{AppWindow, PartyAdapter, PartyMember, SaveTabsAdapter, ShellAdapter, icons};
 

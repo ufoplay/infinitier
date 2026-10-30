@@ -1,7 +1,8 @@
 # Driving the Slint apps with the Slint MCP
 
 Both GUIs, `infinitier_keeper` and `infinitier_explorer`, have the same `mcp` feature; the
-examples use the keeper, the explorer runs the same way with its game folders as arguments.
+examples use the keeper, the explorer runs the same way with
+`--config config_test/infinitier_explorer.toml`.
 
 Slint ships an **embedded MCP server** behind the `slint/mcp` cargo feature. When enabled and
 switched on at runtime it opens an HTTP endpoint that an external tool (or an AI agent) can use to

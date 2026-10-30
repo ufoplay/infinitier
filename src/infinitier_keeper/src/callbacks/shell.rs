@@ -1,11 +1,11 @@
 //! Callbacks of the window chrome: the header's buttons (`ShellAdapter`)
 //! and the open-saves tabs (`SaveTabsAdapter`).
 
+use infinitier_gui_common::ThemeSetting;
 use slint::ComponentHandle;
 
 use super::{AppRc, on_app};
 use crate::app::{App, Session};
-use crate::settings::ThemeSetting;
 use crate::{AppWindow, SaveAdapter, SaveTabsAdapter, ShellAdapter};
 
 pub fn wire(ui: &AppWindow, app: &AppRc) {

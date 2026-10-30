@@ -17,7 +17,6 @@ mod callbacks;
 mod components;
 mod dialogs;
 mod icons;
-mod settings;
 mod state;
 mod tabs;
 mod view;
@@ -27,14 +26,16 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use clap::Parser;
+use infinitier_gui_common::{SettingsDialog, game_type_options};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::App;
 use crate::components::editable_fields::AttacksOption;
-use crate::dialogs::settings_dialog::{self, SettingsDialog};
-use crate::settings::SETTINGS_FILE;
 
 slint::include_modules!();
+
+/// Default settings file, resolved against the current folder.
+const SETTINGS_FILE: &str = "infinitier_keeper.toml";
 
 /// Infinitier Keeper — cross-engine Infinity Engine save-game editor.
 #[derive(Parser)]
@@ -64,10 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         AttacksOption::ALL.iter().map(|o| o.label.into()).collect();
     ui.global::<CardsAdapter>()
         .set_attacks_options(ModelRc::new(VecModel::from(attacks_labels)));
-    let game_types: Vec<SharedString> = settings_dialog::game_type_options()
-        .into_iter()
-        .map(Into::into)
-        .collect();
+    let game_types: Vec<SharedString> = game_type_options().into_iter().map(Into::into).collect();
     ui.global::<SettingsAdapter>()
         .set_game_types(ModelRc::new(VecModel::from(game_types)));
 

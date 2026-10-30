@@ -11,16 +11,19 @@ publish = false
 
 [dependencies]
 infinitier_core = { workspace = true }
+infinitier_gui_common = { workspace = true }
 
 bytesize = { workspace = true }
 clap = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
+rfd = { workspace = true }
 rodio = { workspace = true }
 # Software renderer + winit (see the workspace manifest), plus
 # `unstable-fontique-011`: it registers a TTF resource's font at run time
-# (the TTF viewer) and finds the system's monospace family (the code views).
-slint = { workspace = true, features = ["unstable-fontique-011"] }
+# (the TTF viewer) and finds the system's monospace family (the code views);
+# and the window handle, which parents the folder picker to the window.
+slint = { workspace = true, features = ["unstable-fontique-011", "raw-window-handle-06"] }
 
 [dev-dependencies]
 # The token lint, run on the explorer's own UI (tests/ui_tokens.rs).

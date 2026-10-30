@@ -5,6 +5,7 @@ members = [
     "src/core",
     "src/datasource",
     "src/infinitier_explorer",
+    "src/infinitier_gui_common",
     "src/infinitier_keeper",
     "src/fs",
     "src/test_utils",
@@ -35,6 +36,9 @@ infinitier_core = { path = "src/core", version = "0.0.17"  }
 infinitier_datasource = { path = "src/datasource", version = "0.0.17"  }
 infinitier_fs = { path = "src/fs", version = "0.0.17"  }
 infinitier_test_utils = { path = "src/test_utils" }
+
+# Shared by the GUIs (the keeper and the explorer)
+infinitier_gui_common = { path = "src/infinitier_gui_common" }
 
 # Resources
 infinitier_acm_resource = { path = "src/resources/acm", version = "0.0.17"  }
@@ -92,7 +96,7 @@ sha2 = "0.11"
 symphonia = { version = "0.6", default-features = false, features = ["ogg", "vorbis"] }
 tempfile = "3"
 thiserror = "2"
-# Settings file format of the keeper.
+# Settings file format of the keeper and the explorer.
 toml = "1"
 
 # This is used to decode DDS image content into the PVR files.
@@ -125,7 +129,7 @@ slint = { version = "1.18.1", default-features = false, features = [
 ] }
 slint-build = "1.18.1"
 
-# Native folder picker (the keeper's Settings "Browse…" buttons).
+# Native folder picker (the Settings dialogs' "Browse…" buttons).
 rfd = "0.17"
 
 # slint-themekit = { path = "../../../github_ufoscout/slint-themekit/crates/slint-themekit" }

@@ -17,13 +17,43 @@ The same as the keeper's (see [its README](../infinitier_keeper/README.md#build-
 ## Run
 
 ```sh
-cargo run -p infinitier_explorer -- "/path/to/Baldur's Gate 2/"
-just run_bg2          # or run_bg2ee, run_iwd2, … (just/run.just)
+cargo run -p infinitier_explorer
+just run_explorer     # with the games of config_test/infinitier_explorer.toml
 ```
 
-- `game_path` — comma-separated game folders; the first must hold `CHITIN.KEY`. Several folders
-  merge into one view, later ones overriding earlier ones (an EE game plus its Documents folder).
+- `--config <file>` — the settings file, default `infinitier_explorer.toml` in the folder the
+  explorer is started from. Created on the first change if it doesn't exist.
 - `--log` — env_logger filter, default `infinitier=debug,warn`.
+
+## Configuration
+
+The explorer keeps its games in its settings file, the same format as the keeper's
+`infinitier_keeper.toml` (see [its README](../infinitier_keeper/README.md#configuration)):
+
+```toml
+[settings]
+# Index into `games` (from 0) of the game loaded at startup.
+active = 0
+theme = "dark"
+
+[[games]]
+game_path = "/games/Baldur's Gate II - Enhanced Edition"
+save_path = "/home/me/Documents/Baldur's Gate II - Enhanced Edition"
+
+[[games]]
+game_path = "/games/Planescape Torment"
+game_type = "Pst"
+```
+
+- **`game_path`** — the install folder, the one containing `CHITIN.KEY`.
+- **`save_path`** (optional) — the folder containing the `save/` directory, when it isn't inside
+  the install (the Enhanced Editions keep it under the user's Documents). Its files are merged
+  over the install's, so its overrides and saved games show in the tree too.
+- **`game_type`** (optional) — forces the game type instead of detecting it from the install.
+
+Click **Settings** in the header to add or remove games: select one and close the dialog (or
+double-click it) to load it in place of the current one. The explorer starts with the last game
+loaded; with none configured it starts empty, pointing at Settings.
 
 ## What it does
 
@@ -39,7 +69,10 @@ just run_bg2          # or run_bg2ee, run_iwd2, … (just/run.just)
   - **BCS** scripts, decompiled to BAF with syntax highlighting (light and dark palettes);
   - **sounds** (ACM, WAV, WAVC) and **movies** (MVE, BIK, WBM), streamed with their players;
   - a message for formats without a viewer yet ("ARE Viewer"…), unknown types and errors.
-- The **Dark / Light** theme toggle, and the status line.
+- The **header bar**: the loaded game, the **Dark / Light** theme toggle (remembered in the
+  settings file) and **Settings**; at the bottom, the status line.
+- A game loads on a background thread, behind a "Loading…" overlay; a game that fails to load
+  reopens Settings with the error and leaves the loaded one in place.
 
 The BAF view isn't selectable text: a **Copy** button copies the script, and long lines scroll
 sideways instead of wrapping. The TTF sample sentence is kept from one font to the next.
@@ -52,7 +85,7 @@ Like the keeper, it can expose Slint's embedded MCP server — see
 
 ```sh
 SLINT_EMIT_DEBUG_INFO=1 SLINT_MCP_PORT=8080 SLINT_BACKEND=headless TMPDIR=/some/scratch/dir \
-cargo run -p infinitier_explorer --features mcp -- "/path/to/Baldur's Gate 2/"
+cargo run -p infinitier_explorer --features mcp -- --config config_test/infinitier_explorer.toml
 ```
 
 ## Layout
@@ -65,12 +98,14 @@ Organised like the keeper:
   TIS grid); the only `.slint` files with literal design values (`tests/ui_tokens.rs` enforces it,
   and that nothing imports `std-widgets`).
 - `ui/components/` — the explorer's own widgets on themekit components (info bar, fitted image,
-  monospace text, hex dump, player transport); `ui/shell/` — the resource panel and the status
-  line; `ui/viewers/` — one file per viewer and their host. Each part reads and calls its
-  `*Adapter` global.
+  monospace text, hex dump, player transport); `ui/shell/` — the header bar, the resource panel
+  and the status line; `ui/viewers/` — one file per viewer and their host; `ui/dialogs/` — the
+  Settings dialog and the loading overlay. Each part reads and calls its `*Adapter` global.
 - `build.rs` — compiles the `.slint` via `slint-build` and bakes in the git version.
-- `src/main.rs` — clap args and startup; `src/app.rs` — the state; `src/tree.rs` — the resource
-  tree and its Slint model; `src/viewers/` — one module per viewer (state and logic);
-  `src/view/` — fills the adapters, per UI part; `src/callbacks/` — handles their callbacks, per
-  UI part; `src/ticker.rs` — the timer that advances a playing viewer; `src/fonts.rs` — runtime
-  fonts (the system's monospace family, the TTF resources).
+- `src/main.rs` — clap args and startup; `src/app.rs` — the state; `src/loading.rs` — background
+  game loading; `src/tree.rs` — the resource tree and its Slint model; `src/viewers/` — one
+  module per viewer (state and logic); `src/view/` — fills the adapters, per UI part;
+  `src/callbacks/` — handles their callbacks, per UI part; `src/ticker.rs` — the timer that
+  advances a playing viewer; `src/fonts.rs` — runtime fonts (the system's monospace family, the
+  TTF resources). The settings file and the Settings dialog's state are shared with the keeper,
+  in the `infinitier_gui_common` crate (`src/infinitier_gui_common/`).

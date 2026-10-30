@@ -18,14 +18,13 @@ use infinitier_core::imported_resource::gam::ImportedGam;
 use infinitier_core::resource::Game;
 use infinitier_core::resource::gam::GamImporter;
 use infinitier_core::save_games::SaveGame;
+use infinitier_gui_common::{GameConfig, SettingsDialog};
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::AppWindow;
 use crate::browser::Browsers;
 use crate::dialogs::load_dialog::LoadDialog;
 use crate::dialogs::save_dialog::SaveDialog;
-use crate::dialogs::settings_dialog::SettingsDialog;
-use crate::settings::GameConfig;
 use crate::state::{LoadedGame, Model};
 use crate::view;
 

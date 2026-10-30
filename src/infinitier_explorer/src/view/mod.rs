@@ -1,9 +1,10 @@
 //! Pushing the explorer's state into the Slint adapter globals, one module
-//! per part of the UI in `ui/`: [`shell`] the window chrome, [`viewers`]
-//! the selected resource's viewer. Every push is cheap: images and the BAF
-//! rows are built once by the viewers and shared, so a refresh after any
-//! change re-sends the whole state.
+//! per part of the UI in `ui/`: [`shell`] the window chrome, [`dialogs`] the
+//! modal dialogs, [`viewers`] the selected resource's viewer. Every push is
+//! cheap: images and the BAF rows are built once by the viewers and shared,
+//! so a refresh after any change re-sends the whole state.
 
+mod dialogs;
 mod shell;
 mod viewers;
 
@@ -17,6 +18,7 @@ pub use viewers::refresh as refresh_viewer;
 /// Repaint the whole UI from `app`.
 pub fn refresh(ui: &AppWindow, app: &App) {
     shell::refresh(ui, app);
+    dialogs::refresh(ui, app);
     refresh_viewer(ui, app);
 }
 

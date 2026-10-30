@@ -151,6 +151,8 @@ The UI is split like Slint's demo apps:
   callbacks, per UI part; `src/tabs/` — one module per character tab;
   `src/components/` — the shared field logic and the tables' cells;
   `src/dialogs/` — the dialogs' state; `src/browser/` — the browsers'
-  indexes and add logic; `src/settings.rs` — the settings file.
+  indexes and add logic. The settings file and the Settings dialog's state
+  are shared with the explorer, in the `infinitier_gui_common` crate
+  (`src/infinitier_gui_common/`).
 
 `PORT_STATUS.md` and `THEMEKIT_MIGRATION.md` record how this UI was built.

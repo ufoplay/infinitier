@@ -11,14 +11,12 @@ publish = false
 
 [dependencies]
 infinitier_core = { workspace = true }
+infinitier_gui_common = { workspace = true }
 
 clap = { workspace = true }
 env_logger = { workspace = true }
 jiff = { workspace = true }
 log = { workspace = true }
-serde = { workspace = true }
-thiserror = { workspace = true }
-toml = { workspace = true }
 rfd = { workspace = true }
 # Software renderer + winit (see the workspace manifest); the window handle
 # parents the folder picker to the keeper's window.

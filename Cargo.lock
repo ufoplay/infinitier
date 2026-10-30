@@ -3665,7 +3665,9 @@ dependencies = [
  "clap",
  "env_logger",
  "infinitier_core",
+ "infinitier_gui_common",
  "log",
+ "rfd",
  "rodio",
  "slint",
  "slint-build",
@@ -3701,6 +3703,18 @@ dependencies = [
  "infinitier_test_utils",
  "log",
  "tempfile",
+]
+
+[[package]]
+name = "infinitier_gui_common"
+version = "0.0.17"
+dependencies = [
+ "infinitier_core",
+ "log",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml",
 ]
 
 [[package]]
@@ -3745,16 +3759,14 @@ dependencies = [
  "clap",
  "env_logger",
  "infinitier_core",
+ "infinitier_gui_common",
  "jiff",
  "log",
  "rfd",
- "serde",
  "slint",
  "slint-build",
  "slint-themekit",
  "tempfile",
- "thiserror 2.0.21",
- "toml",
  "vergen-gix",
 ]
 
