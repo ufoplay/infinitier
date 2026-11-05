@@ -27,6 +27,22 @@ pub use header::{
 };
 pub use importer::CreImporter;
 
+/// A creature's seven colours. Each is an index into the game's colour
+/// gradients (`RANGES12.BMP`, `MPALETTE.BMP`, `MPAL256.BMP`), whose row it
+/// selects.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Colors {
+    pub hair: u8,
+    pub skin: u8,
+    /// Major clothing.
+    pub major: u8,
+    /// Minor clothing.
+    pub minor: u8,
+    pub armor: u8,
+    pub leather: u8,
+    pub metal: u8,
+}
+
 /// 4-byte signature at offset 0 of every CRE file (note the trailing
 /// space — every IE signature is exactly 4 bytes).
 pub const CRE_SIGNATURE: &[u8; 4] = b"CRE ";
@@ -2931,6 +2947,67 @@ impl Cre {
             CreHeader::V12(h) => &h.large_portrait_bmp,
             CreHeader::V90(h) => &h.large_portrait,
             CreHeader::V22(h) => &h.large_portrait_bmp,
+        }
+    }
+
+    /// The creature's animation, an `ANIMATE.IDS` value.
+    pub fn animation_id(&self) -> u32 {
+        match &self.header {
+            CreHeader::V10(h) => h.animation_id,
+            CreHeader::V90(h) => h.animation_id_animate_ids,
+            CreHeader::V12(h) => h.animation_id_animate_ids,
+            CreHeader::V22(h) => h.animation_id_animate_ids_0x002c,
+        }
+    }
+
+    /// The seven colours the creature's art is painted in.
+    pub fn colors(&self) -> Colors {
+        macro_rules! colors {
+            ($h:expr, $( $color:ident => $field:ident ),+ $(,)?) => {
+                Colors { $( $color: $h.$field ),+ }
+            };
+        }
+        match &self.header {
+            CreHeader::V10(h) => colors!(
+                h,
+                hair => hair_colour_index,
+                skin => skin_colour_index,
+                major => major_colour_index,
+                minor => minor_colour_index,
+                armor => armor_colour_index,
+                leather => leather_colour_index,
+                metal => metal_colour_index,
+            ),
+            CreHeader::V90(h) => colors!(
+                h,
+                hair => hair_colour_index,
+                skin => skin_colour_index,
+                major => major_colour_index,
+                minor => minor_colour_index,
+                armor => armor_colour_index,
+                leather => leather_colour_index,
+                metal => metal_colour_index,
+            ),
+            CreHeader::V12(h) => colors!(
+                h,
+                hair => hair_colour_index_bg1_animations,
+                skin => skin_colour_index_bg1_animations,
+                major => major_colour_index_bg1_animations,
+                minor => minor_colour_index_bg1_animations,
+                armor => armor_colour_index_bg1_animations,
+                leather => leather_colour_index_bg1_animations,
+                metal => metal_colour_index_bg1_animations,
+            ),
+            CreHeader::V22(h) => colors!(
+                h,
+                hair => hair_colour_index_bg1_animations,
+                skin => skin_colour_index_bg1_animations,
+                major => major_colour_index_bg1_animations,
+                minor => minor_colour_index_bg1_animations,
+                armor => armor_colour_index_bg1_animations,
+                leather => leather_colour_index_bg1_animations,
+                metal => metal_colour_index_bg1_animations,
+            ),
         }
     }
 

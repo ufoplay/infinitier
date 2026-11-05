@@ -5,6 +5,13 @@ use infinitier_core::imported_resource::ImportedResource;
 use infinitier_core::resource::ResourceType;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
+/// Wrap `width × height` RGBA bytes in a Slint `Image`.
+pub fn rgba_image(width: u32, height: u32, rgba: &[u8]) -> Image {
+    let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+    buffer.make_mut_bytes().copy_from_slice(rgba);
+    Image::from_rgba8(buffer)
+}
+
 /// Decode the first frame of the BAM `resref` (an inventory or spellbook
 /// icon) into a Slint `Image`. `None` when it's unset, missing or empty.
 pub fn bam_icon(game_data: &GameData, resref: &str) -> Option<Image> {
@@ -22,10 +29,7 @@ pub fn bam_icon(game_data: &GameData, resref: &str) -> Option<Image> {
     if w == 0 || h == 0 {
         return None;
     }
-    let raw = frame.into_raw();
-    let mut pb = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
-    pb.make_mut_bytes().copy_from_slice(&raw);
-    Some(Image::from_rgba8(pb))
+    Some(rgba_image(w, h, &frame.into_raw()))
 }
 
 /// Decode the BMP `resref` (a portrait) into a Slint `Image`. `None` when
@@ -41,7 +45,5 @@ pub fn bmp_image(game_data: &GameData, resref: &str) -> Option<Image> {
     if w == 0 || h == 0 {
         return None;
     }
-    let mut pb = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
-    pb.make_mut_bytes().copy_from_slice(img.image.as_raw());
-    Some(Image::from_rgba8(pb))
+    Some(rgba_image(w, h, img.image.as_raw()))
 }

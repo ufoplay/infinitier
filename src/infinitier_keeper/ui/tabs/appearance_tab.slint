@@ -1,8 +1,9 @@
-// The Appearance tab: the animation's name and the colour swatches. In a
-// ScrollArea like the card tabs: the fixed-width swatch rows would
-// otherwise cap the panel's (and so the window's) width.
+// The Appearance tab: the animation's name, the colour swatches and, to their
+// right, the character's paperdoll and portrait. In a ScrollArea like the card
+// tabs: the fixed-width swatch rows would otherwise cap the panel's (and so
+// the window's) width.
 
-import { Card, Label, ScrollArea, TextRole, Theme } from "@themekit";
+import { Card, Checkbox, Label, ScrollArea, TextRole, Theme } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 // One labelled colour slot and its pre-rendered gradient swatch.
@@ -14,6 +15,14 @@ export struct ColorSwatch {
 export global AppearanceAdapter {
     in property <string> animation-name;
     in property <[ColorSwatch]> swatches;
+    // Empty when this character's animation has no paperdoll.
+    in property <image> doll;
+    // Whether the doll has equipment to show or hide, and whether it shows it.
+    in property <bool> doll-has-equipment;
+    in property <bool> show-equipment;
+    // Empty when the game has no portrait for this character.
+    in property <image> portrait;
+    callback toggle-equipment();
 }
 
 export component AppearanceTab inherits ScrollArea {
@@ -26,17 +35,71 @@ export component AppearanceTab inherits ScrollArea {
             font-weight: Theme.typography.strong-weight;
         }
     }
-    Card {
-        content-spacing: Theme.spacing.sm;
-        Label { text: "Colors"; role: TextRole.heading; }
-        for swatch in AppearanceAdapter.swatches: HorizontalLayout {
-            spacing: Theme.spacing.md;
-            Label { text: swatch.label; width: Metrics.appearance-label-width; }
-            Image {
-                source: swatch.image;
-                width: Metrics.swatch-size;
-                height: Metrics.swatch-size;
-                image-rendering: pixelated;
+    HorizontalLayout {
+        alignment: start;
+        spacing: Theme.spacing.md;
+        // The cards share a height: the shorter one's spare room goes below
+        // its content, not into its heading.
+        Card {
+            VerticalLayout {
+                alignment: start;
+                spacing: Theme.spacing.sm;
+                Label { text: "Colors"; role: TextRole.heading; }
+                for swatch in AppearanceAdapter.swatches: HorizontalLayout {
+                    spacing: Theme.spacing.md;
+                    Label { text: swatch.label; width: Metrics.appearance-label-width; }
+                    Image {
+                        source: swatch.image;
+                        width: Metrics.swatch-size;
+                        height: Metrics.swatch-size;
+                        image-rendering: pixelated;
+                    }
+                }
+            }
+        }
+        if AppearanceAdapter.doll.width > 0: Card {
+            VerticalLayout {
+                alignment: start;
+                spacing: Theme.spacing.sm;
+                Label { text: "Character"; role: TextRole.heading; }
+                // A fixed box: the cards don't move from one character to the
+                // next, whose images differ in size. Whole multiples of the
+                // art's pixels keep it crisp; the largest that fits fills the
+                // box in every game, whose art ranges from small to large.
+                Rectangle {
+                    width: Metrics.appearance-doll-width;
+                    height: Metrics.appearance-doll-height;
+                    Image {
+                        property <float> scale: max(1, floor(min(
+                            parent.width / (self.source.width * Metrics.appearance-doll-pixel),
+                            parent.height / (self.source.height * Metrics.appearance-doll-pixel))));
+                        source: AppearanceAdapter.doll;
+                        width: self.source.width * self.scale * Metrics.appearance-doll-pixel;
+                        height: self.source.height * self.scale * Metrics.appearance-doll-pixel;
+                        image-rendering: pixelated;
+                    }
+                }
+                if AppearanceAdapter.doll-has-equipment: Checkbox {
+                    text: "Show equipment";
+                    checked: AppearanceAdapter.show-equipment;
+                    toggled => {
+                        AppearanceAdapter.toggle-equipment();
+                    }
+                }
+            }
+        }
+        if AppearanceAdapter.portrait.width > 0: Card {
+            VerticalLayout {
+                alignment: start;
+                spacing: Theme.spacing.sm;
+                Label { text: "Portrait"; role: TextRole.heading; }
+                // Portraits' sizes and shapes vary by game (PST's are
+                // landscape), so the height follows the image.
+                Image {
+                    source: AppearanceAdapter.portrait;
+                    width: Metrics.appearance-portrait-width;
+                    height: self.width * self.source.height / self.source.width;
+                }
             }
         }
     }

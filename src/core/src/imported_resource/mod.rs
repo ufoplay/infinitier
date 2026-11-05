@@ -14,6 +14,7 @@ use cre::ImportedCre;
 use gam::ImportedGam;
 use image::ImportedImage;
 use movie::MovieSource;
+use plt::ImportedPlt;
 use sound::SoundDecoder;
 use spl::ImportedSpl;
 use tis::ImportedTis;
@@ -24,6 +25,7 @@ pub mod cre;
 pub mod gam;
 pub mod image;
 pub mod movie;
+pub mod plt;
 pub mod sound;
 pub mod spl;
 pub mod tis;
@@ -55,7 +57,8 @@ pub enum ImportedResource {
     Menu,
     Mus,
     Mve(MovieSource),
-    Plt,
+    /// A paperdoll, see [`ImportedPlt`].
+    Plt(ImportedPlt),
     Pro,
     Sav(Sav),
     /// ACM and WAV/WAVC resources both decode to PCM via the unified

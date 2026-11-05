@@ -55,6 +55,9 @@ pub mod key {
 pub mod mos {
     pub use infinitier_mos_resource::*;
 }
+pub mod plt {
+    pub use infinitier_plt_resource::*;
+}
 pub mod png {
     pub use infinitier_png_resource::*;
 }

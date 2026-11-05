@@ -1,95 +1,32 @@
 //! Appearance tab (read-only).
 //!
-//! Shows the creature's
-//! animation resolved to a name (ANIMATE.IDS, title-cased) and the seven
-//! colour gradients (hair/skin/clothing×2/armour/leather/metal) as beveled
-//! swatch images built from the palette BMP (see [`palette`]), wrapped in
-//! Slint `Image`s via `SharedPixelBuffer`. Display-only.
+//! Shows the creature's animation resolved to a name (ANIMATE.IDS,
+//! title-cased), the seven colours (hair/skin/clothing×2/armour/leather/metal)
+//! as beveled swatches (see [`swatch`]), the paperdoll painted in them, with
+//! its equipment or without ([`ImportedPlt`]), and the portrait.
 
-mod palette;
+mod swatch;
 
 use infinitier_core::game::GameData;
-use infinitier_core::resource::cre::{Cre, CreHeader};
-use slint::{Image, Rgba8Pixel, SharedPixelBuffer, SharedString};
+use infinitier_core::imported_resource::plt::{Equipment, Gradients, ImportedPlt};
+use infinitier_core::resource::cre::{Colors, Cre};
+use slint::{Image, SharedString};
 
-use crate::ColorSwatch;
 use crate::state::Model;
-use palette::{Palette, SWATCH_PX};
+use crate::{ColorSwatch, icons};
 
-struct ColorSlot {
-    label: &'static str,
-    index: u8,
-}
-
-struct AppearanceData {
-    animation_id: u32,
-    colors: Vec<ColorSlot>,
-}
-
-fn appearance_data(cre: &Cre) -> Option<AppearanceData> {
-    macro_rules! colour_slots {
-        ($h:expr, $( $label:literal => $field:ident ),+ $(,)?) => {
-            vec![ $( ColorSlot { label: $label, index: $h.$field } ),+ ]
-        };
-    }
-    let (animation_id, colors) = match &cre.header {
-        CreHeader::V10(h) => (
-            h.animation_id,
-            colour_slots!(
-                h,
-                "Hair" => hair_colour_index,
-                "Skin" => skin_colour_index,
-                "Clothing Major" => major_colour_index,
-                "Clothing Minor" => minor_colour_index,
-                "Armor" => armor_colour_index,
-                "Leather" => leather_colour_index,
-                "Metal" => metal_colour_index,
-            ),
-        ),
-        CreHeader::V90(h) => (
-            h.animation_id_animate_ids,
-            colour_slots!(
-                h,
-                "Hair" => hair_colour_index,
-                "Skin" => skin_colour_index,
-                "Clothing Major" => major_colour_index,
-                "Clothing Minor" => minor_colour_index,
-                "Armor" => armor_colour_index,
-                "Leather" => leather_colour_index,
-                "Metal" => metal_colour_index,
-            ),
-        ),
-        CreHeader::V12(h) => (
-            h.animation_id_animate_ids,
-            colour_slots!(
-                h,
-                "Hair" => hair_colour_index_bg1_animations,
-                "Skin" => skin_colour_index_bg1_animations,
-                "Clothing Major" => major_colour_index_bg1_animations,
-                "Clothing Minor" => minor_colour_index_bg1_animations,
-                "Armor" => armor_colour_index_bg1_animations,
-                "Leather" => leather_colour_index_bg1_animations,
-                "Metal" => metal_colour_index_bg1_animations,
-            ),
-        ),
-        CreHeader::V22(h) => (
-            h.animation_id_animate_ids_0x002c,
-            colour_slots!(
-                h,
-                "Hair" => hair_colour_index_bg1_animations,
-                "Skin" => skin_colour_index_bg1_animations,
-                "Clothing Major" => major_colour_index_bg1_animations,
-                "Clothing Minor" => minor_colour_index_bg1_animations,
-                "Armor" => armor_colour_index_bg1_animations,
-                "Leather" => leather_colour_index_bg1_animations,
-                "Metal" => metal_colour_index_bg1_animations,
-            ),
-        ),
-    };
-    Some(AppearanceData {
-        animation_id,
-        colors,
-    })
+/// The tab's content.
+pub struct Page {
+    pub name: SharedString,
+    pub swatches: Vec<ColorSwatch>,
+    /// Empty when the creature's animation has no paperdoll.
+    pub doll: Image,
+    /// Whether the doll has equipment to show or hide.
+    pub doll_has_equipment: bool,
+    /// Whether the doll shows it.
+    pub equipment: Equipment,
+    /// Empty when the game has no portrait for the creature.
+    pub portrait: Image,
 }
 
 /// Resolve an animation id to a prettified ANIMATE.IDS name, falling back to
@@ -118,41 +55,71 @@ fn title_case(symbol: &str) -> String {
         .join(" ")
 }
 
-/// Wrap `SWATCH_PX²` RGBA bytes in a Slint `Image`.
-fn rgba_image(rgba: &[u8]) -> Image {
-    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(SWATCH_PX as u32, SWATCH_PX as u32);
-    buf.make_mut_bytes().copy_from_slice(rgba);
-    Image::from_rgba8(buf)
-}
-
-fn placeholder_image() -> Image {
-    rgba_image(&vec![0u8; SWATCH_PX * SWATCH_PX * 4])
-}
-
-/// Build the Appearance-tab data for the selected creature: the animation
-/// name and the seven colour swatches.
-pub fn build(model: &Model) -> (SharedString, Vec<ColorSwatch>) {
-    let Some(cre) = model.selected_cre() else {
-        return (SharedString::new(), Vec::new());
-    };
-    let Some(data) = appearance_data(cre) else {
-        return (
-            "Appearance is unavailable for this creature's format.".into(),
-            Vec::new(),
-        );
-    };
-    let name = resolve_name(&model.game_data, data.animation_id);
-    let palette = Palette::load(&model.game_data);
-    let swatches = data
-        .colors
-        .iter()
-        .map(|slot| ColorSwatch {
-            label: slot.label.into(),
-            image: match &palette {
-                Some(p) => rgba_image(&p.swatch_rgba(slot.index)),
-                None => placeholder_image(),
-            },
+/// The creature's large (then small) portrait, empty when the game has
+/// neither. A BMP, except for the BAM that PST and PSTEE keep in the large
+/// slot.
+fn portrait(game_data: &GameData, cre: &Cre) -> Image {
+    [cre.large_portrait_name(), cre.small_portrait_name()]
+        .into_iter()
+        .filter(|name| !name.is_empty())
+        .find_map(|name| {
+            icons::bmp_image(game_data, name).or_else(|| icons::bam_icon(game_data, name))
         })
-        .collect();
-    (name.into(), swatches)
+        .unwrap_or_default()
+}
+
+/// One swatch per colour, labelled.
+fn swatches(game_data: &GameData, colors: Colors) -> Vec<ColorSwatch> {
+    let gradients = Gradients::load_coarse(game_data);
+    let Colors {
+        hair,
+        skin,
+        major,
+        minor,
+        armor,
+        leather,
+        metal,
+    } = colors;
+    [
+        ("Hair", hair),
+        ("Skin", skin),
+        ("Clothing Major", major),
+        ("Clothing Minor", minor),
+        ("Armor", armor),
+        ("Leather", leather),
+        ("Metal", metal),
+    ]
+    .into_iter()
+    .map(|(label, index)| ColorSwatch {
+        label: label.into(),
+        image: swatch::image(gradients.as_ref(), index),
+    })
+    .collect()
+}
+
+/// Build the Appearance-tab data for the selected creature.
+pub fn build(model: &Model) -> Page {
+    let game_data = &model.game_data;
+    let Some(cre) = model.selected_imported_cre() else {
+        return Page {
+            name: SharedString::new(),
+            swatches: Vec::new(),
+            doll: Image::default(),
+            doll_has_equipment: false,
+            equipment: model.doll_equipment,
+            portrait: Image::default(),
+        };
+    };
+    let doll = ImportedPlt::for_creature(game_data, cre);
+    let picture = doll.as_ref().map(|doll| doll.render(model.doll_equipment));
+    Page {
+        name: resolve_name(game_data, cre.animation_id()).into(),
+        swatches: swatches(game_data, cre.colors()),
+        doll: picture
+            .map(|picture| icons::rgba_image(picture.width(), picture.height(), picture.as_raw()))
+            .unwrap_or_default(),
+        doll_has_equipment: doll.as_ref().is_some_and(ImportedPlt::has_equipment),
+        equipment: model.doll_equipment,
+        portrait: portrait(game_data, cre),
+    }
 }

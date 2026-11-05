@@ -108,6 +108,23 @@ impl ImportedCre {
             })
             .collect()
     }
+
+    /// The item in on-disk slot `slot`, `None` when it's empty.
+    pub(crate) fn item_in_slot(&self, slot: usize) -> Option<&Item> {
+        let (slots, items) = slots_and_items(&self.cre);
+        let index = usize::try_from(*slots.get(slot)?).ok()?;
+        items.get(index)
+    }
+
+    /// The selected-weapon entry, which follows the item slots (and precedes
+    /// the selected ability).
+    pub(crate) fn selected_weapon(&self) -> Option<i16> {
+        let (slots, _) = slots_and_items(&self.cre);
+        match slots.as_slice() {
+            [.., weapon, _ability] => Some(*weapon),
+            [] | [_] => None,
+        }
+    }
 }
 
 impl From<Cre> for ImportedCre {

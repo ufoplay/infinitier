@@ -166,7 +166,7 @@ pub fn open(game_data: &GameData, id: ResourceId, fonts: &mut FontRegistry) -> V
         ImportedResource::Maze => Viewer::message("MAZE Viewer"),
         ImportedResource::Menu => Viewer::message("MENU Viewer"),
         ImportedResource::Mus => Viewer::message("MUS Viewer"),
-        ImportedResource::Plt => Viewer::message("PLT Viewer"),
+        ImportedResource::Plt(plt) => Viewer::Image(ImageViewer::from_plt(&plt)),
         ImportedResource::Pro => Viewer::message("PRO Viewer"),
         ImportedResource::Spl(_) => Viewer::message("SPL Viewer"),
         ImportedResource::Sql => Viewer::message("SQL Viewer"),

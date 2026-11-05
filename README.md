@@ -76,7 +76,7 @@ just check_code  # rustfmt + clippy
 | MOS | Background mosaic image | Done | Done |
 | MUS | Music playlist | | |
 | MVE | Interplay MVE video | Done | Done |
-| PLT | Paperdoll layered bitmap | | |
+| PLT | Paperdoll layered bitmap | Done | Not needed |
 | PNG | PNG image | Done | Not needed |
 | PRO | Projectile | | |
 | PVRZ | PVR compressed texture | Done | Done |

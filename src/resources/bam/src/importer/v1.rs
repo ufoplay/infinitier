@@ -209,7 +209,7 @@ pub struct BamV1Cycle {
     pub frame_indices: Vec<usize>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BamV1Frame {
     pub width: u32,
     pub height: u32,

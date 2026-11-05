@@ -170,6 +170,16 @@ impl ItmHeader {
             ItmHeader::V2(h) => h.item_type,
         }
     }
+    /// The two-letter code naming the item's art on a creature (`S1` a long
+    /// sword, `D2` a shield, `H0` a helmet, `4A` plate armour); blanks or
+    /// NULs when it has none. Same offset in every version.
+    pub fn item_animation(&self) -> [u8; 2] {
+        match self {
+            ItmHeader::V1(h) => h.item_animation,
+            ItmHeader::V1_1(h) => h.item_animation,
+            ItmHeader::V2(h) => h.item_animation,
+        }
+    }
     /// BAM resref for the inventory icon (same offset in every version).
     pub fn inventory_icon(&self) -> &str {
         match self {

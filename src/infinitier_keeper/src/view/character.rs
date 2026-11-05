@@ -2,6 +2,7 @@
 //! active tab's page, each page's adapter filled by its tab module.
 
 use infinitier_core::imported_resource::gam::NpcCre;
+use infinitier_core::imported_resource::plt::Equipment;
 use slint::{ComponentHandle, SharedString};
 
 use super::{index_or_none, rows_model, sync_nested, sync_rows, sync_table};
@@ -16,7 +17,7 @@ use crate::tabs::{
     levels, memorization, miscellaneous, proficiencies, resistances, spells, variables,
 };
 use crate::{
-    AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent, ColorSwatch,
+    AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent,
     EditTableAdapter, FieldCard, GridAdapter, Icons, InventoryAdapter, Metrics, SpellsAdapter,
     TableAdapter,
 };
@@ -53,10 +54,7 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
         CharacterTab::Proficiencies => show_edit_table(ui, proficiencies::build(model)),
         CharacterTab::Resistances => show_cards(ui, model, resistances::build(model)),
         CharacterTab::Miscellaneous => show_cards(ui, model, miscellaneous::build(model)),
-        CharacterTab::Appearance => {
-            let (name, swatches) = appearance::build(model);
-            show_appearance(ui, name, swatches);
-        }
+        CharacterTab::Appearance => show_appearance(ui, appearance::build(model)),
         CharacterTab::Inventory => {
             show_inventory(ui, inventory::build(model), model.inventory_selected)
         }
@@ -221,11 +219,23 @@ fn show_grid(
     show(ui, CharacterContent::Grid);
 }
 
-/// The animation name and the colour swatches.
-fn show_appearance(ui: &AppWindow, name: SharedString, swatches: Vec<ColorSwatch>) {
+/// The animation name, the colour swatches, the paperdoll and the portrait.
+fn show_appearance(ui: &AppWindow, page: appearance::Page) {
+    let appearance::Page {
+        name,
+        swatches,
+        doll,
+        doll_has_equipment,
+        equipment,
+        portrait,
+    } = page;
     let adapter = ui.global::<AppearanceAdapter>();
     adapter.set_animation_name(name);
     adapter.set_swatches(rows_model(swatches));
+    adapter.set_doll(doll);
+    adapter.set_doll_has_equipment(doll_has_equipment);
+    adapter.set_show_equipment(equipment == Equipment::Shown);
+    adapter.set_portrait(portrait);
     show(ui, CharacterContent::Appearance);
 }
 

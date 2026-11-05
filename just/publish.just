@@ -39,6 +39,7 @@ publish gap="10":
         infinitier_key_resource
         infinitier_mos_resource
         infinitier_mve_decoder
+        infinitier_plt_resource
         infinitier_png_resource
         infinitier_sav_resource
         infinitier_spl_resource

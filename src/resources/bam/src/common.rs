@@ -1,5 +1,5 @@
 /// Represents an RGB color with an alpha channel
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rgb {
     pub r: u8,
     pub g: u8,

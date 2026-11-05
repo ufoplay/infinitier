@@ -54,6 +54,7 @@ infinitier_ini_resource = { path = "src/resources/ini", version = "0.0.17"  }
 infinitier_itm_resource = { path = "src/resources/itm", version = "0.0.17"  }
 infinitier_key_resource = { path = "src/resources/key", version = "0.0.17"  }
 infinitier_mos_resource = { path = "src/resources/mos", version = "0.0.17"  }
+infinitier_plt_resource = { path = "src/resources/plt", version = "0.0.17"  }
 infinitier_png_resource = { path = "src/resources/png", version = "0.0.17"  }
 infinitier_pvrz_resource = { path = "src/resources/pvrz", version = "0.0.17"  }
 infinitier_sav_resource = { path = "src/resources/sav", version = "0.0.17"  }

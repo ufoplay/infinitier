@@ -1,6 +1,7 @@
 //! Callbacks of the party list, the character tab strip and the tab pages'
 //! editable content.
 
+use infinitier_core::imported_resource::plt::Equipment;
 use slint::ComponentHandle;
 
 use super::{AppRc, on_model};
@@ -12,16 +13,32 @@ use crate::tabs::{
 };
 use crate::view;
 use crate::{
-    AppWindow, CardsAdapter, CharacterAdapter, EditTableAdapter, InventoryAdapter, PartyAdapter,
-    SpellsAdapter,
+    AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, EditTableAdapter,
+    InventoryAdapter, PartyAdapter, SpellsAdapter,
 };
 
 pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_party(ui, app);
     wire_cards(ui, app);
     wire_edit_table(ui, app);
+    wire_appearance(ui, app);
     wire_inventory(ui, app);
     wire_spells(ui, app);
+}
+
+/// Appearance: show or hide the paperdoll's equipment.
+fn wire_appearance(ui: &AppWindow, app: &AppRc) {
+    let (app, weak) = (app.clone(), ui.as_weak());
+    ui.global::<AppearanceAdapter>()
+        .on_toggle_equipment(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| {
+                m.doll_equipment = match m.doll_equipment {
+                    Equipment::Shown => Equipment::Hidden,
+                    Equipment::Hidden => Equipment::Shown,
+                };
+            });
+        });
 }
 
 /// Select a party member / a character tab → re-read the tab's content.

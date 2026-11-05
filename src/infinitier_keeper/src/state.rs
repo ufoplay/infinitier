@@ -11,6 +11,7 @@ use infinitier_core::engine_caps::EngineCaps;
 use infinitier_core::game::{GameData, GameDataBuilder};
 use infinitier_core::imported_resource::cre::ImportedCre;
 use infinitier_core::imported_resource::gam::{ImportedGam, ImportedGamNpc, NpcCre};
+use infinitier_core::imported_resource::plt::Equipment;
 use infinitier_core::resource::Game;
 use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, SpellType};
 use infinitier_core::save_games::SaveGame;
@@ -86,6 +87,9 @@ pub struct Model {
     pub parked: Vec<Option<SaveState>>,
     /// Index of the active save in the tab strip (`parked[active_tab]` is None).
     pub active_tab: usize,
+    /// Appearance tab: whether the paperdoll shows the equipment. A way of
+    /// looking, kept from one character and save to the next.
+    pub doll_equipment: Equipment,
 }
 
 /// The per-save state parked when a save isn't the active tab (mirrors the
@@ -116,6 +120,7 @@ impl Model {
             spell_refs: Vec::new(),
             parked: vec![None],
             active_tab: 0,
+            doll_equipment: Equipment::default(),
         }
     }
 

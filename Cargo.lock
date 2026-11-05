@@ -3618,6 +3618,7 @@ dependencies = [
  "infinitier_key_resource",
  "infinitier_mos_resource",
  "infinitier_mve_decoder",
+ "infinitier_plt_resource",
  "infinitier_png_resource",
  "infinitier_pvrz_resource",
  "infinitier_sav_resource",
@@ -3824,6 +3825,15 @@ dependencies = [
  "log",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "infinitier_plt_resource"
+version = "0.0.17"
+dependencies = [
+ "infinitier_datasource",
+ "infinitier_test_utils",
+ "log",
 ]
 
 [[package]]

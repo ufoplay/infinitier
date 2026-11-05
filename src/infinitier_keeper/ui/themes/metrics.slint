@@ -39,9 +39,15 @@ export global Metrics {
     // input / value column.
     out property <length> field-label-min-width: 40px;
     out property <length> field-input-width: 96px;
-    // Appearance: the labels' column and the colour swatches.
+    // Appearance: the labels' column, the colour swatches, the paperdoll's box
+    // and the size of one of the art's pixels in it (scaled up to fit), and the
+    // portrait's width (its height follows the image).
     out property <length> appearance-label-width: 130px;
     out property <length> swatch-size: 24px;
+    out property <length> appearance-doll-width: 256px;
+    out property <length> appearance-doll-height: 320px;
+    out property <length> appearance-doll-pixel: 1px;
+    out property <length> appearance-portrait-width: 169px;
     // Local / Global Variables: the names' column.
     out property <length> variable-name-width: 300px;
     // Memorization / Proficiencies: the table's widest, and its value

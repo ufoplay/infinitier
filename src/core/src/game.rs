@@ -335,7 +335,7 @@ impl GameResource {
 
         use crate::imported_resource::{
             ImportedResource, bam::ImportedBam, bcs::ImportedBcs, image::ImportedImage,
-            tis::ImportedTis,
+            plt::ImportedPlt, tis::ImportedTis,
         };
         use infinitier_bam_resource::BamImporter;
         use infinitier_bcs_resource::BcsImporter;
@@ -424,7 +424,9 @@ impl GameResource {
                 ds.clone(),
                 &self.name,
             ))),
-            ResourceType::Plt => Ok(ImportedResource::Plt),
+            ResourceType::Plt => {
+                ImportedPlt::load(&self.name, ds, game_data).map(ImportedResource::Plt)
+            }
             ResourceType::Png => PngImporter { name: &self.name }
                 .import(ds)
                 .map(ImportedImage::from_png)
