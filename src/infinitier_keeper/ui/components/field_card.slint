@@ -8,9 +8,10 @@ import { Metrics } from "../themes/metrics.slint";
 // One editable / read-only row inside a card. `id` is the index into the
 // active tab's field table, routed back on commit; `-1` marks a derived
 // read-only row. `is-attacks` swaps the text input for the Attacks
-// dropdown; `is-check` renders a checkbox (label + `checked`); `numeric`
-// edits the value with a number field (drag or type) from `minimum` to
-// `maximum`, committing each change.
+// dropdown; `is-select` for a dropdown of `options`, `option-index` the
+// current one, which commits the index picked; `is-check` renders a
+// checkbox (label + `checked`); `numeric` edits the value with a number
+// field (drag or type) from `minimum` to `maximum`, committing each change.
 export struct FieldRow {
     id: int,
     label: string,
@@ -18,6 +19,9 @@ export struct FieldRow {
     bonus: string,
     editable: bool,
     is-attacks: bool,
+    is-select: bool,
+    options: [string],
+    option-index: int,
     is-check: bool,
     checked: bool,
     numeric: bool,
@@ -93,6 +97,14 @@ export component FieldCardView inherits Card {
                 selected(index) => { root.commit-attacks(index); }
             }
 
+            if row.is-select: Select {
+                width: Metrics.field-select-width;
+                size: ControlSize.small;
+                options: row.options;
+                current-index: row.option-index;
+                selected(index) => { root.commit-field(row.id, index); }
+            }
+
             if row.editable && row.numeric && !row.is-attacks: NumberField {
                 width: Metrics.field-input-width;
                 size: ControlSize.small;
@@ -128,7 +140,7 @@ export component FieldCardView inherits Card {
                 }
             }
 
-            if !row.editable && !row.is-attacks: Label {
+            if !row.editable && !row.is-attacks && !row.is-select: Label {
                 width: Metrics.field-input-width;
                 text: row.value;
                 font-weight: Theme.typography.strong-weight;

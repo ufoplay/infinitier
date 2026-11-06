@@ -9,8 +9,8 @@ use super::{AppRc, on_model};
 use crate::components::edit_table::EditTable;
 use crate::state::{self, Model};
 use crate::tabs::{
-    CharacterTab, abilities, appearance, feats, inventory, levels, memorization, proficiencies,
-    resistances, spells,
+    CharacterTab, abilities, appearance, characteristics, feats, inventory, levels, memorization,
+    proficiencies, resistances, spells,
 };
 use crate::view;
 use crate::{
@@ -113,9 +113,9 @@ fn wire_cards(ui: &AppWindow, app: &AppRc) {
                     CharacterTab::Resistances => resistances::commit(m, id, value),
                     CharacterTab::Levels => levels::commit(m, id, value),
                     CharacterTab::Feats => feats::commit(m, id, value),
+                    CharacterTab::Characteristics => characteristics::commit(m, id, value),
                     // Read-only cards, or not a card tab.
-                    CharacterTab::Characteristics
-                    | CharacterTab::Miscellaneous
+                    CharacterTab::Miscellaneous
                     | CharacterTab::Memorization
                     | CharacterTab::Proficiencies
                     | CharacterTab::Appearance

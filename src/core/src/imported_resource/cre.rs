@@ -78,9 +78,7 @@ impl ImportedCre {
     /// on the `IDS` column (the `RACE.IDS` value the byte holds). `None` when
     /// there's no enemy, `HATERACE.2DA` is unavailable, or no row matches.
     pub fn racial_enemy_strref(&self, game_data: &GameData) -> Option<u32> {
-        let value = self.cre.racial_enemy()?;
-        let haterace = game_data.import_2da_by_name("haterace").ok()?;
-        haterace_strref_from_2da(&haterace, value)
+        racial_enemy_strref(game_data, self.cre.racial_enemy()?)
     }
 
     /// The creature's inventory as one [`InventoryRow`] per displayed
@@ -164,6 +162,54 @@ impl AsRef<Cre> for ImportedCre {
 /// `high_word` is `0x4000 | row_index` for a kitted creature; the row index
 /// (after masking the marker) is the KITLIST row's numeric label. Row 0
 /// ("RESERVE") is the no-kit placeholder and carries no name.
+/// One of the game's kits, from `KITLIST.2DA`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Kit {
+    /// The CRE kit dword that selects it (see [`ImportedCre::kit_strref`]).
+    pub kit: u32,
+    /// Its `KITLIST.2DA` row name, e.g. `BERSERKER`.
+    pub symbol: String,
+    /// Its display name's strref (`MIXED`, else `LOWER`), when it has one.
+    pub name_strref: Option<u32>,
+}
+
+/// The game's kits, in `KITLIST.2DA` row order. Row `i` is selected by the
+/// kit dword `(0x4000 | i) << 16`: row 0 (`RESERVE`) by `0x40000000`, the
+/// "true class" of a character without a kit. Empty when the game has no
+/// `KITLIST.2DA`. (`KIT.IDS` can't list them: only the EEs number kits
+/// there, BG2's holds usability flags.)
+pub fn kits(game_data: &GameData) -> Vec<Kit> {
+    let Ok(kitlist) = game_data.import_2da_by_name("kitlist") else {
+        return Vec::new();
+    };
+    let symbol_col = two_da_col(&kitlist, "ROWNAME");
+    let mut rows: Vec<(u32, &Vec<String>)> = kitlist
+        .rows
+        .iter()
+        .filter_map(|(label, cells)| Some((label.trim().parse().ok()?, cells)))
+        .filter(|&(index, _)| index <= 0x3FFF)
+        .collect();
+    rows.sort_by_key(|&(index, _)| index);
+    rows.into_iter()
+        .map(|(index, cells)| Kit {
+            kit: (0x4000 | index) << 16,
+            symbol: symbol_col
+                .and_then(|col| cells.get(col))
+                .cloned()
+                .unwrap_or_default(),
+            name_strref: kit_strref_from_2da(&kitlist, 0x4000 | index),
+        })
+        .collect()
+}
+
+/// The `HATERACE.2DA` `STRREF` naming race `race` (a `RACE.IDS` value) as a
+/// racial enemy. `None` when `HATERACE.2DA` is unavailable or has no row
+/// for it.
+pub fn racial_enemy_strref(game_data: &GameData, race: u8) -> Option<u32> {
+    let haterace = game_data.import_2da_by_name("haterace").ok()?;
+    haterace_strref_from_2da(&haterace, race)
+}
+
 fn kit_strref_from_2da(kitlist: &TwoDA, high_word: u32) -> Option<u32> {
     // Must carry the "has kit" marker and nothing above it (a kitted dword is
     // `0x40XX0000`, so its high word is `0x40XX`); other forms aren't a kit
@@ -447,7 +493,46 @@ fn pstee_label(i: usize) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use infinitier_common::ResourceType;
+    use infinitier_datasource::DataSource;
+    use infinitier_fs::CaseInsensitiveFS;
+
     use super::*;
+    use crate::game::{DataOrigin, GameResource};
+
+    #[test]
+    fn kits_are_the_kitlist_rows_in_order() {
+        let kitlist = "2DA V1.0\n*\n   ROWNAME     LOWER   MIXED   HELP\n\
+                       0  RESERVE     *       *       *\n\
+                       2  WIZARDSLAYER 25180  25152   25202\n\
+                       1  BERSERKER   25179   25151   25201\n";
+        let game_data = GameData::new(
+            vec![GameResource {
+                game_type: Game::Bg2,
+                name: "kitlist".to_owned(),
+                r#type: ResourceType::TwoDA,
+                file_size: None,
+                datasource: Some(DataSource::new(kitlist.as_bytes().to_vec())),
+                data_origin: DataOrigin::Missing,
+                imported: None,
+            }],
+            Game::Bg2,
+            CaseInsensitiveFS::empty(),
+        );
+        let kits = kits(&game_data);
+        let summary: Vec<_> = kits
+            .iter()
+            .map(|kit| (kit.kit, kit.symbol.as_str(), kit.name_strref))
+            .collect();
+        assert_eq!(
+            summary,
+            [
+                (0x4000_0000, "RESERVE", None),
+                (0x4001_0000, "BERSERKER", Some(25151)),
+                (0x4002_0000, "WIZARDSLAYER", Some(25152)),
+            ]
+        );
+    }
 
     /// Build a `TwoDA` from header labels and `(row_label, cells)` rows,
     /// mirroring the on-disk layout (cells align 1:1 with `headers`).

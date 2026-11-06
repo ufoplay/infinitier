@@ -12,14 +12,8 @@ pub fn editable_row(id: i32, label: &str, value: &str) -> FieldRow {
         id,
         label: label.into(),
         value: value.into(),
-        bonus: SharedString::new(),
         editable: true,
-        is_attacks: false,
-        is_check: false,
-        checked: false,
-        numeric: false,
-        minimum: 0,
-        maximum: 0,
+        ..FieldRow::default()
     }
 }
 
@@ -30,14 +24,24 @@ pub fn number_row(id: i32, label: &str, value: i64, minimum: i32, maximum: i32) 
         id,
         label: label.into(),
         value: value.to_string().into(),
-        bonus: SharedString::new(),
         editable: true,
-        is_attacks: false,
-        is_check: false,
-        checked: false,
         numeric: true,
         minimum,
         maximum,
+        ..FieldRow::default()
+    }
+}
+
+/// A dropdown row: picking one of `options` commits `id` with its index.
+/// `index` is the current option's.
+pub fn select_row(id: i32, label: &str, options: Vec<SharedString>, index: i32) -> FieldRow {
+    FieldRow {
+        id,
+        label: label.into(),
+        is_select: true,
+        options: ModelRc::new(VecModel::from(options)),
+        option_index: index,
+        ..FieldRow::default()
     }
 }
 
@@ -47,32 +51,13 @@ pub fn readonly_row(label: &str, value: &str) -> FieldRow {
         id: -1,
         label: label.into(),
         value: value.into(),
-        bonus: SharedString::new(),
-        editable: false,
-        is_attacks: false,
-        is_check: false,
-        checked: false,
-        numeric: false,
-        minimum: 0,
-        maximum: 0,
+        ..FieldRow::default()
     }
 }
 
 /// A read-only (disabled) checkbox row.
 pub fn check_row(label: &str, checked: bool) -> FieldRow {
-    FieldRow {
-        id: -1,
-        label: label.into(),
-        value: SharedString::new(),
-        bonus: SharedString::new(),
-        editable: false,
-        is_attacks: false,
-        is_check: true,
-        checked,
-        numeric: false,
-        minimum: 0,
-        maximum: 0,
-    }
+    editable_check_row(-1, label, checked)
 }
 
 /// An editable checkbox row. Toggling commits `commit-field(id, "1"|"0")`.
@@ -80,15 +65,9 @@ pub fn editable_check_row(id: i32, label: &str, checked: bool) -> FieldRow {
     FieldRow {
         id,
         label: label.into(),
-        value: SharedString::new(),
-        bonus: SharedString::new(),
-        editable: false,
-        is_attacks: false,
         is_check: true,
         checked,
-        numeric: false,
-        minimum: 0,
-        maximum: 0,
+        ..FieldRow::default()
     }
 }
 

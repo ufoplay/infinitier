@@ -256,12 +256,9 @@ fn row(
         bonus: bonus.unwrap_or_default().into(),
         editable: field != EditableField::Attacks,
         is_attacks: field == EditableField::Attacks,
-        is_check: false,
-        checked: false,
         // Typed: an ability value is entered, not dragged.
         numeric: false,
-        minimum: 0,
-        maximum: 0,
+        ..FieldRow::default()
     }
 }
 

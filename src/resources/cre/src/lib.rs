@@ -410,6 +410,23 @@ impl Cre {
         found
     }
 
+    /// Make the creature dual-classed out of `original`, or (`None`) not
+    /// dual-classed: sets that class's `MC_WAS_*` creature-flags bit and
+    /// clears the others. A no-op on V2.2, which reuses those bits.
+    pub fn set_dual_class_original_class(&mut self, original: Option<OriginalClass>) {
+        if matches!(self.header, CreHeader::V22(_)) {
+            return;
+        }
+        let was_any = OriginalClass::ALL
+            .iter()
+            .fold(0, |bits, class| bits | class.bit());
+        let mut flags = self.raw_creature_flags() & !was_any;
+        if let Some(class) = original {
+            flags |= class.bit();
+        }
+        self.set_creature_flags(CreatureFlags::from_bits_retain(flags));
+    }
+
     /// Whether the creature is a fallen paladin or fallen ranger (has
     /// lost its class abilities), per the dedicated creature-flags bits.
     pub fn is_fallen(&self) -> bool {
@@ -834,7 +851,7 @@ impl OriginalClass {
     }
 
     /// All variants, in `MC_WAS_*` bit order.
-    const ALL: [OriginalClass; 6] = [
+    pub const ALL: [OriginalClass; 6] = [
         OriginalClass::Fighter,
         OriginalClass::Mage,
         OriginalClass::Cleric,
@@ -2578,6 +2595,16 @@ impl Cre {
         }
     }
 
+    /// Set the raw kit dword (see [`Self::kit`]). A no-op on V2.2.
+    pub fn set_kit(&mut self, value: u32) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.kit_information_none_0x00000000_kit_barbarian = value,
+            CreHeader::V12(h) => h.kit_information_none_0x00000000_abjurer_0x00400000 = value,
+            CreHeader::V90(h) => h.kit_information_none_abjurer_0x00400000_conjurer = value,
+            CreHeader::V22(_) => {}
+        }
+    }
+
     /// The ranger "racial enemy" byte (a `RACE.IDS` value). `None` for V2.2.
     pub fn racial_enemy(&self) -> Option<u8> {
         match &self.header {
@@ -2585,6 +2612,134 @@ impl Cre {
             CreHeader::V12(h) => Some(h.racial_enemy_race_ids),
             CreHeader::V90(h) => Some(h.racial_enemy_race_ids),
             CreHeader::V22(_) => None,
+        }
+    }
+
+    /// Set the racial enemy (see [`Self::racial_enemy`]). A no-op on V2.2.
+    pub fn set_racial_enemy(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.racial_enemy_race_ids = value,
+            CreHeader::V12(h) => h.racial_enemy_race_ids = value,
+            CreHeader::V90(h) => h.racial_enemy_race_ids = value,
+            CreHeader::V22(_) => {}
+        }
+    }
+
+    /// Gender, a `GENDER.IDS` value: the field the engines play by. (V1.0,
+    /// V1.2 and V9.0 also carry a "sex" byte at `0x0237`, which GemRB
+    /// ignores and this leaves alone.)
+    pub fn gender(&self) -> u8 {
+        match &self.header {
+            CreHeader::V10(h) => h.gender_gender_ids_dictates_the_casting,
+            CreHeader::V12(h) => h.gender_gender_ids,
+            CreHeader::V90(h) => h.gender_gender_ids,
+            CreHeader::V22(h) => h.sex_gender_ids,
+        }
+    }
+    pub fn set_gender(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.gender_gender_ids_dictates_the_casting = value,
+            CreHeader::V12(h) => h.gender_gender_ids = value,
+            CreHeader::V90(h) => h.gender_gender_ids = value,
+            CreHeader::V22(h) => h.sex_gender_ids = value,
+        }
+    }
+
+    /// Set the race (see [`Self::race`]).
+    pub fn set_race(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.race_race_ids = value,
+            CreHeader::V12(h) => h.race_race_ids = value,
+            CreHeader::V90(h) => h.race_race_ids = value,
+            CreHeader::V22(h) => h.race_race_ids = value,
+        }
+    }
+
+    /// IWD2's subrace, numbered within the race (`SUBRACE.IDS` packs the
+    /// two as `race << 16 | subrace`). `None` on other versions.
+    pub fn subrace(&self) -> Option<u8> {
+        match &self.header {
+            CreHeader::V22(h) => Some(h.subrace_subrace_ids),
+            _ => None,
+        }
+    }
+    /// Set the subrace (see [`Self::subrace`]). A no-op before V2.2.
+    pub fn set_subrace(&mut self, value: u8) {
+        if let CreHeader::V22(h) = &mut self.header {
+            h.subrace_subrace_ids = value;
+        }
+    }
+
+    /// Alignment: an `ALIGNMEN.IDS` value (IWD2: `ALIGNS.2DA`'s).
+    pub fn alignment(&self) -> u8 {
+        match &self.header {
+            CreHeader::V10(h) => h.alignment_alignmen_ids,
+            CreHeader::V12(h) => h.alignment_alignmen_ids,
+            CreHeader::V90(h) => h.alignment_alignmen_ids,
+            CreHeader::V22(h) => h.alignment_alignmen_ids,
+        }
+    }
+    pub fn set_alignment(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.alignment_alignmen_ids = value,
+            CreHeader::V12(h) => h.alignment_alignmen_ids = value,
+            CreHeader::V90(h) => h.alignment_alignmen_ids = value,
+            CreHeader::V22(h) => h.alignment_alignmen_ids = value,
+        }
+    }
+
+    /// Class, a `CLASS.IDS` value. IWD2 doesn't keep it up to date: its
+    /// classes are the per-class levels.
+    pub fn class(&self) -> u8 {
+        match &self.header {
+            CreHeader::V10(h) => h.class_class_ids,
+            CreHeader::V12(h) => h.class_class_ids,
+            CreHeader::V90(h) => h.class_class_ids,
+            CreHeader::V22(h) => h.class_class_ids_not_updated_when,
+        }
+    }
+    pub fn set_class(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.class_class_ids = value,
+            CreHeader::V12(h) => h.class_class_ids = value,
+            CreHeader::V90(h) => h.class_class_ids = value,
+            CreHeader::V22(h) => h.class_class_ids_not_updated_when = value,
+        }
+    }
+
+    /// Enemy/ally, an `EA.IDS` value.
+    pub fn enemy_ally(&self) -> u8 {
+        match &self.header {
+            CreHeader::V10(h) => h.enemy_ally_ea_ids,
+            CreHeader::V12(h) => h.enemy_ally_ea_ids,
+            CreHeader::V90(h) => h.enemy_ally_ea_ids,
+            CreHeader::V22(h) => h.enemy_ally_ea_ids,
+        }
+    }
+    pub fn set_enemy_ally(&mut self, value: u8) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.enemy_ally_ea_ids = value,
+            CreHeader::V12(h) => h.enemy_ally_ea_ids = value,
+            CreHeader::V90(h) => h.enemy_ally_ea_ids = value,
+            CreHeader::V22(h) => h.enemy_ally_ea_ids = value,
+        }
+    }
+
+    /// The permanent status flags, `STATE.IDS` bits.
+    pub fn state_flags(&self) -> u32 {
+        match &self.header {
+            CreHeader::V10(h) => h.permanent_status_flags_state_ids,
+            CreHeader::V12(h) => h.permanent_status_flags_state_ids,
+            CreHeader::V90(h) => h.permanent_status_flags_state_ids,
+            CreHeader::V22(h) => h.permanent_status_flags_state_ids,
+        }
+    }
+    pub fn set_state_flags(&mut self, value: u32) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.permanent_status_flags_state_ids = value,
+            CreHeader::V12(h) => h.permanent_status_flags_state_ids = value,
+            CreHeader::V90(h) => h.permanent_status_flags_state_ids = value,
+            CreHeader::V22(h) => h.permanent_status_flags_state_ids = value,
         }
     }
 
@@ -3606,6 +3761,68 @@ mod tests {
             assert_eq!(rt.large_portrait_name(), "MAN2L", "{fixture}");
             assert_eq!(rt.long_name_strref(), name, "{fixture}");
         }
+    }
+
+    #[test]
+    fn identity_sets_and_round_trips_in_every_version() {
+        for fixture in [
+            "v1_0/IMOEN_DUAL.cre",
+            "v1_2/THIEF3.cre",
+            "v9_0/BARBWAR2.cre",
+            "v2_2/52SERSA.cre",
+        ] {
+            let mut cre = crate::test_support::import_fixture(fixture);
+            let iwd2 = matches!(cre.header, CreHeader::V22(_));
+            let flags = cre.creature_flags();
+            cre.set_gender(2);
+            cre.set_race(3);
+            cre.set_subrace(1);
+            cre.set_alignment(0x13);
+            cre.set_class(6);
+            cre.set_enemy_ally(4);
+            cre.set_state_flags(0x8000_0800);
+            cre.set_kit(0x4002_0000);
+            cre.set_racial_enemy(7);
+            cre.set_dual_class_original_class(Some(OriginalClass::Thief));
+
+            let rt = round_trip(&cre);
+            assert_eq!(rt.gender(), 2, "{fixture}");
+            assert_eq!(rt.race(), 3, "{fixture}");
+            assert_eq!(rt.alignment(), 0x13, "{fixture}");
+            assert_eq!(rt.class(), 6, "{fixture}");
+            assert_eq!(rt.enemy_ally(), 4, "{fixture}");
+            assert_eq!(rt.state_flags(), 0x8000_0800, "{fixture}");
+            if iwd2 {
+                // No kit, racial enemy or dual-classing: those bits mean
+                // something else, and stay as they were.
+                assert_eq!(rt.subrace(), Some(1), "{fixture}");
+                assert_eq!(rt.kit(), None, "{fixture}");
+                assert_eq!(rt.racial_enemy(), None, "{fixture}");
+                assert_eq!(rt.creature_flags(), flags, "{fixture}");
+            } else {
+                assert_eq!(rt.subrace(), None, "{fixture}");
+                assert_eq!(rt.kit(), Some(0x4002_0000), "{fixture}");
+                assert_eq!(rt.racial_enemy(), Some(7), "{fixture}");
+                assert_eq!(
+                    rt.dual_class_original_class(),
+                    Some(OriginalClass::Thief),
+                    "{fixture}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_new_original_class_replaces_the_old_one_and_none_clears_it() {
+        let mut cre = crate::test_support::import_fixture("v1_0/IMOEN_DUAL.cre");
+        let others = cre.creature_flags().bits() & !0x01F8;
+        cre.set_dual_class_original_class(Some(OriginalClass::Fighter));
+        cre.set_dual_class_original_class(Some(OriginalClass::Mage));
+        assert_eq!(cre.dual_class_original_class(), Some(OriginalClass::Mage));
+        cre.set_dual_class_original_class(None);
+        assert_eq!(cre.dual_class_original_class(), None);
+        // The other flags are untouched.
+        assert_eq!(cre.creature_flags().bits(), others);
     }
 
     #[test]
