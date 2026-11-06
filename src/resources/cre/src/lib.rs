@@ -46,6 +46,55 @@ pub struct Colors {
     pub metal: u8,
 }
 
+/// Matches a creature header and hands `$apply!(header, colour => field, …)`
+/// the fields its version stores each of the seven colours in.
+macro_rules! colour_fields {
+    ($header:expr, $apply:ident) => {
+        match $header {
+            CreHeader::V10(h) => $apply!(
+                h,
+                hair => hair_colour_index,
+                skin => skin_colour_index,
+                major => major_colour_index,
+                minor => minor_colour_index,
+                armor => armor_colour_index,
+                leather => leather_colour_index,
+                metal => metal_colour_index
+            ),
+            CreHeader::V90(h) => $apply!(
+                h,
+                hair => hair_colour_index,
+                skin => skin_colour_index,
+                major => major_colour_index,
+                minor => minor_colour_index,
+                armor => armor_colour_index,
+                leather => leather_colour_index,
+                metal => metal_colour_index
+            ),
+            CreHeader::V12(h) => $apply!(
+                h,
+                hair => hair_colour_index_bg1_animations,
+                skin => skin_colour_index_bg1_animations,
+                major => major_colour_index_bg1_animations,
+                minor => minor_colour_index_bg1_animations,
+                armor => armor_colour_index_bg1_animations,
+                leather => leather_colour_index_bg1_animations,
+                metal => metal_colour_index_bg1_animations
+            ),
+            CreHeader::V22(h) => $apply!(
+                h,
+                hair => hair_colour_index_bg1_animations,
+                skin => skin_colour_index_bg1_animations,
+                major => major_colour_index_bg1_animations,
+                minor => minor_colour_index_bg1_animations,
+                armor => armor_colour_index_bg1_animations,
+                leather => leather_colour_index_bg1_animations,
+                metal => metal_colour_index_bg1_animations
+            ),
+        }
+    };
+}
+
 /// 4-byte signature at offset 0 of every CRE file (note the trailing
 /// space — every IE signature is exactly 4 bytes).
 pub const CRE_SIGNATURE: &[u8; 4] = b"CRE ";
@@ -2984,56 +3033,31 @@ impl Cre {
             CreHeader::V22(h) => h.animation_id_animate_ids_0x002c,
         }
     }
+    pub fn set_animation_id(&mut self, value: u32) {
+        match &mut self.header {
+            CreHeader::V10(h) => h.animation_id = value,
+            CreHeader::V90(h) => h.animation_id_animate_ids = value,
+            CreHeader::V12(h) => h.animation_id_animate_ids = value,
+            CreHeader::V22(h) => h.animation_id_animate_ids_0x002c = value,
+        }
+    }
 
     /// The seven colours the creature's art is painted in.
     pub fn colors(&self) -> Colors {
-        macro_rules! colors {
-            ($h:expr, $( $color:ident => $field:ident ),+ $(,)?) => {
+        macro_rules! read {
+            ($h:expr, $( $color:ident => $field:ident ),+) => {
                 Colors { $( $color: $h.$field ),+ }
             };
         }
-        match &self.header {
-            CreHeader::V10(h) => colors!(
-                h,
-                hair => hair_colour_index,
-                skin => skin_colour_index,
-                major => major_colour_index,
-                minor => minor_colour_index,
-                armor => armor_colour_index,
-                leather => leather_colour_index,
-                metal => metal_colour_index,
-            ),
-            CreHeader::V90(h) => colors!(
-                h,
-                hair => hair_colour_index,
-                skin => skin_colour_index,
-                major => major_colour_index,
-                minor => minor_colour_index,
-                armor => armor_colour_index,
-                leather => leather_colour_index,
-                metal => metal_colour_index,
-            ),
-            CreHeader::V12(h) => colors!(
-                h,
-                hair => hair_colour_index_bg1_animations,
-                skin => skin_colour_index_bg1_animations,
-                major => major_colour_index_bg1_animations,
-                minor => minor_colour_index_bg1_animations,
-                armor => armor_colour_index_bg1_animations,
-                leather => leather_colour_index_bg1_animations,
-                metal => metal_colour_index_bg1_animations,
-            ),
-            CreHeader::V22(h) => colors!(
-                h,
-                hair => hair_colour_index_bg1_animations,
-                skin => skin_colour_index_bg1_animations,
-                major => major_colour_index_bg1_animations,
-                minor => minor_colour_index_bg1_animations,
-                armor => armor_colour_index_bg1_animations,
-                leather => leather_colour_index_bg1_animations,
-                metal => metal_colour_index_bg1_animations,
-            ),
+        colour_fields!(&self.header, read)
+    }
+    pub fn set_colors(&mut self, colors: Colors) {
+        macro_rules! write {
+            ($h:expr, $( $color:ident => $field:ident ),+) => {{
+                $( $h.$field = colors.$color; )+
+            }};
         }
+        colour_fields!(&mut self.header, write)
     }
 
     /// Morale (AD&D only; `None` on IWD2, which uses saving throws).
@@ -3522,6 +3546,37 @@ mod tests {
         assert_eq!(iwd2.save_vs_death(), None);
         iwd2.set_save_vs_death(9);
         assert_eq!(iwd2.save_vs_death(), None);
+    }
+
+    /// Every version stores the appearance in its own header fields: what
+    /// is set there survives export / import, and touches nothing else.
+    #[test]
+    fn appearance_sets_and_round_trips_in_every_version() {
+        let colors = Colors {
+            hair: 1,
+            skin: 2,
+            major: 3,
+            minor: 4,
+            armor: 5,
+            leather: 6,
+            metal: 7,
+        };
+        for fixture in [
+            "v1_0/IMOEN_DUAL.cre",
+            "v1_2/THIEF3.cre",
+            "v9_0/BARBWAR2.cre",
+            "v2_2/52SERSA.cre",
+        ] {
+            let mut cre = crate::test_support::import_fixture(fixture);
+            let name = cre.long_name_strref();
+            cre.set_colors(colors);
+            cre.set_animation_id(0x6012);
+
+            let rt = round_trip(&cre);
+            assert_eq!(rt.colors(), colors, "{fixture}");
+            assert_eq!(rt.animation_id(), 0x6012, "{fixture}");
+            assert_eq!(rt.long_name_strref(), name, "{fixture}");
+        }
     }
 
     #[test]

@@ -39,11 +39,15 @@ export global Metrics {
     // input / value column.
     out property <length> field-label-min-width: 40px;
     out property <length> field-input-width: 96px;
-    // Appearance: the labels' column, the colour swatches, the paperdoll's box
-    // and the size of one of the art's pixels in it (scaled up to fit), and the
-    // portrait's width (its height follows the image).
+    // Appearance: the labels' column, the animation dropdown, the colour
+    // swatches and the picker's grid of them, the paperdoll's box and the size
+    // of one of the art's pixels in it (scaled up to fit), and the portrait's
+    // width (its height follows the image).
     out property <length> appearance-label-width: 130px;
+    out property <length> appearance-animation-width: 300px;
     out property <length> swatch-size: 24px;
+    out property <length> palette-swatch-size: 20px;
+    out property <int> palette-columns: 16;
     out property <length> appearance-doll-width: 256px;
     out property <length> appearance-doll-height: 320px;
     out property <length> appearance-doll-pixel: 1px;

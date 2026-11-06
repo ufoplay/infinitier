@@ -8,8 +8,8 @@ use super::{AppRc, on_model};
 use crate::components::edit_table::EditTable;
 use crate::state::{self, Model};
 use crate::tabs::{
-    CharacterTab, abilities, feats, inventory, levels, memorization, proficiencies, resistances,
-    spells,
+    CharacterTab, abilities, appearance, feats, inventory, levels, memorization, proficiencies,
+    resistances, spells,
 };
 use crate::view;
 use crate::{
@@ -26,11 +26,27 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_spells(ui, app);
 }
 
-/// Appearance: show or hide the paperdoll's equipment.
+/// Appearance: pick the animation or a colour, show or hide the
+/// paperdoll's equipment.
 fn wire_appearance(ui: &AppWindow, app: &AppRc) {
-    let (app, weak) = (app.clone(), ui.as_weak());
-    ui.global::<AppearanceAdapter>()
-        .on_toggle_equipment(move || {
+    let adapter = ui.global::<AppearanceAdapter>();
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        adapter.on_select_animation(move |index| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| appearance::select_animation(m, index));
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        adapter.on_pick_color(move |slot, gradient| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| appearance::pick_color(m, slot, gradient));
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        adapter.on_toggle_equipment(move || {
             let Some(ui) = weak.upgrade() else { return };
             on_model(&ui, &app, |m| {
                 m.doll_equipment = match m.doll_equipment {
@@ -39,6 +55,7 @@ fn wire_appearance(ui: &AppWindow, app: &AppRc) {
                 };
             });
         });
+    }
 }
 
 /// Select a party member / a character tab → re-read the tab's content.

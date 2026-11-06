@@ -54,6 +54,16 @@ impl Gradients {
         Some(Self { ramps })
     }
 
+    /// How many gradients there are: colours `0..len()` have one, except
+    /// for any empty row.
+    pub fn len(&self) -> usize {
+        self.ramps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ramps.is_empty()
+    }
+
     /// The gradient colour `index` selects. `None` for an index the game has
     /// no gradient for.
     pub fn ramp(&self, index: u8) -> Option<&[[u8; 3]]> {

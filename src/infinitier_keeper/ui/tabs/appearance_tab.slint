@@ -1,20 +1,30 @@
-// The Appearance tab: the animation's name, the colour swatches and, to their
-// right, the character's paperdoll and portrait. In a ScrollArea like the card
-// tabs: the fixed-width swatch rows would otherwise cap the panel's (and so
-// the window's) width.
+// The Appearance tab: the animation, picked by name; the colour swatches, each
+// opening a grid of the game's gradients to pick from; and, to their right,
+// the character's paperdoll and portrait. In a ScrollArea like the card tabs:
+// the fixed-width swatch rows would otherwise cap the panel's (and so the
+// window's) width.
 
-import { Card, Checkbox, Label, ScrollArea, TextRole, Theme } from "@themekit";
+import {
+    Card, Checkbox, Label, Popover, ScrollArea, Select, StateLayer, TextRole, Theme, Tone,
+} from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
-// One labelled colour slot and its pre-rendered gradient swatch.
+// One labelled colour slot: the gradient it's set to, pre-rendered as a
+// swatch.
 export struct ColorSwatch {
     label: string,
+    index: int,
     image: image,
 }
 
 export global AppearanceAdapter {
-    in property <string> animation-name;
+    // The animations to pick from, by name, and the creature's.
+    in property <[string]> animations;
+    in property <int> animation-index;
     in property <[ColorSwatch]> swatches;
+    // Every gradient a colour can pick, as a swatch, in colour order; empty
+    // when the game has none, and then the colours can't be picked.
+    in property <[image]> palette;
     // Empty when this character's animation has no paperdoll.
     in property <image> doll;
     // Whether the doll has equipment to show or hide, and whether it shows it.
@@ -22,17 +32,139 @@ export global AppearanceAdapter {
     in property <bool> show-equipment;
     // Empty when the game has no portrait for this character.
     in property <image> portrait;
+    callback select-animation(index: int);
+    // Set the colour of swatch row `slot` to gradient `gradient`.
+    callback pick-color(slot: int, gradient: int);
     callback toggle-equipment();
+}
+
+// A grid of every gradient to pick colour `swatch` from, the current one
+// ringed. Picking one reports `picked(gradient)`.
+component Palette inherits Rectangle {
+    in property <ColorSwatch> swatch;
+    callback picked(gradient: int);
+
+    property <length> gap: Theme.spacing.xs;
+    property <length> pitch: Metrics.palette-swatch-size + self.gap;
+    // The gradient under the pointer, -1 for none.
+    property <int> hovered: -1;
+
+    VerticalLayout {
+        spacing: Theme.spacing.sm;
+        Label { text: root.swatch.label; role: TextRole.heading; }
+        Label {
+            text: "Colour " + (root.hovered >= 0 ? root.hovered : root.swatch.index);
+            role: TextRole.caption;
+            tone: Tone.muted;
+        }
+        Rectangle {
+            width: Metrics.palette-columns * root.pitch - root.gap;
+            height: ceil(AppearanceAdapter.palette.length / Metrics.palette-columns) * root.pitch - root.gap;
+            for shade[gradient] in AppearanceAdapter.palette: Rectangle {
+                x: mod(gradient, Metrics.palette-columns) * root.pitch;
+                y: floor(gradient / Metrics.palette-columns) * root.pitch;
+                width: Metrics.palette-swatch-size;
+                height: Metrics.palette-swatch-size;
+                accessible-role: button;
+                accessible-label: "Colour " + gradient;
+                accessible-action-default => { root.picked(gradient); }
+
+                Image {
+                    source: shade;
+                    width: parent.width;
+                    height: parent.height;
+                    image-rendering: pixelated;
+                }
+                StateLayer {
+                    hovered: cell.has-hover;
+                    pressed: cell.pressed;
+                }
+                // Around the swatch, in the gap, so it hides none of it.
+                if gradient == root.swatch.index: Rectangle {
+                    x: -Theme.sizes.focus-width;
+                    y: -Theme.sizes.focus-width;
+                    width: parent.width + Theme.sizes.focus-width * 2;
+                    height: parent.height + Theme.sizes.focus-width * 2;
+                    border-width: Theme.sizes.focus-width;
+                    border-color: Theme.palette.primary;
+                }
+                cell := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.picked(gradient); }
+                    changed has-hover => {
+                        if self.has-hover {
+                            root.hovered = gradient;
+                        } else if root.hovered == gradient {
+                            root.hovered = -1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Colour `swatch`, a button that opens the grid to pick another from (a
+// popup can't sit in a repeated row itself). Picking one reports
+// `picked(gradient)`.
+component SwatchButton inherits Rectangle {
+    in property <ColorSwatch> swatch;
+    callback picked(gradient: int);
+
+    property <bool> enabled: AppearanceAdapter.palette.length > 0;
+
+    width: Metrics.swatch-size;
+    height: Metrics.swatch-size;
+    accessible-role: button;
+    accessible-label: root.swatch.label;
+    accessible-value: "Colour " + root.swatch.index;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            picker.show();
+        }
+    }
+
+    Image {
+        source: root.swatch.image;
+        width: parent.width;
+        height: parent.height;
+        image-rendering: pixelated;
+    }
+    StateLayer {
+        hovered: touch.has-hover;
+        pressed: touch.pressed;
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { picker.show(); }
+    }
+    // To the swatch's right, its top level with it.
+    picker := Popover {
+        x: root.width + Theme.spacing.sm;
+        y: 0;
+        Palette {
+            swatch: root.swatch;
+            picked(gradient) => {
+                picker.close();
+                root.picked(gradient);
+            }
+        }
+    }
 }
 
 export component AppearanceTab inherits ScrollArea {
     content-spacing: Theme.spacing.sm;
     HorizontalLayout {
+        alignment: start;
         spacing: Theme.spacing.md;
         Label { text: "Appearance"; width: Metrics.appearance-label-width; }
-        Label {
-            text: AppearanceAdapter.animation-name;
-            font-weight: Theme.typography.strong-weight;
+        Select {
+            width: Metrics.appearance-animation-width;
+            options: AppearanceAdapter.animations;
+            current-index: AppearanceAdapter.animation-index;
+            selected(index) => { AppearanceAdapter.select-animation(index); }
         }
     }
     HorizontalLayout {
@@ -45,14 +177,12 @@ export component AppearanceTab inherits ScrollArea {
                 alignment: start;
                 spacing: Theme.spacing.sm;
                 Label { text: "Colors"; role: TextRole.heading; }
-                for swatch in AppearanceAdapter.swatches: HorizontalLayout {
+                for swatch[slot] in AppearanceAdapter.swatches: HorizontalLayout {
                     spacing: Theme.spacing.md;
                     Label { text: swatch.label; width: Metrics.appearance-label-width; }
-                    Image {
-                        source: swatch.image;
-                        width: Metrics.swatch-size;
-                        height: Metrics.swatch-size;
-                        image-rendering: pixelated;
+                    SwatchButton {
+                        swatch: swatch;
+                        picked(gradient) => { AppearanceAdapter.pick-color(slot, gradient); }
                     }
                 }
             }

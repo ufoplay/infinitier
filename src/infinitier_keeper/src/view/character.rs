@@ -5,7 +5,7 @@ use infinitier_core::imported_resource::gam::NpcCre;
 use infinitier_core::imported_resource::plt::Equipment;
 use slint::{ComponentHandle, SharedString};
 
-use super::{index_or_none, rows_model, sync_nested, sync_rows, sync_table};
+use super::{index_or_none, rows_changed, rows_model, sync_nested, sync_rows, sync_table};
 use crate::components::edit_table::{EditCell, EditTable};
 use crate::components::editable_fields::AttacksOption;
 use crate::components::table::{self, Overflow};
@@ -222,16 +222,26 @@ fn show_grid(
 /// The animation name, the colour swatches, the paperdoll and the portrait.
 fn show_appearance(ui: &AppWindow, page: appearance::Page) {
     let appearance::Page {
-        name,
+        animations,
+        animation_index,
         swatches,
+        palette,
         doll,
         doll_has_equipment,
         equipment,
         portrait,
     } = page;
     let adapter = ui.global::<AppearanceAdapter>();
-    adapter.set_animation_name(name);
+    // Long lists, the same from one character to the next: kept unless
+    // they change (see [`rows_changed`]).
+    if rows_changed(&adapter.get_animations(), &animations) {
+        adapter.set_animations(rows_model(animations));
+    }
+    adapter.set_animation_index(animation_index);
     adapter.set_swatches(rows_model(swatches));
+    if rows_changed(&adapter.get_palette(), &palette) {
+        adapter.set_palette(rows_model(palette));
+    }
     adapter.set_doll(doll);
     adapter.set_doll_has_equipment(doll_has_equipment);
     adapter.set_show_equipment(equipment == Equipment::Shown);
