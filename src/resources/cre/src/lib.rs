@@ -1586,7 +1586,186 @@ fn wr_resref_n(b: &mut [u8], o: usize, n: usize, s: &str) {
     b[o..o + len].copy_from_slice(&encoded[..len]);
 }
 
+/// Opcode of the effect that changes the movement rate.
+const MOVEMENT_RATE_OPCODE: u32 = 126;
+
+/// Whether a V2 effect is the creature's movement bonus: a permanent
+/// (timing 9) opcode-126 effect that adds to the rate (parameter 2 = 0).
+fn is_movement_bonus(effect: &EffectV2) -> bool {
+    matches!(effect, EffectV2::Effect(e)
+        if e.opcode == MOVEMENT_RATE_OPCODE
+            && e.timing_mode == TimingMode::PermanentAfterDeath
+            && e.param2 == 0)
+}
+
+/// [`is_movement_bonus`] for a classic V1 effect.
+fn is_movement_bonus_v1(effect: &EffectV1) -> bool {
+    matches!(effect, EffectV1::Effect(e)
+        if u32::from(e.opcode) == MOVEMENT_RATE_OPCODE
+            && e.timing_mode == TimingMode::PermanentAfterDeath
+            && e.param2 == 0)
+}
+
+/// A new V2 movement-bonus effect of `value`: on the creature itself,
+/// permanent, and not dispelled; no source, as the game leaves an effect
+/// nothing cast.
+fn movement_bonus_effect(value: u32) -> Effect {
+    const NOWHERE: u32 = u32::MAX;
+    Effect {
+        header: [0; 8],
+        opcode: MOVEMENT_RATE_OPCODE,
+        target: 2,
+        power: 0,
+        param1: value,
+        param2: 0,
+        timing_mode: TimingMode::PermanentAfterDeath,
+        duration: 0,
+        probability1: 100,
+        probability2: 0,
+        resource: String::new(),
+        dice_thrown: 0,
+        dice_sides: 0,
+        save_type: SaveType::empty(),
+        save_bonus: 0,
+        special: 0,
+        primary_type: 0,
+        unknown_48: 0,
+        parent_lowest_level: 0,
+        parent_highest_level: 0,
+        resistance: Resistance::BypassResistance,
+        param3: 0,
+        param4: 0,
+        param5: 0,
+        time_applied: 0,
+        resource2: String::new(),
+        resource3: String::new(),
+        caster_x: NOWHERE,
+        caster_y: NOWHERE,
+        target_x: NOWHERE,
+        target_y: NOWHERE,
+        parent_resource_type: 0,
+        parent_resource: String::new(),
+        parent_resource_flags: 0,
+        projectile: 0,
+        parent_resource_slot: NOWHERE,
+        variable: String::new(),
+        caster_level: 0,
+        first_apply: 0,
+        secondary_type: 0,
+        unknown_cc: 0,
+        trailing: [0; 56],
+    }
+}
+
+/// [`movement_bonus_effect`] as a classic V1 effect.
+fn movement_bonus_effect_v1(value: u32) -> EffectV1Body {
+    EffectV1Body {
+        // MOVEMENT_RATE_OPCODE: a word in V1.
+        opcode: 126,
+        target: 2,
+        power: 0,
+        param1: value,
+        param2: 0,
+        timing_mode: TimingMode::PermanentAfterDeath,
+        resistance: Resistance::BypassResistance,
+        duration: 0,
+        probability1: 100,
+        probability2: 0,
+        resource: String::new(),
+        dice_thrown: 0,
+        dice_sides: 0,
+        save_type: SaveType::empty(),
+        save_bonus: 0,
+        special: 0,
+    }
+}
+
+/// Keep the first effect `is_bonus` matches in `list` at `value`: update
+/// its parameter 1, insert `new(value)` first when there's none, or remove
+/// it for 0.
+fn set_bonus_effect<T>(
+    list: &mut Vec<T>,
+    value: u32,
+    is_bonus: impl Fn(&T) -> bool,
+    param1: impl Fn(&mut T) -> Option<&mut u32>,
+    new: impl Fn(u32) -> T,
+) {
+    match (list.iter().position(is_bonus), value) {
+        (Some(index), 0) => {
+            list.remove(index);
+        }
+        (Some(index), _) => {
+            if let Some(param1) = param1(&mut list[index]) {
+                *param1 = value;
+            }
+        }
+        (None, 0) => {}
+        (None, _) => list.insert(0, new(value)),
+    }
+}
+
 impl Cre {
+    fn effect_list(&self) -> &EffectList {
+        match &self.sub_sections {
+            SubSections::V1(s) => &s.effects,
+            SubSections::V22(s) => &s.effects,
+        }
+    }
+
+    fn effect_list_mut(&mut self) -> &mut EffectList {
+        match &mut self.sub_sections {
+            SubSections::V1(s) => &mut s.effects,
+            SubSections::V22(s) => &mut s.effects,
+        }
+    }
+
+    /// The bonus to the creature's movement rate an editor keeps on it
+    /// (EEKeeper's "Movement"): parameter 1 of its first permanent
+    /// (timing 9) opcode-126 effect that adds to the rate (parameter 2 =
+    /// 0). 0 without one. The engines take the base rate from the
+    /// creature's animation, not its CRE, so an effect is where it lives.
+    pub fn movement_bonus(&self) -> u32 {
+        match self.effect_list() {
+            EffectList::V1(list) => list.iter().find_map(|effect| match effect {
+                EffectV1::Effect(e) if is_movement_bonus_v1(effect) => Some(e.param1),
+                _ => None,
+            }),
+            EffectList::V2(list) => list.iter().find_map(|effect| match effect {
+                EffectV2::Effect(e) if is_movement_bonus(effect) => Some(e.param1),
+                _ => None,
+            }),
+        }
+        .unwrap_or(0)
+    }
+
+    /// Set the movement bonus (see [`Self::movement_bonus`]): its effect is
+    /// updated in place, or added first in the list (where EEKeeper adds
+    /// it) when there's none; 0 removes it.
+    pub fn set_movement_bonus(&mut self, value: u32) {
+        match self.effect_list_mut() {
+            EffectList::V1(list) => set_bonus_effect(
+                list,
+                value,
+                is_movement_bonus_v1,
+                |effect| match effect {
+                    EffectV1::Effect(e) => Some(&mut e.param1),
+                    _ => None,
+                },
+                |value| EffectV1::Effect(movement_bonus_effect_v1(value)),
+            ),
+            EffectList::V2(list) => set_bonus_effect(
+                list,
+                value,
+                is_movement_bonus,
+                |effect| match effect {
+                    EffectV2::Effect(e) => Some(&mut e.param1),
+                    _ => None,
+                },
+                |value| EffectV2::Effect(Box::new(movement_bonus_effect(value))),
+            ),
+        }
+    }
+
     /// The creature's local script variables (`LOCALS` scope), in CRE
     /// file order. These are stored as `op187` effects, parsed by the
     /// importer into [`EffectV2::LocalVariable`]. Empty for creatures
@@ -3810,6 +3989,55 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn the_movement_bonus_is_added_first_updated_and_removed_in_every_version() {
+        for fixture in [
+            "v1_0/IMOEN_DUAL.cre",
+            "v1_2/THIEF3.cre",
+            "v9_0/BARBWAR2.cre",
+            "v2_2/52SERSA.cre",
+        ] {
+            let mut cre = crate::test_support::import_fixture(fixture);
+            let count = cre.effect_list().len();
+            let first_opcode = |cre: &Cre| match cre.effect_list() {
+                EffectList::V1(list) => list.first().map(EffectV1::opcode),
+                EffectList::V2(list) => list.first().map(EffectV2::opcode),
+            };
+            assert_eq!(cre.movement_bonus(), 0, "{fixture}");
+
+            cre.set_movement_bonus(12);
+            let rt = round_trip(&cre);
+            assert_eq!(rt.movement_bonus(), 12, "{fixture}");
+            assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
+            assert_eq!(first_opcode(&rt), Some(MOVEMENT_RATE_OPCODE), "{fixture}");
+
+            // The same effect, updated.
+            cre.set_movement_bonus(50);
+            let rt = round_trip(&cre);
+            assert_eq!(rt.movement_bonus(), 50, "{fixture}");
+            assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
+
+            cre.set_movement_bonus(0);
+            let rt = round_trip(&cre);
+            assert_eq!(rt.movement_bonus(), 0, "{fixture}");
+            assert_eq!(rt.effect_list().len(), count, "{fixture}");
+        }
+    }
+
+    #[test]
+    fn only_a_permanent_increment_is_the_movement_bonus() {
+        let mut haste = movement_bonus_effect(3);
+        haste.timing_mode = TimingMode::InstantLimited;
+        let mut set = movement_bonus_effect(3);
+        set.param2 = 1;
+        for effect in [haste, set] {
+            assert!(!is_movement_bonus(&EffectV2::Effect(Box::new(effect))));
+        }
+        assert!(is_movement_bonus(&EffectV2::Effect(Box::new(
+            movement_bonus_effect(3)
+        ))));
     }
 
     #[test]
