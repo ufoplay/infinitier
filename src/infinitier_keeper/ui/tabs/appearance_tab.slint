@@ -25,7 +25,8 @@ export global AppearanceAdapter {
     // Every gradient a colour can pick, as a swatch, in colour order; empty
     // when the game has none, and then the colours can't be picked.
     in property <[image]> palette;
-    // Empty when this character's animation has no paperdoll.
+    // Empty when this character's animation has no paperdoll: its card then
+    // says so.
     in property <image> doll;
     // Whether the doll has equipment to show or hide, and whether it shows it.
     in property <bool> doll-has-equipment;
@@ -187,19 +188,25 @@ export component AppearanceTab inherits ScrollArea {
                 }
             }
         }
-        if AppearanceAdapter.doll.width > 0: Card {
+        Card {
             VerticalLayout {
                 alignment: start;
                 spacing: Theme.spacing.sm;
                 Label { text: "Character"; role: TextRole.heading; }
                 // A fixed box: the cards don't move from one character to the
-                // next, whose images differ in size. Whole multiples of the
-                // art's pixels keep it crisp; the largest that fits fills the
-                // box in every game, whose art ranges from small to large.
+                // next, whose images differ in size, nor when one has none.
+                // Whole multiples of the art's pixels keep it crisp; the
+                // largest that fits fills the box in every game, whose art
+                // ranges from small to large.
                 Rectangle {
                     width: Metrics.appearance-doll-width;
                     height: Metrics.appearance-doll-height;
-                    Image {
+                    if AppearanceAdapter.doll.width == 0: Label {
+                        text: "Image not available";
+                        tone: Tone.muted;
+                        horizontal-alignment: center;
+                    }
+                    if AppearanceAdapter.doll.width > 0: Image {
                         property <float> scale: max(1, floor(min(
                             parent.width / (self.source.width * Metrics.appearance-doll-pixel),
                             parent.height / (self.source.height * Metrics.appearance-doll-pixel))));

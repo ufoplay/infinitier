@@ -19,8 +19,11 @@ use slint::{Image, SharedString};
 use crate::state::Model;
 use crate::{ColorSwatch, icons};
 
+/// One of a creature's seven colours, out of all of them.
+type Slot = fn(&mut Colors) -> &mut u8;
+
 /// The colour slots, in display order: a label and the colour it is.
-const SLOTS: [(&str, fn(&mut Colors) -> &mut u8); 7] = [
+const SLOTS: [(&str, Slot); 7] = [
     ("Hair", |c| &mut c.hair),
     ("Skin", |c| &mut c.skin),
     ("Clothing Major", |c| &mut c.major),
