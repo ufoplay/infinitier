@@ -6,7 +6,7 @@ use infinitier_core::imported_resource::gam::{ImportedGamNpc, NpcCre};
 use infinitier_gui_common::ThemeSetting;
 use slint::{ComponentHandle, Image, SharedString};
 
-use super::rows_model;
+use super::{rows_changed, rows_model, sync_rows};
 use crate::app::App;
 use crate::build_data::build_version;
 use crate::state::Model;
@@ -33,11 +33,16 @@ pub(super) fn refresh(ui: &AppWindow, app: &App) {
 }
 
 /// The open saves' tabs, and the active save's party and selected member.
-/// Set on every refresh: they change when the active save is switched.
+/// They change when the active save is switched. Both lists are kept unless
+/// they change: a new model rebuilds their rows, which drops a click in
+/// progress — and a click on a tab or a member commits the field being
+/// edited first, whose refresh lands between its press and its release.
 fn refresh_saves(ui: &AppWindow, model: &Model) {
     let tabs = ui.global::<SaveTabsAdapter>();
     let names: Vec<SharedString> = model.save_tab_names().into_iter().map(Into::into).collect();
-    tabs.set_names(rows_model(names));
+    if rows_changed(&tabs.get_names(), &names) {
+        tabs.set_names(rows_model(names));
+    }
     tabs.set_active(i32::try_from(model.active_tab).unwrap_or(0));
 
     let party = ui.global::<PartyAdapter>();
@@ -50,7 +55,9 @@ fn refresh_saves(ui: &AppWindow, model: &Model) {
             portrait: party_portrait(model, npc),
         })
         .collect();
-    party.set_members(rows_model(members));
+    if let Some(members) = sync_rows(&party.get_members(), members) {
+        party.set_members(members);
+    }
     party.set_selected(i32::try_from(model.selected.unwrap_or(0)).unwrap_or(0));
 }
 

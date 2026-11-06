@@ -28,7 +28,12 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
     let adapter = ui.global::<CharacterAdapter>();
     let visible_tabs = model.visible_tabs();
     let tab_names: Vec<SharedString> = visible_tabs.iter().map(|t| t.label().into()).collect();
-    adapter.set_tab_names(rows_model(tab_names));
+    // Kept unless they change: a click on a tab commits the field being
+    // edited first, and a new model would drop the click (see
+    // `rows_changed`).
+    if rows_changed(&adapter.get_tab_names(), &tab_names) {
+        adapter.set_tab_names(rows_model(tab_names));
+    }
     let tab_index = visible_tabs.iter().position(|t| *t == model.selected_tab);
     adapter.set_selected_tab(tab_index.and_then(|i| i32::try_from(i).ok()).unwrap_or(0));
     let has_character = model.selected_cre().is_some();
@@ -248,7 +253,9 @@ fn show_appearance(ui: &AppWindow, page: appearance::Page) {
         adapter.set_animations(rows_model(animations));
     }
     adapter.set_animation_index(animation_index);
-    adapter.set_swatches(rows_model(swatches));
+    if let Some(swatches) = sync_rows(&adapter.get_swatches(), swatches) {
+        adapter.set_swatches(swatches);
+    }
     if rows_changed(&adapter.get_palette(), &palette) {
         adapter.set_palette(rows_model(palette));
     }

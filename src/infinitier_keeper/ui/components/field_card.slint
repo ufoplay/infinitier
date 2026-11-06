@@ -92,6 +92,8 @@ export component FieldCardView inherits Card {
             if row.is-attacks: Select {
                 width: Metrics.field-input-width;
                 size: ControlSize.small;
+                // A number, centred like those above and below it.
+                horizontal-alignment: TextHorizontalAlignment.center;
                 options: root.attacks-options;
                 current-index: root.attacks-index;
                 selected(index) => { root.commit-attacks(index); }
@@ -126,6 +128,8 @@ export component FieldCardView inherits Card {
 
                 width: Metrics.field-input-width;
                 size: ControlSize.small;
+                // Centred, like the number fields among which it sits.
+                horizontal-alignment: TextHorizontalAlignment.right;
                 text: row.value;
                 // Commit on Enter and on focus loss (clamp-on-blur).
                 accepted(t) => {

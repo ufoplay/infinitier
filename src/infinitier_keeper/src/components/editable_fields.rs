@@ -182,6 +182,77 @@ impl EditableField {
             .and_then(|i| Self::ALL.get(i).copied())
     }
 
+    /// The values the field's writer clamps to, `(minimum, maximum)`: the
+    /// engine's caps. `None` for Attacks, a dropdown. (IWD2's class levels
+    /// are clamped further, so that the eleven sum to at most 255.)
+    pub fn range(self, caps: &EngineCaps) -> Option<(i64, i64)> {
+        fn span<T: Copy + Ord + Into<i64>>(range: AbilityRange<T>) -> Option<(i64, i64)> {
+            Some((range.min.into(), range.max.into()))
+        }
+        match self {
+            Self::Strength
+            | Self::Dexterity
+            | Self::Constitution
+            | Self::Intelligence
+            | Self::Wisdom
+            | Self::Charisma => span(caps.ability_score),
+            Self::StrengthPct => span(caps.strength_percentile),
+            Self::CurrentHp => span(caps.current_hit_points),
+            Self::MaxHp => span(caps.max_hit_points),
+            Self::AcNatural | Self::AcEffective => span(caps.armor_class),
+            Self::Thac0 => span(caps.thac0),
+            Self::Attacks => None,
+            Self::Reputation => span(caps.reputation),
+            Self::PartyGold => span(caps.party_gold),
+            Self::Fatigue => span(caps.fatigue),
+            Self::Intoxication => span(caps.intoxication),
+            Self::Luck => span(caps.luck),
+            Self::Experience => span(caps.experience),
+            Self::XpForKill => span(caps.xp_for_kill),
+            Self::Level1
+            | Self::Level2
+            | Self::Level3
+            | Self::BarbarianLevel
+            | Self::BardLevel
+            | Self::ClericLevel
+            | Self::DruidLevel
+            | Self::FighterLevel
+            | Self::MonkLevel
+            | Self::PaladinLevel
+            | Self::RangerLevel
+            | Self::RogueLevel
+            | Self::SorcererLevel
+            | Self::WizardLevel => span(caps.class_level),
+            Self::Morale => span(caps.morale),
+            Self::MoraleBreak => span(caps.morale_break),
+            Self::MoraleRecovery => span(caps.morale_recovery),
+            Self::HideInShadows
+            | Self::MoveSilently
+            | Self::Lockpicking
+            | Self::FindTraps
+            | Self::SetTraps
+            | Self::PickPockets
+            | Self::DetectIllusion => span(caps.thief_skill),
+            Self::Lore => span(caps.lore),
+            Self::Alchemy
+            | Self::AnimalEmpathy
+            | Self::Bluff
+            | Self::Concentration
+            | Self::Diplomacy
+            | Self::DisableDevice
+            | Self::Hide
+            | Self::Intimidate
+            | Self::KnowledgeArcana
+            | Self::D20MoveSilently
+            | Self::OpenLock
+            | Self::PickPocket
+            | Self::Search
+            | Self::Spellcraft
+            | Self::UseMagicDevice
+            | Self::WildernessLore => span(D20_SKILL_RANGE),
+        }
+    }
+
     pub fn section(self) -> Section {
         match self {
             Self::Strength
@@ -921,5 +992,132 @@ impl AttacksOption {
 
     pub fn index_for_byte(byte: u8) -> Option<usize> {
         Self::ALL.iter().position(|o| o.byte == byte)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use infinitier_core::fs::{CaseInsensitiveFS, DataSource, Importer};
+    use infinitier_core::game::{DataOrigin, GameData, GameResource};
+    use infinitier_core::imported_resource::gam::NpcCre;
+    use infinitier_core::resource::gam::GamImporter;
+    use infinitier_core::resource::{Game, ResourceType};
+
+    use super::*;
+
+    fn assets() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets")
+    }
+
+    /// `game`'s engine caps, from its tables among the test assets.
+    fn caps(dir: &str, game: Game) -> EngineCaps {
+        let resources = std::fs::read_dir(assets().join("engine_caps").join(dir))
+            .expect("engine caps fixtures")
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+                Some(GameResource {
+                    game_type: game,
+                    name: path.file_stem()?.to_str()?.to_ascii_lowercase(),
+                    r#type: ResourceType::from_extension(&extension)?,
+                    file_size: None,
+                    datasource: Some(DataSource::new(path.as_path())),
+                    data_origin: DataOrigin::Missing,
+                    imported: None,
+                })
+            })
+            .collect();
+        EngineCaps::new(&GameData::new(resources, game, CaseInsensitiveFS::empty()))
+            .expect("engine caps")
+    }
+
+    /// A save's party, from the test assets.
+    fn party(path: &str, game: Game) -> ImportedGam {
+        let gam = GamImporter {
+            name: path,
+            engine: game.engine(),
+        }
+        .import(&DataSource::new(
+            assets().join("SAV_GAM").join(path).as_path(),
+        ))
+        .expect("GAM fixture");
+        ImportedGam::load_with_tlk(gam, game, None).expect("party")
+    }
+
+    /// The first party member's creature.
+    fn first(gam: &mut ImportedGam) -> &mut Cre {
+        match gam.party_npcs[0].cre.as_mut() {
+            Some(NpcCre::Cre(cre)) => cre.cre_mut(),
+            _ => panic!("the first party member has no CRE"),
+        }
+    }
+
+    /// What writing `raw` leaves in `field` (of the first member, or the
+    /// party's), read back.
+    fn written(field: EditableField, gam: &mut ImportedGam, caps: &EngineCaps, raw: &str) -> i64 {
+        if field.is_gam_field() {
+            field.write_clamped_gam(gam, raw, caps);
+        } else {
+            field.write_clamped_cre(first(gam), raw, caps);
+        }
+        let cre = first(gam).clone();
+        let text = field.read_text(&cre, gam);
+        text.parse()
+            .unwrap_or_else(|_| panic!("{field:?} reads {text:?}, not a number"))
+    }
+
+    /// A field's number drags exactly as far as a typed value may go: its
+    /// writer clamps to [`EditableField::range`], at both ends.
+    #[test]
+    fn writers_clamp_to_the_range() {
+        for (save, caps_dir, game) in [
+            (
+                "bg2_ee/save/000000000-Auto-Save/BALDUR.gam",
+                "bg2_ee",
+                Game::Bg2ee,
+            ),
+            (
+                "iwd2/mpsave/000000002-Quick-Save/ICEWIND2.GAM",
+                "iwd2",
+                Game::Iwd2,
+            ),
+        ] {
+            let caps = caps(caps_dir, game);
+            let mut gam = party(save, game);
+            let cre = first(&mut gam).clone();
+            let fields: Vec<_> = EditableField::ALL
+                .iter()
+                .copied()
+                // IWD2's class levels are clamped by their sum as well.
+                .filter(|field| {
+                    field.is_visible(&cre) && field.section() != Section::Iwd2ClassLevels
+                })
+                .collect();
+            assert!(fields.len() > 10, "{game:?}: {fields:?}");
+            for field in fields {
+                let Some((minimum, maximum)) = field.range(&caps) else {
+                    continue;
+                };
+                // Past each end: an unsigned field takes no minus sign.
+                let below = if minimum < 0 {
+                    format!("{minimum}0")
+                } else {
+                    "0".to_owned()
+                };
+                let above = format!("{maximum}0");
+                assert_eq!(
+                    written(field, &mut gam, &caps, &below),
+                    minimum,
+                    "{game:?} {field:?} below"
+                );
+                assert_eq!(
+                    written(field, &mut gam, &caps, &above),
+                    maximum,
+                    "{game:?} {field:?} above"
+                );
+            }
+        }
     }
 }

@@ -112,6 +112,16 @@ export component AppWindow inherits Window {
         browsers.scroll-to(kind, row);
     }
 
+    // Under everything: a click on nothing in particular (a card's
+    // background, a label, empty space) takes the keyboard focus here, so a
+    // field being edited loses it and commits, as when a control is clicked
+    // (the themekit's controls take it themselves).
+    FocusScope {
+        width: root.width;
+        height: root.height;
+        focus-on-tab-navigation: false;
+    }
+
     VerticalLayout {
         padding: Theme.spacing.md;
         spacing: Theme.spacing.sm;

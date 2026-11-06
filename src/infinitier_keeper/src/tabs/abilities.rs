@@ -6,7 +6,7 @@
 //! are recomputed from the committed CRE on every refresh (after each commit
 //! or selection change).
 
-use infinitier_core::engine_caps::ThiefSkill;
+use infinitier_core::engine_caps::{EngineCaps, ThiefSkill};
 use infinitier_core::imported_resource::gam::NpcCre;
 use infinitier_core::resource::Engine;
 use infinitier_core::resource::cre::{Cre, CreHeader, CreHeaderV22};
@@ -90,6 +90,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
     // ── Ability scores card ──────────────────────────────────────────
     let con_hp_per_level = caps.constitution_hp_per_level(constitution, is_warrior) as i8;
     let mut ability_rows = vec![row(
+        caps,
         cre,
         EditableField::Strength,
         gam,
@@ -100,9 +101,10 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         )),
     )];
     if EditableField::StrengthPct.is_visible(cre) {
-        ability_rows.push(row(cre, EditableField::StrengthPct, gam, None));
+        ability_rows.push(row(caps, cre, EditableField::StrengthPct, gam, None));
     }
     ability_rows.push(row(
+        caps,
         cre,
         EditableField::Dexterity,
         gam,
@@ -113,6 +115,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         )),
     ));
     ability_rows.push(row(
+        caps,
         cre,
         EditableField::Constitution,
         gam,
@@ -122,9 +125,9 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             con_hp_per_level,
         )),
     ));
-    ability_rows.push(row(cre, EditableField::Intelligence, gam, None));
-    ability_rows.push(row(cre, EditableField::Wisdom, gam, None));
-    ability_rows.push(row(cre, EditableField::Charisma, gam, None));
+    ability_rows.push(row(caps, cre, EditableField::Intelligence, gam, None));
+    ability_rows.push(row(caps, cre, EditableField::Wisdom, gam, None));
+    ability_rows.push(row(caps, cre, EditableField::Charisma, gam, None));
     let ability_total = u32::from(cre.strength())
         + u32::from(cre.dexterity())
         + u32::from(cre.constitution())
@@ -162,7 +165,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             EditableField::MaxHp => Some(format!("(effective: {effective_max_hp})")),
             _ => None,
         };
-        combat_rows.push(row(cre, field, gam, bonus));
+        combat_rows.push(row(caps, cre, field, gam, bonus));
     }
 
     // ── Experience & levels card ─────────────────────────────────────
@@ -171,7 +174,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         if field.section() != Section::ExperienceLevels || !field.is_visible(cre) {
             continue;
         }
-        xp_rows.push(row(cre, field, gam, None));
+        xp_rows.push(row(caps, cre, field, gam, None));
     }
     if let CreHeader::V22(h) = &cre.header {
         xp_rows.push(readonly_row("Total levels", &h.total_levels.to_string()));
@@ -187,7 +190,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
         if field.section() != Section::Morale || !field.is_visible(cre) {
             continue;
         }
-        morale_rows.push(row(cre, field, gam, None));
+        morale_rows.push(row(caps, cre, field, gam, None));
     }
     if morale_rows.is_empty() {
         morale_rows.push(readonly_row("Morale system", "disabled (d20)"));
@@ -200,7 +203,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             if field.section() != Section::D20Skills || !field.is_visible(cre) {
                 continue;
             }
-            rows.push(row(cre, field, gam, None));
+            rows.push(row(caps, cre, field, gam, None));
         }
         card("Skills", 2, rows)
     } else {
@@ -223,7 +226,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             } else {
                 None
             };
-            rows.push(row(cre, field, gam, bonus));
+            rows.push(row(caps, cre, field, gam, bonus));
         }
         card("Thief Skills", 2, rows)
     };
@@ -243,12 +246,25 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
 
 // ── Row / card constructors ──────────────────────────────────────────
 
+/// The most values a field can take and still be dragged: a byte's. A
+/// longer range (hit points, armor class, experience, gold) is only typed,
+/// as a drag across it would never end.
+const DRAG_MAX_VALUES: i64 = 256;
+
 fn row(
+    caps: &EngineCaps,
     cre: &Cre,
     field: EditableField,
     gam: &infinitier_core::imported_resource::gam::ImportedGam,
     bonus: Option<String>,
 ) -> FieldRow {
+    // Dragged sideways as well as typed, within the range it's clamped to.
+    let drag = field
+        .range(caps)
+        .filter(|&(minimum, maximum)| maximum - minimum < DRAG_MAX_VALUES)
+        .and_then(|(minimum, maximum)| {
+            Some((i32::try_from(minimum).ok()?, i32::try_from(maximum).ok()?))
+        });
     FieldRow {
         id: field.index(),
         label: field.label(cre).into(),
@@ -256,8 +272,9 @@ fn row(
         bonus: bonus.unwrap_or_default().into(),
         editable: field != EditableField::Attacks,
         is_attacks: field == EditableField::Attacks,
-        // Typed: an ability value is entered, not dragged.
-        numeric: false,
+        numeric: drag.is_some(),
+        minimum: drag.map_or(0, |(minimum, _)| minimum),
+        maximum: drag.map_or(0, |(_, maximum)| maximum),
         ..FieldRow::default()
     }
 }
