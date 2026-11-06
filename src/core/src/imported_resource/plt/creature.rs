@@ -14,6 +14,7 @@ use infinitier_datasource::Importer;
 use infinitier_two_da_resource::{TwoDA, TwoDAImporter};
 
 use super::art::Art;
+use super::recolor::{self, ColorChange, Part};
 use crate::game::GameData;
 use crate::imported_resource::ImportedResource;
 use crate::imported_resource::cre::ImportedCre;
@@ -26,6 +27,11 @@ const ARMOR_SLOT: usize = 1;
 const SHIELD_SLOT: usize = 2;
 const FIRST_WEAPON_SLOT: usize = 9;
 const WEAPON_SLOTS: usize = 4;
+/// The slots, the same in every layout with paperdolls, of what's worn but
+/// not drawn over the doll: armour, gauntlets, rings, amulet, belt, boots.
+const WORN_SLOTS: [usize; 7] = [ARMOR_SLOT, 3, 4, 5, 6, 7, 8];
+/// The cloak's slot in the BG / BG2 / IWD layout.
+const CLOAK_SLOT: usize = 17;
 const FIRST_QUIVER_SLOT: usize = 13;
 const QUIVER_SLOTS: usize = 4;
 /// A selected launcher is recorded as its ammunition's quiver, counted from
@@ -40,6 +46,8 @@ const SLING: u16 = 18;
 const CROSSBOW: u16 = 27;
 const BOLTS: u16 = 31;
 const SHIELD_TYPES: [u16; 5] = [12, 41, 47, 49, 53];
+/// The item flag (`ITM` offset 0x18) of a weapon held in both hands.
+const TWO_HANDED: u32 = 0x2;
 
 /// A sprite's `G1` cycle where it stands, facing the viewer.
 const SPRITE_STANDING_CYCLE: usize = 9;
@@ -54,9 +62,11 @@ pub(super) struct Parts {
     pub(super) bare: Art,
     /// The doll in the armour the creature wears, when that's another level.
     pub(super) armored: Option<Art>,
-    /// What it holds and wears over its armour, in the order the game draws
-    /// them: weapon, off hand, helmet.
-    pub(super) equipment: Vec<Art>,
+    /// What it holds and wears over its armour, each the part it is, in the
+    /// order the game draws them: weapon, off hand, helmet.
+    pub(super) equipment: Vec<(Part, Art)>,
+    /// The colours everything it wears changes.
+    pub(super) changes: Vec<ColorChange>,
 }
 
 /// A creature's paperdoll. `None` when its animation has no doll: a creature
@@ -72,6 +82,7 @@ pub(super) fn art(game_data: &GameData, cre: &ImportedCre) -> Option<Parts> {
                 bare: picture(game_data, cell(&table, &row, "INVENTORY")?)?,
                 armored: None,
                 equipment: Vec::new(),
+                changes: Vec::new(),
             })
         }
         Game::Iwd2 => {
@@ -85,6 +96,7 @@ pub(super) fn art(game_data: &GameData, cre: &ImportedCre) -> Option<Parts> {
                 bare,
                 armored,
                 equipment: Vec::new(),
+                changes: worn_changes(game_data, cre, &WORN_SLOTS),
             })
         }
         // No table of its own: the same art as BG2:EE.
@@ -110,17 +122,33 @@ fn paperdoll(
 ) -> Option<Parts> {
     let table = table(table_game, "pdolls")?;
     let row = format!("0x{animation:04X}");
+    let base = cell(&table, &row, "LEVEL1");
     let (bare, armored) = bare_and_armored(worn_armor_level(game_data, cre), |level| {
-        doll_art(game_data, cell(&table, &row, &format!("LEVEL{level}"))?)
+        // The table, written for the classic games, sends some animations to
+        // another's art for a level they had none for (a thief in chain mail
+        // to a fighter's); the Enhanced Editions draw their own, named like
+        // the base level's.
+        let own = base
+            .and_then(|base| level_name(base, level))
+            .and_then(|name| doll_art(game_data, &name));
+        own.or_else(|| doll_art(game_data, cell(&table, &row, &format!("LEVEL{level}"))?))
     })?;
-    let equipment = cell(&table, &row, "SIZE")
-        .map(|size| equipment(game_data, cre, size))
-        .unwrap_or_default();
+    let (equipment, changes) = equipment(game_data, cre, cell(&table, &row, "SIZE"));
     Some(Parts {
         bare,
         armored,
         equipment,
+        changes,
     })
+}
+
+/// The name of a doll's art at `level`, from its base level's (`CHFT1INV`:
+/// `CHFT3INV`). `None` for a name that doesn't follow the pattern.
+fn level_name(base: &str, level: u8) -> Option<String> {
+    let prefix = base
+        .strip_suffix("1INV")
+        .filter(|prefix| prefix.len() == 4)?;
+    Some(format!("{prefix}{level}INV"))
 }
 
 /// A doll's art bare and in the armour worn: the plainest level with art,
@@ -135,22 +163,79 @@ fn bare_and_armored<T>(worn: u8, art_at: impl Fn(u8) -> Option<T>) -> Option<(T,
     Some((bare, armored))
 }
 
-/// What the creature holds and wears over its armour, in drawing order, where
-/// the game has art for it.
-fn equipment(game_data: &GameData, cre: &ImportedCre, size: &str) -> Vec<Art> {
+/// What the creature holds and wears over its armour, each the part it is,
+/// in drawing order, where the game has art for it at the doll's `size`; and
+/// the colours everything it wears changes.
+fn equipment(
+    game_data: &GameData,
+    cre: &ImportedCre,
+    size: Option<&str>,
+) -> (Vec<(Part, Art)>, Vec<ColorChange>) {
     let item = |slot: usize| held(game_data, cre, slot);
     let weapon = cre
         .selected_weapon()
         .and_then(|selected| weapon_slot(selected, |slot| item(slot).map(|held| held.item_type)))
-        .and_then(item)
-        .and_then(|held| item_art(size, held.animation, MAIN_HAND));
+        .and_then(item);
+    // A weapon held in both hands leaves the off hand's out of the picture.
     let off_hand = item(SHIELD_SLOT)
-        .and_then(|held| item_art(size, held.animation, off_hand_suffix(held.item_type)));
-    let helmet = item(HELMET_SLOT).and_then(|held| item_art(size, held.animation, MAIN_HAND));
-    [weapon, off_hand, helmet]
+        .filter(|_| !weapon.as_ref().is_some_and(|weapon| weapon.two_handed))
+        .map(|held| {
+            let shield = SHIELD_TYPES.contains(&held.item_type);
+            Held {
+                changes: off_hand_changes(held.changes, shield),
+                ..held
+            }
+        });
+    let helmet = item(HELMET_SLOT);
+
+    let mut changes = worn_changes(game_data, cre, &WORN_SLOTS);
+    changes.extend(worn_changes(game_data, cre, &[CLOAK_SLOT]));
+    let mut layers = Vec::new();
+    for (part, held) in [
+        (Part::Weapon, weapon),
+        (Part::OffHand, off_hand),
+        (Part::Helmet, helmet),
+    ] {
+        let Some(held) = held else { continue };
+        let suffix = match part {
+            Part::OffHand => off_hand_suffix(held.item_type),
+            Part::Weapon | Part::Helmet | Part::Body => MAIN_HAND,
+        };
+        let art = size
+            .and_then(|size| item_art(size, held.animation, suffix))
+            .and_then(|resref| doll_art(game_data, &resref));
+        if let Some(art) = art {
+            layers.push((part, art));
+        }
+        changes.extend(held.changes);
+    }
+    (layers, changes)
+}
+
+/// The colour changes of the items in `slots`.
+fn worn_changes(game_data: &GameData, cre: &ImportedCre, slots: &[usize]) -> Vec<ColorChange> {
+    slots
+        .iter()
+        .filter_map(|slot| held(game_data, cre, *slot))
+        .flat_map(|held| held.changes)
+        .collect()
+}
+
+/// A weapon's colour changes name the weapon wherever it's held: in the off
+/// hand they're the off hand's. A shield's already are.
+fn off_hand_changes(changes: Vec<ColorChange>, shield: bool) -> Vec<ColorChange> {
+    if shield {
+        return changes;
+    }
+    changes
         .into_iter()
-        .flatten()
-        .filter_map(|resref| doll_art(game_data, &resref))
+        .map(|change| match change.part {
+            Part::Weapon => ColorChange {
+                part: Part::OffHand,
+                ..change
+            },
+            Part::Body | Part::OffHand | Part::Helmet => change,
+        })
         .collect()
 }
 
@@ -158,6 +243,9 @@ fn equipment(game_data: &GameData, cre: &ImportedCre, size: &str) -> Vec<Art> {
 struct Held {
     item_type: u16,
     animation: [u8; 2],
+    two_handed: bool,
+    /// The colours it changes while equipped.
+    changes: Vec<ColorChange>,
 }
 
 /// The item in `slot`, if the game has it.
@@ -167,6 +255,8 @@ fn held(game_data: &GameData, cre: &ImportedCre, slot: usize) -> Option<Held> {
     Some(Held {
         item_type: itm.header.item_type(),
         animation: itm.header.item_animation(),
+        two_handed: itm.header.flags() & TWO_HANDED != 0,
+        changes: recolor::changes(&itm),
     })
 }
 
@@ -375,6 +465,22 @@ mod tests {
     }
 
     #[test]
+    fn an_off_hand_weapons_colours_are_the_off_hands() {
+        let change = |part| ColorChange {
+            part,
+            color: 4,
+            gradient: 9,
+        };
+        let changes = vec![change(Part::Weapon), change(Part::Body)];
+        assert_eq!(
+            off_hand_changes(changes.clone(), false),
+            [change(Part::OffHand), change(Part::Body)]
+        );
+        // A shield's name the off hand already.
+        assert_eq!(off_hand_changes(changes.clone(), true), changes);
+    }
+
+    #[test]
     fn a_shield_and_an_off_hand_weapon_have_their_own_art() {
         assert_eq!(off_hand_suffix(12), MAIN_HAND);
         assert_eq!(off_hand_suffix(49), MAIN_HAND);
@@ -395,6 +501,15 @@ mod tests {
     /// `bare_and_armored` for art at these levels: the level itself.
     fn levels(worn: u8, with_art: &[u8]) -> Option<(u8, Option<u8>)> {
         bare_and_armored(worn, |level| with_art.contains(&level).then_some(level))
+    }
+
+    #[test]
+    fn a_levels_art_is_named_like_the_base_levels() {
+        assert_eq!(level_name("CHFT1INV", 3).as_deref(), Some("CHFT3INV"));
+        assert_eq!(level_name("CHFT1INV", 1).as_deref(), Some("CHFT1INV"));
+        // A monster's doll has no levels; nor does a name off the pattern.
+        assert_eq!(level_name("MTROINV", 2), None);
+        assert_eq!(level_name("CHF1INV", 2), None);
     }
 
     #[test]

@@ -170,6 +170,15 @@ impl ItmHeader {
             ItmHeader::V2(h) => h.item_type,
         }
     }
+    /// Item flags (0x18): two-handed, droppable, magical, …
+    pub fn flags(&self) -> u32 {
+        match self {
+            ItmHeader::V1(h) => h.flags,
+            ItmHeader::V1_1(h) => h.flags,
+            ItmHeader::V2(h) => h.flags,
+        }
+    }
+
     /// The two-letter code naming the item's art on a creature (`S1` a long
     /// sword, `D2` a shield, `H0` a helmet, `4A` plate armour); blanks or
     /// NULs when it has none. Same offset in every version.

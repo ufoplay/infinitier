@@ -9,6 +9,7 @@
 mod art;
 mod creature;
 mod gradients;
+mod recolor;
 
 use std::io;
 
@@ -21,6 +22,7 @@ use crate::game::GameData;
 use crate::imported_resource::ImportedResource;
 use crate::imported_resource::cre::ImportedCre;
 use art::{Art, Palettes};
+use recolor::{ColorChange, Part};
 
 pub use gradients::Gradients;
 
@@ -66,10 +68,12 @@ pub struct ImportedPlt {
     /// In the armour it wears, when that's other art: drawn instead of the
     /// bare doll when the equipment is shown.
     armored: Option<Art>,
-    /// Drawn over the doll when the equipment is shown, in this order:
-    /// weapon, off hand, helmet.
-    equipment: Vec<Art>,
+    /// Drawn over the doll when the equipment is shown, each the part it is,
+    /// in this order: weapon, off hand, helmet.
+    equipment: Vec<(Part, Art)>,
     colors: Colors,
+    /// The colours the equipment changes, part by part, while it's shown.
+    changes: Vec<ColorChange>,
     palettes: Palettes,
 }
 
@@ -90,29 +94,33 @@ impl ImportedPlt {
             armored: None,
             equipment: Vec::new(),
             colors: base_creature_colors(game_data),
+            changes: Vec::new(),
             palettes: Palettes::load(game_data),
         })
     }
 
-    /// `cre`'s paperdoll: in its colours, its armour and its equipment. `None`
-    /// when its animation has no doll: a creature that isn't humanoid, a
-    /// polymorph.
+    /// `cre`'s paperdoll: in its colours, its armour and its equipment, each
+    /// part in the colours what it wears gives it. `None` when its animation
+    /// has no doll: a creature that isn't humanoid, a polymorph.
     pub fn for_creature(game_data: &GameData, cre: &ImportedCre) -> Option<Self> {
         let creature::Parts {
             bare,
             armored,
             equipment,
+            changes,
         } = creature::art(game_data, cre)?;
         Some(Self {
             bare,
             armored,
             equipment,
             colors: cre.colors(),
+            changes,
             palettes: Palettes::load(game_data),
         })
     }
 
-    /// The same doll in other colours.
+    /// The same doll in other colours. Its equipment still changes them
+    /// where it does.
     #[must_use]
     pub fn with_colors(self, colors: Colors) -> Self {
         Self { colors, ..self }
@@ -123,10 +131,13 @@ impl ImportedPlt {
         self.colors
     }
 
-    /// Whether there is equipment to show: armour, or something held or worn
-    /// over it. [`Equipment`] then changes the picture.
+    /// Whether there is equipment to show: armour, something held or worn
+    /// over it, or something that changes the figure's colours.
+    /// [`Equipment`] then changes the picture.
     pub fn has_equipment(&self) -> bool {
-        self.armored.is_some() || !self.equipment.is_empty()
+        self.armored.is_some()
+            || !self.equipment.is_empty()
+            || self.changes.iter().any(|change| change.part == Part::Body)
     }
 
     /// What the bare doll is stored as.
@@ -134,17 +145,24 @@ impl ImportedPlt {
         self.bare.format()
     }
 
-    /// The doll as RGBA pixels, painted: in its armour and with what it holds
-    /// and wears over it, or bare.
+    /// The doll as RGBA pixels: in its armour, with what it holds and wears
+    /// over it, each part in the colours that equipment gives it; or bare, in
+    /// its own colours.
     pub fn render(&self, equipment: Equipment) -> RgbaImage {
-        let (body, worn): (&Art, &[Art]) = match equipment {
-            Equipment::Shown => (self.armored.as_ref().unwrap_or(&self.bare), &self.equipment),
-            Equipment::Hidden => (&self.bare, &[]),
+        let layers: Vec<(&Art, Colors)> = match equipment {
+            Equipment::Shown => {
+                let body = self.armored.as_ref().unwrap_or(&self.bare);
+                std::iter::once((Part::Body, body))
+                    .chain(self.equipment.iter().map(|(part, art)| (*part, art)))
+                    .map(|(part, art)| (art, recolor::colors_of(part, self.colors, &self.changes)))
+                    .collect()
+            }
+            Equipment::Hidden => vec![(&self.bare, self.colors)],
         };
-        let (width, height) = body.size();
+        let (width, height) = layers.first().map_or((0, 0), |(body, _)| body.size());
         let mut canvas = RgbaImage::new(width, height);
-        for art in std::iter::once(body).chain(worn) {
-            art.draw(&mut canvas, self.colors, &self.palettes);
+        for (art, colors) in layers {
+            art.draw(&mut canvas, colors, &self.palettes);
         }
         canvas
     }
@@ -214,7 +232,8 @@ mod tests {
         ImportedPlt {
             bare: plt(0),
             armored: Some(plt(1)),
-            equipment: vec![sword()],
+            equipment: vec![(Part::Weapon, sword())],
+            changes: Vec::new(),
             colors: Colors {
                 hair: 1,
                 ..Colors::default()
@@ -240,6 +259,55 @@ mod tests {
         assert_eq!(
             unarmed.render(Equipment::Shown).get_pixel(0, 0).0,
             [4, 5, 6, 255]
+        );
+    }
+
+    /// A doll whose only art is the bare body (skin) and a helmet (hair),
+    /// with these colour changes.
+    fn helmeted(changes: Vec<ColorChange>) -> ImportedPlt {
+        ImportedPlt {
+            armored: None,
+            equipment: vec![(Part::Helmet, plt(1))],
+            colors: Colors::default(),
+            changes,
+            ..doll()
+        }
+    }
+
+    fn change(part: Part, color: u8) -> ColorChange {
+        // Gradient 1 of the doll's: [4, 5, 6].
+        ColorChange {
+            part,
+            color,
+            gradient: 1,
+        }
+    }
+
+    #[test]
+    fn equipment_paints_its_own_part() {
+        // The helmet's hair (colour 6) changed: the helmet takes it.
+        let picture = helmeted(vec![change(Part::Helmet, 6)]).render(Equipment::Shown);
+        assert_eq!(picture.get_pixel(0, 0).0, [4, 5, 6, 255]);
+        // The body's hair changed: not the helmet's.
+        let picture = helmeted(vec![change(Part::Body, 6)]).render(Equipment::Shown);
+        assert_eq!(picture.get_pixel(0, 0).0, [1, 2, 3, 255]);
+    }
+
+    #[test]
+    fn equipment_paints_the_body_only_while_shown() {
+        // The body's skin (colour 3) changed, as armour does.
+        let armour = ImportedPlt {
+            equipment: Vec::new(),
+            ..helmeted(vec![change(Part::Body, 3)])
+        };
+        assert!(armour.has_equipment());
+        assert_eq!(
+            armour.render(Equipment::Shown).get_pixel(0, 0).0,
+            [4, 5, 6, 255]
+        );
+        assert_eq!(
+            armour.render(Equipment::Hidden).get_pixel(0, 0).0,
+            [1, 2, 3, 255]
         );
     }
 
