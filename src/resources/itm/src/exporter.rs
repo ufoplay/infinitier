@@ -14,7 +14,8 @@ use log::debug;
 
 use crate::{
     ABILITY_LEN, EFFECT_LEN, HEADER_LEN_V1, HEADER_LEN_V1_1, HEADER_LEN_V2, ITM_SIGNATURE, Itm,
-    ItmAbility, ItmEffect, ItmHeader, ItmHeaderV1, ItmHeaderV1_1, ItmHeaderV2,
+    ItmAbility, ItmEffect, ItmFlags, ItmHeader, ItmHeaderV1, ItmHeaderV1_1, ItmHeaderV2,
+    KitUsability, Usability,
 };
 
 /// File writer for ITM resources.
@@ -73,12 +74,12 @@ fn serialize(itm: &Itm) -> io::Result<Vec<u8>> {
 
     let mut off = abilities_off;
     for a in &itm.abilities {
-        write_ability(&mut buf[off..off + ABILITY_LEN], a);
+        write_ability(&mut buf[off..off + ABILITY_LEN], a)?;
         off += ABILITY_LEN;
     }
     let mut off = effects_off;
     for e in &itm.effects {
-        write_effect(&mut buf[off..off + EFFECT_LEN], e);
+        write_effect(&mut buf[off..off + EFFECT_LEN], e)?;
         off += EFFECT_LEN;
     }
 
@@ -98,20 +99,26 @@ fn write_header_v1(out: &mut [u8], h: &ItmHeaderV1) {
     out[0x08..0x0C].copy_from_slice(&h.name_unidentified.to_le_bytes());
     out[0x0C..0x10].copy_from_slice(&h.name_identified.to_le_bytes());
     write_resref(&mut out[0x10..0x18], &h.replacement_item);
-    out[0x18..0x1C].copy_from_slice(&h.flags.to_le_bytes());
-    out[0x1C..0x1E].copy_from_slice(&h.item_type.to_le_bytes());
-    out[0x1E..0x22].copy_from_slice(&h.usability);
+    out[0x18..0x1C].copy_from_slice(&h.flags.bits().to_le_bytes());
+    out[0x1C..0x1E].copy_from_slice(&u16::from(h.item_type).to_le_bytes());
+    out[0x1E..0x22].copy_from_slice(&h.usability.bits().to_le_bytes());
     out[0x22..0x24].copy_from_slice(&h.item_animation);
     out[0x24..0x26].copy_from_slice(&h.min_level.to_le_bytes());
     out[0x26..0x28].copy_from_slice(&h.min_strength.to_le_bytes());
     out[0x28] = h.min_strength_bonus;
-    out[0x29] = h.kit_usability_1;
+    let [
+        kit_usability_1,
+        kit_usability_2,
+        kit_usability_3,
+        kit_usability_4,
+    ] = h.kit_usability.to_bytes();
+    out[0x29] = kit_usability_1;
     out[0x2A] = h.min_intelligence;
-    out[0x2B] = h.kit_usability_2;
+    out[0x2B] = kit_usability_2;
     out[0x2C] = h.min_dexterity;
-    out[0x2D] = h.kit_usability_3;
+    out[0x2D] = kit_usability_3;
     out[0x2E] = h.min_wisdom;
-    out[0x2F] = h.kit_usability_4;
+    out[0x2F] = kit_usability_4;
     out[0x30] = h.min_constitution;
     out[0x31] = h.weapon_proficiency;
     out[0x32..0x34].copy_from_slice(&h.min_charisma.to_le_bytes());
@@ -137,9 +144,9 @@ fn write_header_v1_1(out: &mut [u8], h: &ItmHeaderV1_1) {
     out[0x08..0x0C].copy_from_slice(&h.name_unidentified.to_le_bytes());
     out[0x0C..0x10].copy_from_slice(&h.name_identified.to_le_bytes());
     write_resref(&mut out[0x10..0x18], &h.drop_sound);
-    out[0x18..0x1C].copy_from_slice(&h.flags.to_le_bytes());
-    out[0x1C..0x1E].copy_from_slice(&h.item_type.to_le_bytes());
-    out[0x1E..0x22].copy_from_slice(&h.usability);
+    out[0x18..0x1C].copy_from_slice(&h.flags.bits().to_le_bytes());
+    out[0x1C..0x1E].copy_from_slice(&u16::from(h.item_type).to_le_bytes());
+    out[0x1E..0x22].copy_from_slice(&h.usability.bits().to_le_bytes());
     out[0x22..0x24].copy_from_slice(&h.item_animation);
     out[0x24..0x26].copy_from_slice(&h.min_level.to_le_bytes());
     for (i, v) in h.unused_stats.iter().enumerate() {
@@ -174,20 +181,22 @@ fn write_header_v2(out: &mut [u8], h: &ItmHeaderV2) {
         name_unidentified: h.name_unidentified,
         name_identified: h.name_identified,
         replacement_item: h.replacement_item.clone(),
-        flags: h.flags,
+        flags: ItmFlags::from_bits_retain(h.flags.bits()),
         item_type: h.item_type,
-        usability: h.usability,
+        usability: Usability::from_bits_retain(h.usability.bits()),
         item_animation: h.item_animation,
         min_level: h.min_level,
         min_strength: h.min_strength,
         min_strength_bonus: h.min_strength_bonus,
-        kit_usability_1: h.kit_usability_1,
+        kit_usability: KitUsability::from_bytes([
+            h.kit_usability_1,
+            h.kit_usability_2,
+            h.kit_usability_3,
+            h.kit_usability_4,
+        ]),
         min_intelligence: h.min_intelligence,
-        kit_usability_2: h.kit_usability_2,
         min_dexterity: h.min_dexterity,
-        kit_usability_3: h.kit_usability_3,
         min_wisdom: h.min_wisdom,
-        kit_usability_4: h.kit_usability_4,
         min_constitution: h.min_constitution,
         weapon_proficiency: h.weapon_proficiency,
         min_charisma: h.min_charisma,
@@ -209,14 +218,25 @@ fn write_header_v2(out: &mut [u8], h: &ItmHeaderV2) {
     out[HEADER_LEN_V1..HEADER_LEN_V1 + n].copy_from_slice(&h.trailing_unknown[..n]);
 }
 
-fn write_ability(out: &mut [u8], a: &ItmAbility) {
+/// A value into a one-byte field, refused when it doesn't fit.
+fn byte(value: impl Into<u32>, field: &str) -> io::Result<u8> {
+    let value = value.into();
+    u8::try_from(value).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("ITM {field} {value} doesn't fit its one-byte field"),
+        )
+    })
+}
+
+fn write_ability(out: &mut [u8], a: &ItmAbility) -> io::Result<()> {
     debug_assert_eq!(out.len(), ABILITY_LEN);
-    out[0x00] = a.attack_type;
-    out[0x01] = a.id_required;
-    out[0x02] = a.location;
+    out[0x00] = u8::from(a.attack_type);
+    out[0x01] = a.id_required.bits();
+    out[0x02] = byte(u16::from(a.location), "ability location")?;
     out[0x03] = a.alt_dice_sides;
     write_resref(&mut out[0x04..0x0C], &a.use_icon);
-    out[0x0C] = a.target;
+    out[0x0C] = u8::from(a.target);
     out[0x0D] = a.target_count;
     out[0x0E..0x10].copy_from_slice(&a.range.to_le_bytes());
     out[0x10] = a.projectile_type;
@@ -229,12 +249,12 @@ fn write_ability(out: &mut [u8], a: &ItmAbility) {
     out[0x18] = a.dice_thrown;
     out[0x19] = a.secondary_type;
     out[0x1A..0x1C].copy_from_slice(&a.damage_bonus.to_le_bytes());
-    out[0x1C..0x1E].copy_from_slice(&a.damage_type.to_le_bytes());
+    out[0x1C..0x1E].copy_from_slice(&u16::from(a.damage_type).to_le_bytes());
     out[0x1E..0x20].copy_from_slice(&a.num_effects.to_le_bytes());
     out[0x20..0x22].copy_from_slice(&a.first_effect_index.to_le_bytes());
     out[0x22..0x24].copy_from_slice(&a.max_charges.to_le_bytes());
-    out[0x24..0x26].copy_from_slice(&a.charge_depletion.to_le_bytes());
-    out[0x26..0x2A].copy_from_slice(&a.flags.to_le_bytes());
+    out[0x24..0x26].copy_from_slice(&u16::from(a.charge_depletion).to_le_bytes());
+    out[0x26..0x2A].copy_from_slice(&a.flags.bits().to_le_bytes());
     out[0x2A..0x2C].copy_from_slice(&a.projectile_animation.to_le_bytes());
     for (i, v) in a.melee_animation.iter().enumerate() {
         let off = 0x2C + i * 2;
@@ -243,26 +263,28 @@ fn write_ability(out: &mut [u8], a: &ItmAbility) {
     out[0x32..0x34].copy_from_slice(&a.qualifier_arrow.to_le_bytes());
     out[0x34..0x36].copy_from_slice(&a.qualifier_bolt.to_le_bytes());
     out[0x36..0x38].copy_from_slice(&a.qualifier_bullet.to_le_bytes());
+    Ok(())
 }
 
-fn write_effect(out: &mut [u8], e: &ItmEffect) {
+fn write_effect(out: &mut [u8], e: &ItmEffect) -> io::Result<()> {
     debug_assert_eq!(out.len(), EFFECT_LEN);
     out[0x00..0x02].copy_from_slice(&e.opcode.to_le_bytes());
     out[0x02] = e.target_type;
     out[0x03] = e.power;
     out[0x04..0x08].copy_from_slice(&e.parameter1.to_le_bytes());
     out[0x08..0x0C].copy_from_slice(&e.parameter2.to_le_bytes());
-    out[0x0C] = e.timing_mode;
-    out[0x0D] = e.resistance;
+    out[0x0C] = byte(u32::from(e.timing_mode), "effect timing mode")?;
+    out[0x0D] = byte(e.resistance.bits(), "effect resistance")?;
     out[0x0E..0x12].copy_from_slice(&e.duration.to_le_bytes());
     out[0x12] = e.probability1;
     out[0x13] = e.probability2;
     write_resref(&mut out[0x14..0x1C], &e.resource);
     out[0x1C..0x20].copy_from_slice(&e.dice_thrown.to_le_bytes());
     out[0x20..0x24].copy_from_slice(&e.dice_sides.to_le_bytes());
-    out[0x24..0x28].copy_from_slice(&e.save_type.to_le_bytes());
+    out[0x24..0x28].copy_from_slice(&e.save_type.bits().to_le_bytes());
     out[0x28..0x2C].copy_from_slice(&e.save_bonus.to_le_bytes());
     out[0x2C..0x30].copy_from_slice(&e.trailing_extra.to_le_bytes());
+    Ok(())
 }
 
 /// Encode a String via WINDOWS-1252 into a fixed-width zero-padded

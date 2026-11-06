@@ -6,8 +6,9 @@ use infinitier_datasource::{DataSource, Importer, ReadExt, Reader, SeekExt};
 use log::{debug, error};
 
 use crate::{
-    ABILITY_LEN, EFFECT_LEN, HEADER_LEN_V1, HEADER_LEN_V2, SPL_SIGNATURE, Spl, SplAbility,
-    SplEffect, SplHeader, SplHeaderV1, SplHeaderV2, SplVersion,
+    ABILITY_LEN, AbilityLocation, AbilityTarget, EFFECT_LEN, ExclusionFlags, HEADER_LEN_V1,
+    HEADER_LEN_V2, Resistance, SPL_SIGNATURE, SaveType, SpellType, Spl, SplAbility, SplEffect,
+    SplFlags, SplHeader, SplHeaderV1, SplHeaderV2, SplVersion, TimingMode,
 };
 
 /// File reader for SPL resources.
@@ -125,9 +126,9 @@ fn parse_header_v1(reader: &mut SplReader) -> std::io::Result<SplHeaderV1> {
     let name_unidentified = reader.read_u32()?;
     let name_identified = reader.read_u32()?;
     let completion_sound = reader.read_string(8)?;
-    let flags = reader.read_u32()?;
-    let spell_type = reader.read_u16()?;
-    let exclusion_flags = reader.read_u32()?;
+    let flags = SplFlags::from_bits_retain(reader.read_u32()?);
+    let spell_type = SpellType::from(reader.read_u16()?);
+    let exclusion_flags = ExclusionFlags::from_bits_retain(reader.read_u32()?);
     let casting_graphics = reader.read_u16()?;
     let min_level = reader.read_u8()?;
     let primary_type = reader.read_u8()?;
@@ -284,9 +285,9 @@ fn parse_abilities(
 fn parse_ability(reader: &mut SplReader) -> std::io::Result<SplAbility> {
     let spell_form = reader.read_u8()?;
     let misc_flags = reader.read_u8()?;
-    let location = reader.read_u16()?;
+    let location = AbilityLocation::from(reader.read_u16()?);
     let memorised_icon = reader.read_string(8)?;
-    let target = reader.read_u8()?;
+    let target = AbilityTarget::from(reader.read_u8()?);
     let target_count = reader.read_u8()?;
     let range = reader.read_u16()?;
     let level_required = reader.read_u16()?;
@@ -350,15 +351,15 @@ fn parse_effect(reader: &mut SplReader) -> std::io::Result<SplEffect> {
     let power = reader.read_u8()?;
     let parameter1 = reader.read_u32()?;
     let parameter2 = reader.read_u32()?;
-    let timing_mode = reader.read_u8()?;
-    let resistance = reader.read_u8()?;
+    let timing_mode = TimingMode::from(u32::from(reader.read_u8()?));
+    let resistance = Resistance::from_bits_retain(u32::from(reader.read_u8()?));
     let duration = reader.read_u32()?;
     let probability1 = reader.read_u8()?;
     let probability2 = reader.read_u8()?;
     let resource = reader.read_string(8)?;
     let dice_thrown = reader.read_u32()?;
     let dice_sides = reader.read_u32()?;
-    let save_type = reader.read_u32()?;
+    let save_type = SaveType::from_bits_retain(reader.read_u32()?);
     let save_bonus = reader.read_i32()?;
     let trailing_extra = reader.read_u32()?;
     Ok(SplEffect {
@@ -411,7 +412,7 @@ mod tests {
             panic!("expected V1 header");
         };
         // 1 = Wizard spell type.
-        assert_eq!(h.spell_type, 1);
+        assert_eq!(h.spell_type, SpellType::Wizard);
         assert!(!spl.abilities.is_empty());
         // The completion sound resref shouldn't be empty for a
         // BG1 wizard spell.

@@ -10,7 +10,7 @@
 
 mod opcode_names;
 
-use infinitier_core::resource::cre::{Cre, EffectList, EffectV2, SubSections};
+use infinitier_core::resource::cre::{Cre, EffectList, EffectV2, SubSections, TimingMode};
 use infinitier_core::resource::ids::Ids;
 use slint::SharedString;
 
@@ -46,7 +46,7 @@ struct EffectRow {
     param2: u32,
     resources: [String; 4],
     time: u32,
-    timing_mode: u32,
+    timing_mode: TimingMode,
     target: u32,
 }
 
@@ -86,20 +86,21 @@ fn type_text(opcode: u32) -> String {
     effect_name(opcode).map_or_else(|| format!("Unknown [{opcode}]"), str::to_owned)
 }
 
-fn timing_text(mode: u32) -> String {
+fn timing_text(mode: TimingMode) -> String {
     let label = match mode {
-        0 => "Duration",
-        1 => "Permanent",
-        2 => "While Equipped",
-        3 => "Delayed Duration",
-        4 => "Delayed",
-        5 => "Delayed, Equipped",
-        6 => "Delayed, Absolute Duration",
-        7 => "Delayed, Permanent",
-        8 => "Equipped, Permanent",
-        9 => "Instant, Permanent",
-        4096 => "Absolute Duration",
-        other => return other.to_string(),
+        TimingMode::InstantLimited => "Duration",
+        TimingMode::InstantPermanent => "Permanent",
+        TimingMode::InstantWhileEquipped => "While Equipped",
+        TimingMode::DelayLimited => "Delayed Duration",
+        TimingMode::DelayPermanent => "Delayed",
+        TimingMode::DelayWhileEquipped => "Delayed, Equipped",
+        TimingMode::LimitedAfterDuration => "Delayed, Absolute Duration",
+        TimingMode::PermanentAfterDuration => "Delayed, Permanent",
+        TimingMode::EquippedAfterDuration => "Equipped, Permanent",
+        TimingMode::PermanentAfterDeath => "Instant, Permanent",
+        TimingMode::InstantLimitedTicks => "Duration (Ticks)",
+        TimingMode::AbsoluteDuration => "Absolute Duration",
+        TimingMode::Unknown(other) => return other.to_string(),
     };
     label.to_owned()
 }

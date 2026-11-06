@@ -11,6 +11,7 @@
 
 use infinitier_common::{Game, ResourceType};
 use infinitier_datasource::Importer;
+use infinitier_itm_resource::ItemType;
 use infinitier_two_da_resource::{TwoDA, TwoDAImporter};
 
 use super::art::Art;
@@ -38,16 +39,12 @@ const QUIVER_SLOTS: usize = 4;
 /// this slot: -24 the first quiver, -23 the second.
 const QUIVER_SELECTION_BASE: i16 = 37;
 
-/// Item types (`ITM` offset 0x1C), as IESDP numbers them.
-const ARROWS: u16 = 5;
-const BULLETS: u16 = 14;
-const BOW: u16 = 15;
-const SLING: u16 = 18;
-const CROSSBOW: u16 = 27;
-const BOLTS: u16 = 31;
-const SHIELD_TYPES: [u16; 5] = [12, 41, 47, 49, 53];
-/// The item flag (`ITM` offset 0x18) of a weapon held in both hands.
-const TWO_HANDED: u32 = 0x2;
+/// Ammunition, and the launcher that shoots it.
+const LAUNCHERS: [(ItemType, ItemType); 3] = [
+    (ItemType::Arrows, ItemType::Bow),
+    (ItemType::Bolts, ItemType::Crossbow),
+    (ItemType::Bullets, ItemType::Sling),
+];
 
 /// A sprite's `G1` cycle where it stands, facing the viewer.
 const SPRITE_STANDING_CYCLE: usize = 9;
@@ -180,7 +177,7 @@ fn equipment(
     let off_hand = item(SHIELD_SLOT)
         .filter(|_| !weapon.as_ref().is_some_and(|weapon| weapon.two_handed))
         .map(|held| {
-            let shield = SHIELD_TYPES.contains(&held.item_type);
+            let shield = held.item_type.is_shield();
             Held {
                 changes: off_hand_changes(held.changes, shield),
                 ..held
@@ -241,7 +238,7 @@ fn off_hand_changes(changes: Vec<ColorChange>, shield: bool) -> Vec<ColorChange>
 
 /// What the paperdoll needs of an item.
 struct Held {
-    item_type: u16,
+    item_type: ItemType,
     animation: [u8; 2],
     two_handed: bool,
     /// The colours it changes while equipped.
@@ -255,7 +252,7 @@ fn held(game_data: &GameData, cre: &ImportedCre, slot: usize) -> Option<Held> {
     Some(Held {
         item_type: itm.header.item_type(),
         animation: itm.header.item_animation(),
-        two_handed: itm.header.flags() & TWO_HANDED != 0,
+        two_handed: itm.header.is_two_handed(),
         changes: recolor::changes(&itm),
     })
 }
@@ -264,7 +261,7 @@ fn held(game_data: &GameData, cre: &ImportedCre, slot: usize) -> Option<Held> {
 /// quick weapons, or, when it names a quiver, the launcher for its ammunition.
 /// `None` for fists or anything else. `item_type` gives the type of the item
 /// in a slot.
-fn weapon_slot(selected: i16, item_type: impl Fn(usize) -> Option<u16>) -> Option<usize> {
+fn weapon_slot(selected: i16, item_type: impl Fn(usize) -> Option<ItemType>) -> Option<usize> {
     let weapons = FIRST_WEAPON_SLOT..FIRST_WEAPON_SLOT + WEAPON_SLOTS;
     let quivers = FIRST_QUIVER_SLOT..FIRST_QUIVER_SLOT + QUIVER_SLOTS;
     if let Ok(quick) = usize::try_from(selected) {
@@ -281,13 +278,11 @@ fn weapon_slot(selected: i16, item_type: impl Fn(usize) -> Option<u16>) -> Optio
 }
 
 /// The launcher that shoots this ammunition.
-fn launcher_for(ammunition: u16) -> Option<u16> {
-    match ammunition {
-        ARROWS => Some(BOW),
-        BOLTS => Some(CROSSBOW),
-        BULLETS => Some(SLING),
-        _ => None,
-    }
+fn launcher_for(ammunition: ItemType) -> Option<ItemType> {
+    LAUNCHERS
+        .into_iter()
+        .find(|(ammo, _)| *ammo == ammunition)
+        .map(|(_, launcher)| launcher)
 }
 
 /// How an item's art is named in the main hand, and on the head.
@@ -296,8 +291,8 @@ const MAIN_HAND: &str = "INV";
 const OFF_HAND: &str = "OIN";
 
 /// The off-hand slot holds a shield or a second weapon, each with its own art.
-fn off_hand_suffix(item_type: u16) -> &'static str {
-    if SHIELD_TYPES.contains(&item_type) {
+fn off_hand_suffix(item_type: ItemType) -> &'static str {
+    if item_type.is_shield() {
         MAIN_HAND
     } else {
         OFF_HAND
@@ -427,8 +422,8 @@ mod tests {
     }
 
     /// `weapon_slot` over these slots' item types.
-    fn weapon_in(selected: i16, types: &[(usize, u16)]) -> Option<usize> {
-        let types: HashMap<usize, u16> = types.iter().copied().collect();
+    fn weapon_in(selected: i16, types: &[(usize, ItemType)]) -> Option<usize> {
+        let types: HashMap<usize, ItemType> = types.iter().copied().collect();
         weapon_slot(selected, |slot| types.get(&slot).copied())
     }
 
@@ -444,23 +439,37 @@ mod tests {
     #[test]
     fn a_selected_quiver_means_its_launcher() {
         // Arrows in the first quiver; a sword, then a bow in the quick slots.
-        let slots = [(13, ARROWS), (9, 20), (10, BOW)];
+        let slots = [
+            (13, ItemType::Arrows),
+            (9, ItemType::LargeSword),
+            (10, ItemType::Bow),
+        ];
         assert_eq!(weapon_in(-24, &slots), Some(10));
         // Bullets in the second quiver.
-        let slots = [(14, BULLETS), (9, BOW), (11, SLING)];
+        let slots = [
+            (14, ItemType::Bullets),
+            (9, ItemType::Bow),
+            (11, ItemType::Sling),
+        ];
         assert_eq!(weapon_in(-23, &slots), Some(11));
         // Bolts.
-        let slots = [(13, BOLTS), (12, CROSSBOW)];
+        let slots = [(13, ItemType::Bolts), (12, ItemType::Crossbow)];
         assert_eq!(weapon_in(-24, &slots), Some(12));
     }
 
     #[test]
     fn a_quiver_without_its_launcher_means_no_weapon() {
-        assert_eq!(weapon_in(-24, &[(13, ARROWS), (9, SLING)]), None);
+        assert_eq!(
+            weapon_in(-24, &[(13, ItemType::Arrows), (9, ItemType::Sling)]),
+            None
+        );
         // An empty quiver, something that isn't ammunition, no quiver at all.
-        assert_eq!(weapon_in(-24, &[(9, BOW)]), None);
-        assert_eq!(weapon_in(-24, &[(13, 20), (9, BOW)]), None);
-        assert_eq!(weapon_in(-30, &[(9, BOW)]), None);
+        assert_eq!(weapon_in(-24, &[(9, ItemType::Bow)]), None);
+        assert_eq!(
+            weapon_in(-24, &[(13, ItemType::LargeSword), (9, ItemType::Bow)]),
+            None
+        );
+        assert_eq!(weapon_in(-30, &[(9, ItemType::Bow)]), None);
         assert_eq!(weapon_in(i16::MIN, &[]), None);
     }
 
@@ -482,9 +491,9 @@ mod tests {
 
     #[test]
     fn a_shield_and_an_off_hand_weapon_have_their_own_art() {
-        assert_eq!(off_hand_suffix(12), MAIN_HAND);
-        assert_eq!(off_hand_suffix(49), MAIN_HAND);
-        assert_eq!(off_hand_suffix(20), OFF_HAND);
+        assert_eq!(off_hand_suffix(ItemType::Shield), MAIN_HAND);
+        assert_eq!(off_hand_suffix(ItemType::MediumShield), MAIN_HAND);
+        assert_eq!(off_hand_suffix(ItemType::LargeSword), OFF_HAND);
     }
 
     #[test]

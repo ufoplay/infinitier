@@ -6,6 +6,7 @@ use infinitier_core::imported_resource::spl::Iwd2Placement;
 use infinitier_core::resource::ResourceType;
 use infinitier_core::resource::cre::{Iwd2Spellbook, SpellType};
 use infinitier_core::resource::ids::Ids;
+use infinitier_core::resource::spl::SpellType as SplSpellType;
 use slint::SharedString;
 
 use super::{Entry, first_strref};
@@ -91,10 +92,14 @@ pub(super) fn add_adnd(model: &mut Model, resref: &str) {
         return;
     };
     let spell_type = match spl.header.spell_type() {
-        1 => SpellType::Wizard,
-        2 => SpellType::Priest,
-        // Innate / special / psionic / bard / other → the Innate book.
-        _ => SpellType::Innate,
+        SplSpellType::Wizard => SpellType::Wizard,
+        SplSpellType::Priest => SpellType::Priest,
+        // Everything else goes in the Innate book.
+        SplSpellType::Special
+        | SplSpellType::Psionic
+        | SplSpellType::Innate
+        | SplSpellType::BardSong
+        | SplSpellType::Unknown(_) => SpellType::Innate,
     };
     // SPL levels are 1-based; known spells store them 0-based.
     let level = (spl.header.spell_level() as u16).saturating_sub(1);
@@ -179,17 +184,17 @@ fn book_name(book: Iwd2Spellbook) -> &'static str {
     }
 }
 
-/// Map an SPL spell-type id to a display "Type". Mirrors EEKeeper, which
-/// shows priest spells as "Cleric". Unknown values fall back to "Other".
-fn spell_type_name(spell_type: u16) -> &'static str {
+/// A spell type's display "Type". Mirrors EEKeeper, which shows priest
+/// spells as "Cleric".
+fn spell_type_name(spell_type: SplSpellType) -> &'static str {
     match spell_type {
-        1 => "Wizard",
-        2 => "Cleric",
-        3 => "Psionic",
-        4 => "Innate",
-        5 => "Bard",
-        0 => "Special",
-        _ => "Other",
+        SplSpellType::Wizard => "Wizard",
+        SplSpellType::Priest => "Cleric",
+        SplSpellType::Psionic => "Psionic",
+        SplSpellType::Innate => "Innate",
+        SplSpellType::BardSong => "Bard",
+        SplSpellType::Special => "Special",
+        SplSpellType::Unknown(_) => "Other",
     }
 }
 

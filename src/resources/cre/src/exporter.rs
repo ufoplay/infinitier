@@ -82,9 +82,9 @@ fn serialize(cre: &Cre) -> io::Result<Vec<u8>> {
 
     let buf = match (cre.version, &cre.sub_sections) {
         (CreVersion::V1_0 | CreVersion::V1_2 | CreVersion::V9_0, SubSections::V1(s)) => {
-            serialize_v1(cre.version, &header_bytes, s)
+            serialize_v1(cre.version, &header_bytes, s)?
         }
-        (CreVersion::V2_2, SubSections::V22(s)) => serialize_v22(&header_bytes, s),
+        (CreVersion::V2_2, SubSections::V22(s)) => serialize_v22(&header_bytes, s)?,
         (v, _) => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -159,13 +159,17 @@ fn compute_v1_layout(version: CreVersion, s: &V1SubSections) -> V1Layout {
     }
 }
 
-fn serialize_v1(version: CreVersion, header_bytes: &[u8], s: &V1SubSections) -> Vec<u8> {
+fn serialize_v1(
+    version: CreVersion,
+    header_bytes: &[u8],
+    s: &V1SubSections,
+) -> io::Result<Vec<u8>> {
     let layout = compute_v1_layout(version, s);
     let mut buf = vec![0u8; layout.file_size];
     buf[..header_bytes.len()].copy_from_slice(header_bytes);
     write_v1_section_table(&mut buf, version, &layout);
-    write_v1_sub_sections(&mut buf, &layout, s);
-    buf
+    write_v1_sub_sections(&mut buf, &layout, s)?;
+    Ok(buf)
 }
 
 /// Patch the computed offsets/counts into the header's section table.
@@ -288,13 +292,13 @@ fn compute_v22_layout(s: &V22SubSections) -> V22Layout {
     }
 }
 
-fn serialize_v22(header_bytes: &[u8], s: &V22SubSections) -> Vec<u8> {
+fn serialize_v22(header_bytes: &[u8], s: &V22SubSections) -> io::Result<Vec<u8>> {
     let layout = compute_v22_layout(s);
     let mut buf = vec![0u8; layout.file_size];
     buf[..header_bytes.len()].copy_from_slice(header_bytes);
     write_v22_section_table(&mut buf, &layout);
-    write_v22_sub_sections(&mut buf, &layout, s);
-    buf
+    write_v22_sub_sections(&mut buf, &layout, s)?;
+    Ok(buf)
 }
 
 /// Patch the computed IWD2 offsets/counts into the header section tables.
@@ -358,7 +362,7 @@ fn v1_section_table_base(version: CreVersion) -> usize {
     }
 }
 
-fn write_v1_sub_sections(buf: &mut [u8], l: &V1Layout, s: &V1SubSections) {
+fn write_v1_sub_sections(buf: &mut [u8], l: &V1Layout, s: &V1SubSections) -> io::Result<()> {
     write_known_spells(buf, l.known_spells_off as usize, &s.known_spells);
     write_spell_memorization_info(buf, l.spell_mem_off as usize, &s.spell_memorization_info);
     write_memorized_spells(buf, l.mem_spells_off as usize, &s.memorized_spells);
@@ -369,14 +373,14 @@ fn write_v1_sub_sections(buf: &mut [u8], l: &V1Layout, s: &V1SubSections) {
         buf[item_slots_off..item_slots_off + n].copy_from_slice(&s.item_slots);
     }
     write_items(buf, l.items_off as usize, &s.items);
-    write_effects(buf, l.effects_off as usize, &s.effects);
+    write_effects(buf, l.effects_off as usize, &s.effects)
 }
 
 // ─────────────────────────────────────────────────────────────────────
 //  V2.2 writer
 // ─────────────────────────────────────────────────────────────────────
 
-fn write_v22_sub_sections(buf: &mut [u8], l: &V22Layout, s: &V22SubSections) {
+fn write_v22_sub_sections(buf: &mut [u8], l: &V22Layout, s: &V22SubSections) -> io::Result<()> {
     let class_lists: [&[Iwd2Table; 9]; 7] = [
         &s.bard_spells,
         &s.cleric_spells,
@@ -403,7 +407,7 @@ fn write_v22_sub_sections(buf: &mut [u8], l: &V22Layout, s: &V22SubSections) {
         buf[item_slots_off..item_slots_off + n].copy_from_slice(&s.item_slots);
     }
     write_items(buf, l.items_off as usize, &s.items);
-    write_effects(buf, l.effects_off as usize, &s.effects);
+    write_effects(buf, l.effects_off as usize, &s.effects)
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -435,7 +439,7 @@ fn write_memorized_spells(buf: &mut [u8], offset: usize, list: &[MemorizedSpell]
     for (i, m) in list.iter().enumerate() {
         let off = offset + i * MEMORIZED_SPELL_LEN;
         write_resref(&mut buf[off..off + 8], &m.spell);
-        buf[off + 8..off + 10].copy_from_slice(&m.memorization_flags.to_le_bytes());
+        buf[off + 8..off + 10].copy_from_slice(&m.memorization_flags.bits().to_le_bytes());
         buf[off + 10..off + 12].copy_from_slice(&m.padding.to_le_bytes());
     }
 }
@@ -452,12 +456,12 @@ fn write_items(buf: &mut [u8], offset: usize, list: &[Item]) {
     }
 }
 
-fn write_effects(buf: &mut [u8], offset: usize, effects: &EffectList) {
+fn write_effects(buf: &mut [u8], offset: usize, effects: &EffectList) -> io::Result<()> {
     match effects {
         EffectList::V1(list) => {
             for (i, e) in list.iter().enumerate() {
                 let off = offset + i * 48;
-                let r = e.to_record();
+                let r = e.to_record()?;
                 let n = r.len().min(48);
                 buf[off..off + n].copy_from_slice(&r[..n]);
             }
@@ -475,6 +479,7 @@ fn write_effects(buf: &mut [u8], offset: usize, effects: &EffectList) {
             }
         }
     }
+    Ok(())
 }
 
 /// Writes one IWD2 sub-section block: `entries.len()` × 16-byte

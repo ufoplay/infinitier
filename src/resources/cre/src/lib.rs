@@ -17,6 +17,8 @@
 //! | `V9.0`  | `0x033C` (828 B)  | `0x0308`     | V1 spell/item/effect block |
 //! | `V2.2`  | `0x062E` (1582 B) | `0x03BA`/`0x05FA` | IWD2 d20 block: per-class spell tables, abilities, songs, shapes, items, effects |
 
+use std::io;
+
 mod exporter;
 mod header;
 mod importer;
@@ -26,6 +28,7 @@ pub use header::{
     CreHeaderV10, CreHeaderV12, CreHeaderV22, CreHeaderV90, NumberOfAttacks, TrackingTarget,
 };
 pub use importer::CreImporter;
+pub use infinitier_common::{Resistance, SaveType, TimingMode};
 
 /// A creature's seven colours. Each is an index into the game's colour
 /// gradients (`RANGES12.BMP`, `MPALETTE.BMP`, `MPAL256.BMP`), whose row it
@@ -592,14 +595,25 @@ pub struct SpellMemorizationInfo {
     pub spell_count: u32,
 }
 
+bitflags::bitflags! {
+    /// A memorised spell's state (IESDP: a dword at entry offset 0x08,
+    /// whose upper word is [`MemorizedSpell::padding`]). Other bits ("already
+    /// cast" in some EE saves) are kept as read.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct MemorizationFlags: u16 {
+        /// Memorised, ready to cast.
+        const Memorized = 1 << 0;
+        const Disabled = 1 << 1;
+    }
+}
+
 /// One memorised-spell entry (12 B on disk).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemorizedSpell {
     /// 0x00: 8-byte ASCIIZ SPL resref.
     pub spell: String,
-    /// 0x08: memorisation flag bitfield (bit 0 = memorised, bit 1 =
-    /// disabled, bit 2+ = "already cast" in some EE saves).
-    pub memorization_flags: u16,
+    /// 0x08: whether it's memorised and whether it's disabled.
+    pub memorization_flags: MemorizationFlags,
     /// 0x0A: unknown / padding (NI calls this "Unknown"). Preserved
     /// verbatim for round-trip.
     pub padding: u16,
@@ -888,10 +902,10 @@ impl EffectV1 {
     }
 
     /// The 48-byte on-disk record for this effect.
-    pub(crate) fn to_record(&self) -> Vec<u8> {
+    pub(crate) fn to_record(&self) -> io::Result<Vec<u8>> {
         match self {
-            EffectV1::Raw(r) => r.clone(),
-            EffectV1::Proficiency(p) => p.to_v1_record(),
+            EffectV1::Raw(r) => Ok(r.clone()),
+            EffectV1::Proficiency(p) => Ok(p.to_v1_record()),
             EffectV1::Effect(e) => e.to_record(),
         }
     }
@@ -918,10 +932,10 @@ pub struct EffectV1Body {
     pub param1: u32,
     /// 0x08: parameter 2.
     pub param2: u32,
-    /// 0x0C: timing mode.
-    pub timing_mode: u8,
-    /// 0x0D: dispel / resistance.
-    pub resistance: u8,
+    /// 0x0C: when it applies and how long it lasts (one byte on disk).
+    pub timing_mode: TimingMode,
+    /// 0x0D: whether it can be dispelled and resisted (one byte on disk).
+    pub resistance: Resistance,
     /// 0x0E: duration.
     pub duration: u32,
     /// 0x12: probability (upper).
@@ -934,8 +948,8 @@ pub struct EffectV1Body {
     pub dice_thrown: u32,
     /// 0x20: dice sides / min level.
     pub dice_sides: u32,
-    /// 0x24: saving-throw type.
-    pub save_type: u32,
+    /// 0x24: the saving throws against it.
+    pub save_type: SaveType,
     /// 0x28: saving-throw bonus.
     pub save_bonus: u32,
     /// 0x2C: special.
@@ -952,40 +966,41 @@ impl EffectV1Body {
             power: r[0x03],
             param1: rd_u32(r, 0x04),
             param2: rd_u32(r, 0x08),
-            timing_mode: r[0x0C],
-            resistance: r[0x0D],
+            timing_mode: TimingMode::from(u32::from(r[0x0C])),
+            resistance: Resistance::from_bits_retain(u32::from(r[0x0D])),
             duration: rd_u32(r, 0x0E),
             probability1: r[0x12],
             probability2: r[0x13],
             resource: rd_resref(r, 0x14),
             dice_thrown: rd_u32(r, 0x1C),
             dice_sides: rd_u32(r, 0x20),
-            save_type: rd_u32(r, 0x24),
+            save_type: SaveType::from_bits_retain(rd_u32(r, 0x24)),
             save_bonus: rd_u32(r, 0x28),
             special: rd_u32(r, 0x2C),
         }
     }
 
-    /// Serialise back to a 48-byte classic effect record.
-    pub(crate) fn to_record(&self) -> Vec<u8> {
+    /// Serialise back to a 48-byte classic effect record. Fails when its
+    /// timing mode or resistance doesn't fit their one-byte fields.
+    pub(crate) fn to_record(&self) -> io::Result<Vec<u8>> {
         let mut r = vec![0u8; 48];
         wr_u16(&mut r, 0x00, self.opcode);
         r[0x02] = self.target;
         r[0x03] = self.power;
         wr_u32(&mut r, 0x04, self.param1);
         wr_u32(&mut r, 0x08, self.param2);
-        r[0x0C] = self.timing_mode;
-        r[0x0D] = self.resistance;
+        r[0x0C] = byte(u32::from(self.timing_mode), "timing mode")?;
+        r[0x0D] = byte(self.resistance.bits(), "resistance")?;
         wr_u32(&mut r, 0x0E, self.duration);
         r[0x12] = self.probability1;
         r[0x13] = self.probability2;
         wr_resref(&mut r, 0x14, &self.resource);
         wr_u32(&mut r, 0x1C, self.dice_thrown);
         wr_u32(&mut r, 0x20, self.dice_sides);
-        wr_u32(&mut r, 0x24, self.save_type);
+        wr_u32(&mut r, 0x24, self.save_type.bits());
         wr_u32(&mut r, 0x28, self.save_bonus);
         wr_u32(&mut r, 0x2C, self.special);
-        r
+        Ok(r)
     }
 }
 
@@ -1285,7 +1300,7 @@ pub struct Effect {
     /// 0x18: parameter 2.
     pub param2: u32,
     /// 0x1C: timing mode.
-    pub timing_mode: u32,
+    pub timing_mode: TimingMode,
     /// 0x20: duration.
     pub duration: u32,
     /// 0x24: probability (upper).
@@ -1299,7 +1314,7 @@ pub struct Effect {
     /// 0x34: dice sides / min level.
     pub dice_sides: u32,
     /// 0x38: saving-throw type.
-    pub save_type: u32,
+    pub save_type: SaveType,
     /// 0x3C: saving-throw bonus.
     pub save_bonus: u32,
     /// 0x40: special / "is variable".
@@ -1312,8 +1327,8 @@ pub struct Effect {
     pub parent_lowest_level: u32,
     /// 0x50: maximum level (parent resource).
     pub parent_highest_level: u32,
-    /// 0x54: dispel / resistance.
-    pub resistance: u32,
+    /// 0x54: whether it can be dispelled and resisted.
+    pub resistance: Resistance,
     /// 0x58: parameter 3.
     pub param3: u32,
     /// 0x5C: parameter 4.
@@ -1369,21 +1384,21 @@ impl Effect {
             power: rd_u32(r, 0x10),
             param1: rd_u32(r, 0x14),
             param2: rd_u32(r, 0x18),
-            timing_mode: rd_u32(r, 0x1C),
+            timing_mode: TimingMode::from(rd_u32(r, 0x1C)),
             duration: rd_u32(r, 0x20),
             probability1: rd_u16(r, 0x24),
             probability2: rd_u16(r, 0x26),
             resource: rd_resref(r, 0x28),
             dice_thrown: rd_u32(r, 0x30),
             dice_sides: rd_u32(r, 0x34),
-            save_type: rd_u32(r, 0x38),
+            save_type: SaveType::from_bits_retain(rd_u32(r, 0x38)),
             save_bonus: rd_u32(r, 0x3C),
             special: rd_u32(r, 0x40),
             primary_type: rd_u32(r, 0x44),
             unknown_48: rd_u32(r, 0x48),
             parent_lowest_level: rd_u32(r, 0x4C),
             parent_highest_level: rd_u32(r, 0x50),
-            resistance: rd_u32(r, 0x54),
+            resistance: Resistance::from_bits_retain(rd_u32(r, 0x54)),
             param3: rd_u32(r, 0x58),
             param4: rd_u32(r, 0x5C),
             param5: rd_u32(r, 0x60),
@@ -1417,21 +1432,21 @@ impl Effect {
         wr_u32(&mut r, 0x10, self.power);
         wr_u32(&mut r, 0x14, self.param1);
         wr_u32(&mut r, 0x18, self.param2);
-        wr_u32(&mut r, 0x1C, self.timing_mode);
+        wr_u32(&mut r, 0x1C, u32::from(self.timing_mode));
         wr_u32(&mut r, 0x20, self.duration);
         wr_u16(&mut r, 0x24, self.probability1);
         wr_u16(&mut r, 0x26, self.probability2);
         wr_resref(&mut r, 0x28, &self.resource);
         wr_u32(&mut r, 0x30, self.dice_thrown);
         wr_u32(&mut r, 0x34, self.dice_sides);
-        wr_u32(&mut r, 0x38, self.save_type);
+        wr_u32(&mut r, 0x38, self.save_type.bits());
         wr_u32(&mut r, 0x3C, self.save_bonus);
         wr_u32(&mut r, 0x40, self.special);
         wr_u32(&mut r, 0x44, self.primary_type);
         wr_u32(&mut r, 0x48, self.unknown_48);
         wr_u32(&mut r, 0x4C, self.parent_lowest_level);
         wr_u32(&mut r, 0x50, self.parent_highest_level);
-        wr_u32(&mut r, 0x54, self.resistance);
+        wr_u32(&mut r, 0x54, self.resistance.bits());
         wr_u32(&mut r, 0x58, self.param3);
         wr_u32(&mut r, 0x5C, self.param4);
         wr_u32(&mut r, 0x60, self.param5);
@@ -1455,6 +1470,16 @@ impl Effect {
         r[0xD0..0x108].copy_from_slice(&self.trailing);
         r
     }
+}
+
+/// A value into a one-byte record field, refused when it doesn't fit.
+fn byte(value: u32, field: &str) -> io::Result<u8> {
+    u8::try_from(value).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("CRE effect {field} {value} doesn't fit its one-byte field"),
+        )
+    })
 }
 
 fn rd_u32(b: &[u8], o: usize) -> u32 {
@@ -1747,7 +1772,7 @@ impl Cre {
             let flags = matches
                 .first()
                 .map(|&i| sub.memorized_spells[i].memorization_flags)
-                .unwrap_or(1);
+                .unwrap_or(MemorizationFlags::Memorized);
             let new = MemorizedSpell {
                 spell: resref.to_string(),
                 memorization_flags: flags,
@@ -4319,7 +4344,7 @@ mod tests {
             .collect();
         let body = EffectV1Body::from_record(&original);
         assert_eq!(
-            body.to_record(),
+            body.to_record().expect("its fields fit"),
             original,
             "EffectV1Body must cover every byte"
         );
@@ -4347,7 +4372,7 @@ mod tests {
             points: 2,
         });
         assert_eq!(prof.opcode(), EffectV1::PROFICIENCY_OPCODE);
-        assert_eq!(prof.to_record().len(), 48);
+        assert_eq!(prof.to_record().expect("its fields fit").len(), 48);
 
         let raw = EffectV1::Raw(vec![233, 0, 0, 0]);
         assert_eq!(raw.opcode(), 233);

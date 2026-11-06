@@ -17,8 +17,18 @@
 //! | `V1.1`  | 0x9A (154 B) | 0x0064            | Dialog + Conversable label + Paperdoll colour + 6 reserved dwords (PST) |
 //! | `V2.0`  | 0x82 (130 B) | 0x0064            | 16-byte trailing reserved blob; extended-header `flags` split into two `u16`s |
 
+mod ability;
 mod exporter;
+mod flags;
 mod importer;
+mod item_type;
+
+pub use ability::{AbilityFlags, AttackType, ChargeDepletion, DamageType, IdRequired};
+pub use flags::{
+    ItmFlags, ItmFlagsV1_1, ItmFlagsV2, KitUsability, Usability, UsabilityV1_1, UsabilityV2,
+};
+pub use infinitier_common::{AbilityLocation, AbilityTarget, Resistance, SaveType, TimingMode};
+pub use item_type::ItemType;
 
 pub use exporter::ItmExporter;
 pub use importer::ItmImporter;
@@ -163,19 +173,19 @@ impl ItmHeader {
     }
     /// Item category (sword / staff / shield / armour / …) — the value
     /// the Item Browser maps to a display "Type".
-    pub fn item_type(&self) -> u16 {
+    pub fn item_type(&self) -> ItemType {
         match self {
             ItmHeader::V1(h) => h.item_type,
             ItmHeader::V1_1(h) => h.item_type,
             ItmHeader::V2(h) => h.item_type,
         }
     }
-    /// Item flags (0x18): two-handed, droppable, magical, …
-    pub fn flags(&self) -> u32 {
+    /// Whether the item takes both hands (the same flag in every version).
+    pub fn is_two_handed(&self) -> bool {
         match self {
-            ItmHeader::V1(h) => h.flags,
-            ItmHeader::V1_1(h) => h.flags,
-            ItmHeader::V2(h) => h.flags,
+            ItmHeader::V1(h) => h.flags.contains(ItmFlags::TwoHanded),
+            ItmHeader::V1_1(h) => h.flags.contains(ItmFlagsV1_1::TwoHanded),
+            ItmHeader::V2(h) => h.flags.contains(ItmFlagsV2::TwoHanded),
         }
     }
 
@@ -254,13 +264,12 @@ pub struct ItmHeaderV1 {
     /// 0x10: 8-byte ASCIIZ replacement-item resref (BG / IWD) /
     /// drop-sound resref (PSTEE).
     pub replacement_item: String,
-    /// 0x18: item flags bitfield.
-    pub flags: u32,
+    /// 0x18: item flags.
+    pub flags: ItmFlags,
     /// 0x1C: item type (sword / staff / shield / armour / …).
-    pub item_type: u16,
-    /// 0x1E..0x22: 4-byte usability bitmask (per IESDP
-    /// `Header_Usability`).
-    pub usability: [u8; 4],
+    pub item_type: ItemType,
+    /// 0x1E..0x22: who can't use the item.
+    pub usability: Usability,
     /// 0x22..0x24: 2-byte "Item animation" string (e.g. `S1`, `BW`)
     /// indexing into the engine's animation tables.
     pub item_animation: [u8; 2],
@@ -270,20 +279,14 @@ pub struct ItmHeaderV1 {
     pub min_strength: u16,
     /// 0x28: minimum Strength bonus (the 18/01-style mod).
     pub min_strength_bonus: u8,
-    /// 0x29: kit usability bitmask 1/4.
-    pub kit_usability_1: u8,
+    /// 0x29, 0x2B, 0x2D, 0x2F: which kits can't use the item.
+    pub kit_usability: KitUsability,
     /// 0x2A: minimum Intelligence.
     pub min_intelligence: u8,
-    /// 0x2B: kit usability bitmask 2/4.
-    pub kit_usability_2: u8,
     /// 0x2C: minimum Dexterity.
     pub min_dexterity: u8,
-    /// 0x2D: kit usability bitmask 3/4.
-    pub kit_usability_3: u8,
     /// 0x2E: minimum Wisdom.
     pub min_wisdom: u8,
-    /// 0x2F: kit usability bitmask 4/4.
-    pub kit_usability_4: u8,
     /// 0x30: minimum Constitution.
     pub min_constitution: u8,
     /// 0x31: weapon proficiency (IESDP `Header_Proficiency`).
@@ -333,9 +336,9 @@ pub struct ItmHeaderV1_1 {
     pub name_identified: u32,
     /// 0x10..0x18: PST drop-sound resref.
     pub drop_sound: String,
-    pub flags: u32,
-    pub item_type: u16,
-    pub usability: [u8; 4],
+    pub flags: ItmFlagsV1_1,
+    pub item_type: ItemType,
+    pub usability: UsabilityV1_1,
     pub item_animation: [u8; 2],
     pub min_level: u16,
     /// 0x26..0x36: 8 "unused" 2-byte words PST reserved for future
@@ -374,13 +377,15 @@ pub struct ItmHeaderV2 {
     pub name_unidentified: u32,
     pub name_identified: u32,
     pub replacement_item: String,
-    pub flags: u32,
-    pub item_type: u16,
-    pub usability: [u8; 4],
+    pub flags: ItmFlagsV2,
+    pub item_type: ItemType,
+    pub usability: UsabilityV2,
     pub item_animation: [u8; 2],
     pub min_level: u16,
     pub min_strength: u16,
     pub min_strength_bonus: u8,
+    /// 0x29, 0x2B, 0x2D, 0x2F: kit usability. IWD2's kits; IESDP's table for
+    /// them is too unclear to name the bits, so the bytes are kept as read.
     pub kit_usability_1: u8,
     pub min_intelligence: u8,
     pub kit_usability_2: u8,
@@ -412,20 +417,18 @@ pub struct ItmHeaderV2 {
 /// byte layout in every ITM version.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItmAbility {
-    /// 0x00: attack type — `0` None, `1` Melee, `2` Ranged,
-    /// `3` Magical, `4` Launcher.
-    pub attack_type: u8,
-    /// 0x01: identification-required bitfield.
-    pub id_required: u8,
-    /// 0x02: ability location — `0` None, `1` Weapon, `2` Spell,
-    /// `3` Item, `4` Innate.
-    pub location: u8,
+    /// 0x00: how the ability attacks.
+    pub attack_type: AttackType,
+    /// 0x01: whether the ability needs the item identified.
+    pub id_required: IdRequired,
+    /// 0x02: where the ability is used from (one byte on disk).
+    pub location: AbilityLocation,
     /// 0x03: alternate dice-sides (vs. the engine default).
     pub alt_dice_sides: u8,
     /// 0x04: 8-byte BAM resref for the use icon.
     pub use_icon: String,
-    /// 0x0C: target type.
-    pub target: u8,
+    /// 0x0C: what the ability targets.
+    pub target: AbilityTarget,
     /// 0x0D: target count for multi-target abilities.
     pub target_count: u8,
     /// 0x0E: range in feet.
@@ -451,8 +454,8 @@ pub struct ItmAbility {
     pub secondary_type: u8,
     /// 0x1A: damage bonus.
     pub damage_bonus: u16,
-    /// 0x1C: damage type bitfield.
-    pub damage_type: u16,
+    /// 0x1C: the damage the ability deals.
+    pub damage_type: DamageType,
     /// 0x1E: number of feature blocks this ability owns.
     pub num_effects: u16,
     /// 0x20: index of the first feature-block (relative to
@@ -460,14 +463,14 @@ pub struct ItmAbility {
     pub first_effect_index: u16,
     /// 0x22: maximum charges.
     pub max_charges: u16,
-    /// 0x24: charge-depletion behaviour.
-    pub charge_depletion: u16,
+    /// 0x24: what happens when the charges run out.
+    pub charge_depletion: ChargeDepletion,
     /// 0x26..0x2A: 4 bytes of flags. V1 / V1.1 interpret this as a
     /// single `u32` flags field; V2.0 splits it into `flags` (low
     /// 16 bits) + `attack_type_v2` (high 16 bits — Normal / Bypass
     /// armor / Keen). Stored as `u32` so byte-layout round-trips
     /// regardless of which interpretation the file uses.
-    pub flags: u32,
+    pub flags: AbilityFlags,
     /// 0x2A: projectile animation index (`projectl.ids` /
     /// `missile.ids`).
     pub projectile_animation: u16,
@@ -499,10 +502,11 @@ pub struct ItmEffect {
     pub parameter1: u32,
     /// 0x08: opcode-specific parameter 2.
     pub parameter2: u32,
-    /// 0x0C: timing mode.
-    pub timing_mode: u8,
-    /// 0x0D: resistance flags.
-    pub resistance: u8,
+    /// 0x0C: when the effect applies and how long it lasts (one byte on
+    /// disk).
+    pub timing_mode: TimingMode,
+    /// 0x0D: whether it can be dispelled and resisted (one byte on disk).
+    pub resistance: Resistance,
     /// 0x0E: duration in seconds.
     pub duration: u32,
     /// 0x12: probability 1.
@@ -516,8 +520,8 @@ pub struct ItmEffect {
     pub dice_thrown: u32,
     /// 0x20: dice sides (or min level for some opcodes).
     pub dice_sides: u32,
-    /// 0x24: saving-throw type bitfield.
-    pub save_type: u32,
+    /// 0x24: the saving throws against it.
+    pub save_type: SaveType,
     /// 0x28: saving-throw bonus (signed).
     pub save_bonus: i32,
     /// 0x2C: trailing 4-byte field — TobEx "stacking ID" /

@@ -80,7 +80,7 @@ fn serialize(spl: &Spl) -> io::Result<Vec<u8>> {
     }
     let mut off = effects_off;
     for e in &spl.effects {
-        write_effect(&mut buf[off..off + EFFECT_LEN], e);
+        write_effect(&mut buf[off..off + EFFECT_LEN], e)?;
         off += EFFECT_LEN;
     }
 
@@ -100,9 +100,9 @@ fn write_header_v1(out: &mut [u8], h: &SplHeaderV1) {
     out[0x08..0x0C].copy_from_slice(&h.name_unidentified.to_le_bytes());
     out[0x0C..0x10].copy_from_slice(&h.name_identified.to_le_bytes());
     write_resref(&mut out[0x10..0x18], &h.completion_sound);
-    out[0x18..0x1C].copy_from_slice(&h.flags.to_le_bytes());
-    out[0x1C..0x1E].copy_from_slice(&h.spell_type.to_le_bytes());
-    out[0x1E..0x22].copy_from_slice(&h.exclusion_flags.to_le_bytes());
+    out[0x18..0x1C].copy_from_slice(&h.flags.bits().to_le_bytes());
+    out[0x1C..0x1E].copy_from_slice(&u16::from(h.spell_type).to_le_bytes());
+    out[0x1E..0x22].copy_from_slice(&h.exclusion_flags.bits().to_le_bytes());
     out[0x22..0x24].copy_from_slice(&h.casting_graphics.to_le_bytes());
     out[0x24] = h.min_level;
     out[0x25] = h.primary_type;
@@ -185,9 +185,9 @@ fn write_ability(out: &mut [u8], a: &SplAbility) {
     debug_assert_eq!(out.len(), ABILITY_LEN);
     out[0x00] = a.spell_form;
     out[0x01] = a.misc_flags;
-    out[0x02..0x04].copy_from_slice(&a.location.to_le_bytes());
+    out[0x02..0x04].copy_from_slice(&u16::from(a.location).to_le_bytes());
     write_resref(&mut out[0x04..0x0C], &a.memorised_icon);
-    out[0x0C] = a.target;
+    out[0x0C] = u8::from(a.target);
     out[0x0D] = a.target_count;
     out[0x0E..0x10].copy_from_slice(&a.range.to_le_bytes());
     out[0x10..0x12].copy_from_slice(&a.level_required.to_le_bytes());
@@ -204,24 +204,35 @@ fn write_ability(out: &mut [u8], a: &SplAbility) {
     out[0x26..0x28].copy_from_slice(&a.projectile.to_le_bytes());
 }
 
-fn write_effect(out: &mut [u8], e: &SplEffect) {
+/// A value into a one-byte field, refused when it doesn't fit.
+fn byte(value: u32, field: &str) -> io::Result<u8> {
+    u8::try_from(value).map_err(|_| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("SPL {field} {value} doesn't fit its one-byte field"),
+        )
+    })
+}
+
+fn write_effect(out: &mut [u8], e: &SplEffect) -> io::Result<()> {
     debug_assert_eq!(out.len(), EFFECT_LEN);
     out[0x00..0x02].copy_from_slice(&e.opcode.to_le_bytes());
     out[0x02] = e.target_type;
     out[0x03] = e.power;
     out[0x04..0x08].copy_from_slice(&e.parameter1.to_le_bytes());
     out[0x08..0x0C].copy_from_slice(&e.parameter2.to_le_bytes());
-    out[0x0C] = e.timing_mode;
-    out[0x0D] = e.resistance;
+    out[0x0C] = byte(u32::from(e.timing_mode), "effect timing mode")?;
+    out[0x0D] = byte(e.resistance.bits(), "effect resistance")?;
     out[0x0E..0x12].copy_from_slice(&e.duration.to_le_bytes());
     out[0x12] = e.probability1;
     out[0x13] = e.probability2;
     write_resref(&mut out[0x14..0x1C], &e.resource);
     out[0x1C..0x20].copy_from_slice(&e.dice_thrown.to_le_bytes());
     out[0x20..0x24].copy_from_slice(&e.dice_sides.to_le_bytes());
-    out[0x24..0x28].copy_from_slice(&e.save_type.to_le_bytes());
+    out[0x24..0x28].copy_from_slice(&e.save_type.bits().to_le_bytes());
     out[0x28..0x2C].copy_from_slice(&e.save_bonus.to_le_bytes());
     out[0x2C..0x30].copy_from_slice(&e.trailing_extra.to_le_bytes());
+    Ok(())
 }
 
 /// Encode a String via WINDOWS-1252 into a fixed-width zero-padded

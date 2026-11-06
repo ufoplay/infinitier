@@ -6,8 +6,11 @@ use infinitier_datasource::{DataSource, Importer, ReadExt, Reader, SeekExt};
 use log::{debug, error};
 
 use crate::{
-    ABILITY_LEN, EFFECT_LEN, HEADER_LEN_V1, HEADER_LEN_V1_1, HEADER_LEN_V2, ITM_SIGNATURE, Itm,
-    ItmAbility, ItmEffect, ItmHeader, ItmHeaderV1, ItmHeaderV1_1, ItmHeaderV2, ItmVersion,
+    ABILITY_LEN, AbilityFlags, AbilityLocation, AbilityTarget, AttackType, ChargeDepletion,
+    DamageType, EFFECT_LEN, HEADER_LEN_V1, HEADER_LEN_V1_1, HEADER_LEN_V2, ITM_SIGNATURE,
+    IdRequired, ItemType, Itm, ItmAbility, ItmEffect, ItmFlags, ItmFlagsV1_1, ItmFlagsV2,
+    ItmHeader, ItmHeaderV1, ItmHeaderV1_1, ItmHeaderV2, ItmVersion, KitUsability, Resistance,
+    SaveType, TimingMode, Usability, UsabilityV1_1, UsabilityV2,
 };
 
 /// File reader for ITM resources.
@@ -132,9 +135,10 @@ fn parse_header_v1(reader: &mut ItmReader) -> std::io::Result<ItmHeaderV1> {
     let name_unidentified = reader.read_u32()?;
     let name_identified = reader.read_u32()?;
     let replacement_item = reader.read_string(8)?;
-    let flags = reader.read_u32()?;
-    let item_type = reader.read_u16()?;
-    let usability = reader.read_exact_to_array::<4>()?;
+    let flags = ItmFlags::from_bits_retain(reader.read_u32()?);
+    let item_type = ItemType::from(reader.read_u16()?);
+    let usability =
+        Usability::from_bits_retain(u32::from_le_bytes(reader.read_exact_to_array::<4>()?));
     let item_animation = reader.read_exact_to_array::<2>()?;
     let min_level = reader.read_u16()?;
     let min_strength = reader.read_u16()?;
@@ -178,13 +182,15 @@ fn parse_header_v1(reader: &mut ItmReader) -> std::io::Result<ItmHeaderV1> {
         min_level,
         min_strength,
         min_strength_bonus,
-        kit_usability_1,
+        kit_usability: KitUsability::from_bytes([
+            kit_usability_1,
+            kit_usability_2,
+            kit_usability_3,
+            kit_usability_4,
+        ]),
         min_intelligence,
-        kit_usability_2,
         min_dexterity,
-        kit_usability_3,
         min_wisdom,
-        kit_usability_4,
         min_constitution,
         weapon_proficiency,
         min_charisma,
@@ -208,9 +214,10 @@ fn parse_header_v1_1(reader: &mut ItmReader) -> std::io::Result<ItmHeaderV1_1> {
     let name_unidentified = reader.read_u32()?;
     let name_identified = reader.read_u32()?;
     let drop_sound = reader.read_string(8)?;
-    let flags = reader.read_u32()?;
-    let item_type = reader.read_u16()?;
-    let usability = reader.read_exact_to_array::<4>()?;
+    let flags = ItmFlagsV1_1::from_bits_retain(reader.read_u32()?);
+    let item_type = ItemType::from(reader.read_u16()?);
+    let usability =
+        UsabilityV1_1::from_bits_retain(u32::from_le_bytes(reader.read_exact_to_array::<4>()?));
     let item_animation = reader.read_exact_to_array::<2>()?;
     let min_level = reader.read_u16()?;
     // 0x26..0x34: 7 × u16 "unused" PST stat slots.
@@ -278,24 +285,31 @@ fn parse_header_v2(reader: &mut ItmReader) -> std::io::Result<ItmHeaderV2> {
     let mut trailing_unknown = vec![0u8; HEADER_LEN_V2 - HEADER_LEN_V1];
     reader.read_exact(&mut trailing_unknown)?;
     debug_assert_eq!(reader.position()?, HEADER_LEN_V2 as u64);
+    // The same bytes, read with IWD2's meanings.
+    let [
+        kit_usability_1,
+        kit_usability_2,
+        kit_usability_3,
+        kit_usability_4,
+    ] = v1.kit_usability.to_bytes();
     Ok(ItmHeaderV2 {
         name_unidentified: v1.name_unidentified,
         name_identified: v1.name_identified,
         replacement_item: v1.replacement_item,
-        flags: v1.flags,
+        flags: ItmFlagsV2::from_bits_retain(v1.flags.bits()),
         item_type: v1.item_type,
-        usability: v1.usability,
+        usability: UsabilityV2::from_bits_retain(v1.usability.bits()),
         item_animation: v1.item_animation,
         min_level: v1.min_level,
         min_strength: v1.min_strength,
         min_strength_bonus: v1.min_strength_bonus,
-        kit_usability_1: v1.kit_usability_1,
+        kit_usability_1,
         min_intelligence: v1.min_intelligence,
-        kit_usability_2: v1.kit_usability_2,
+        kit_usability_2,
         min_dexterity: v1.min_dexterity,
-        kit_usability_3: v1.kit_usability_3,
+        kit_usability_3,
         min_wisdom: v1.min_wisdom,
-        kit_usability_4: v1.kit_usability_4,
+        kit_usability_4,
         min_constitution: v1.min_constitution,
         weapon_proficiency: v1.weapon_proficiency,
         min_charisma: v1.min_charisma,
@@ -336,12 +350,12 @@ fn parse_abilities(
 }
 
 fn parse_ability(reader: &mut ItmReader) -> std::io::Result<ItmAbility> {
-    let attack_type = reader.read_u8()?;
-    let id_required = reader.read_u8()?;
-    let location = reader.read_u8()?;
+    let attack_type = AttackType::from(reader.read_u8()?);
+    let id_required = IdRequired::from_bits_retain(reader.read_u8()?);
+    let location = AbilityLocation::from(u16::from(reader.read_u8()?));
     let alt_dice_sides = reader.read_u8()?;
     let use_icon = reader.read_string(8)?;
-    let target = reader.read_u8()?;
+    let target = AbilityTarget::from(reader.read_u8()?);
     let target_count = reader.read_u8()?;
     let range = reader.read_u16()?;
     let projectile_type = reader.read_u8()?;
@@ -354,12 +368,12 @@ fn parse_ability(reader: &mut ItmReader) -> std::io::Result<ItmAbility> {
     let dice_thrown = reader.read_u8()?;
     let secondary_type = reader.read_u8()?;
     let damage_bonus = reader.read_u16()?;
-    let damage_type = reader.read_u16()?;
+    let damage_type = DamageType::from(reader.read_u16()?);
     let num_effects = reader.read_u16()?;
     let first_effect_index = reader.read_u16()?;
     let max_charges = reader.read_u16()?;
-    let charge_depletion = reader.read_u16()?;
-    let flags = reader.read_u32()?;
+    let charge_depletion = ChargeDepletion::from(reader.read_u16()?);
+    let flags = AbilityFlags::from_bits_retain(reader.read_u32()?);
     let projectile_animation = reader.read_u16()?;
     let melee_animation = [reader.read_u16()?, reader.read_u16()?, reader.read_u16()?];
     let qualifier_arrow = reader.read_u16()?;
@@ -424,15 +438,15 @@ fn parse_effect(reader: &mut ItmReader) -> std::io::Result<ItmEffect> {
     let power = reader.read_u8()?;
     let parameter1 = reader.read_u32()?;
     let parameter2 = reader.read_u32()?;
-    let timing_mode = reader.read_u8()?;
-    let resistance = reader.read_u8()?;
+    let timing_mode = TimingMode::from(u32::from(reader.read_u8()?));
+    let resistance = Resistance::from_bits_retain(u32::from(reader.read_u8()?));
     let duration = reader.read_u32()?;
     let probability1 = reader.read_u8()?;
     let probability2 = reader.read_u8()?;
     let resource = reader.read_string(8)?;
     let dice_thrown = reader.read_u32()?;
     let dice_sides = reader.read_u32()?;
-    let save_type = reader.read_u32()?;
+    let save_type = SaveType::from_bits_retain(reader.read_u32()?);
     let save_bonus = reader.read_i32()?;
     let trailing_extra = reader.read_u32()?;
     Ok(ItmEffect {

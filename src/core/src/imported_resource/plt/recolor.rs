@@ -126,6 +126,8 @@ fn set(colors: Colors, color: u8, gradient: u8) -> Colors {
 
 #[cfg(test)]
 mod tests {
+    use infinitier_itm_resource::{Resistance, SaveType, TimingMode};
+
     use super::*;
 
     fn effect(opcode: u16, gradient: u32, location: u32) -> ItmEffect {
@@ -135,15 +137,15 @@ mod tests {
             power: 0,
             parameter1: gradient,
             parameter2: location,
-            timing_mode: 2,
-            resistance: 0,
+            timing_mode: TimingMode::InstantWhileEquipped,
+            resistance: Resistance::empty(),
             duration: 0,
             probability1: 100,
             probability2: 0,
             resource: String::new(),
             dice_thrown: 0,
             dice_sides: 0,
-            save_type: 0,
+            save_type: SaveType::empty(),
             save_bonus: 0,
             trailing_extra: 0,
         }

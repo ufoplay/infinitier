@@ -29,7 +29,11 @@
 //! layouts across V1 and V2.
 
 mod exporter;
+mod flags;
 mod importer;
+
+pub use flags::{ExclusionFlags, SpellType, SplFlags};
+pub use infinitier_common::{AbilityLocation, AbilityTarget, Resistance, SaveType, TimingMode};
 
 pub use exporter::SplExporter;
 pub use importer::SplImporter;
@@ -159,7 +163,7 @@ impl SplHeader {
     }
     /// Spell type — `0` Special, `1` Wizard, `2` Priest, `3`
     /// Psionic, `4` Innate, `5` Bard song.
-    pub fn spell_type(&self) -> u16 {
+    pub fn spell_type(&self) -> SpellType {
         match self {
             SplHeader::V1(h) => h.spell_type,
             SplHeader::V2(h) => h.spell_type,
@@ -196,13 +200,12 @@ pub struct SplHeaderV1 {
     /// 0x10: 8-byte ASCIIZ WAV resref played at the end of the
     /// casting animation.
     pub completion_sound: String,
-    /// 0x18: spell flags bitfield (see IESDP `Header_Flags`).
-    pub flags: u32,
-    /// 0x1C: spell type — `0` Special, `1` Wizard, `2` Priest,
-    /// `3` Psionic, `4` Innate, `5` Bard song.
-    pub spell_type: u16,
-    /// 0x1E: exclusion flags (which other spells this one suppresses).
-    pub exclusion_flags: u32,
+    /// 0x18: spell flags.
+    pub flags: SplFlags,
+    /// 0x1C: the kind of spell.
+    pub spell_type: SpellType,
+    /// 0x1E: who can't cast it.
+    pub exclusion_flags: ExclusionFlags,
     /// 0x22: casting-graphics enum.
     pub casting_graphics: u16,
     /// 0x24: minimum caster level (unused on most engines).
@@ -273,9 +276,9 @@ pub struct SplHeaderV2 {
     pub name_unidentified: u32,
     pub name_identified: u32,
     pub completion_sound: String,
-    pub flags: u32,
-    pub spell_type: u16,
-    pub exclusion_flags: u32,
+    pub flags: SplFlags,
+    pub spell_type: SpellType,
+    pub exclusion_flags: ExclusionFlags,
     pub casting_graphics: u16,
     pub min_level: u8,
     pub primary_type: u8,
@@ -320,13 +323,12 @@ pub struct SplAbility {
     pub spell_form: u8,
     /// 0x01: misc flags (PST uses bit 2 for "friendly").
     pub misc_flags: u8,
-    /// 0x02: usable-location — `0` none, `2` spell book, `4`
-    /// innate, …
-    pub location: u16,
+    /// 0x02: where the ability is used from.
+    pub location: AbilityLocation,
     /// 0x04: 8-byte ASCIIZ BAM resref for the memorised icon.
     pub memorised_icon: String,
-    /// 0x0C: target type.
-    pub target: u8,
+    /// 0x0C: what the ability targets.
+    pub target: AbilityTarget,
     /// 0x0D: target count (for area / multi-target spells).
     pub target_count: u8,
     /// 0x0E: targeting range (in feet).
@@ -373,10 +375,11 @@ pub struct SplEffect {
     pub parameter1: u32,
     /// 0x08: opcode-specific parameter 2.
     pub parameter2: u32,
-    /// 0x0C: timing mode (0 = duration, 1 = permanent, …).
-    pub timing_mode: u8,
-    /// 0x0D: resistance flags (dispel / magic resistance gating).
-    pub resistance: u8,
+    /// 0x0C: when the effect applies and how long it lasts (one byte on
+    /// disk).
+    pub timing_mode: TimingMode,
+    /// 0x0D: whether it can be dispelled and resisted (one byte on disk).
+    pub resistance: Resistance,
     /// 0x0E: duration in seconds (for duration timing modes).
     pub duration: u32,
     /// 0x12: probability 1.
@@ -389,8 +392,8 @@ pub struct SplEffect {
     pub dice_thrown: u32,
     /// 0x20: dice sides (or min level for some opcodes).
     pub dice_sides: u32,
-    /// 0x24: saving-throw type bitfield.
-    pub save_type: u32,
+    /// 0x24: the saving throws against it.
+    pub save_type: SaveType,
     /// 0x28: saving-throw bonus (signed).
     pub save_bonus: i32,
     /// 0x2C: trailing 4-byte field — TobEx labels this "stacking

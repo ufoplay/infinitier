@@ -11,4 +11,6 @@ readme = "readme.md"
 keywords = ["infinity-engine", "baldurs-gate"]
 
 [dependencies]
+bitflags = { workspace = true }
+num_enum = { workspace = true }
 serde = { workspace = true }

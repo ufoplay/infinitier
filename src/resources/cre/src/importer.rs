@@ -6,6 +6,7 @@ use infinitier_common::Game;
 use infinitier_datasource::{DataSource, Importer, ReadExt, Reader, SeekExt};
 use log::{debug, error};
 
+use crate::MemorizationFlags;
 use crate::{
     CRE_SIGNATURE, Cre, CreHeader, CreVersion, Effect, EffectList, EffectV1, EffectV1Body,
     EffectV2, Item, ItemFlags, Iwd2Slot, Iwd2Table, KnownSpell, MemorizedSpell,
@@ -525,7 +526,7 @@ fn parse_memorized_spells(
         reader.set_position(start + i * MEMORIZED_SPELL_LEN)?;
         out.push(MemorizedSpell {
             spell: reader.read_string(8)?,
-            memorization_flags: reader.read_u16()?,
+            memorization_flags: MemorizationFlags::from_bits_retain(reader.read_u16()?),
             padding: reader.read_u16()?,
         });
     }

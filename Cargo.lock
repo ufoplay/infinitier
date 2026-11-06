@@ -3590,6 +3590,8 @@ dependencies = [
 name = "infinitier_common"
 version = "0.0.17"
 dependencies = [
+ "bitflags 2.13.2",
+ "num_enum",
  "serde",
 ]
 
@@ -3746,10 +3748,13 @@ dependencies = [
 name = "infinitier_itm_resource"
 version = "0.0.17"
 dependencies = [
+ "bitflags 2.13.2",
  "encoding_rs",
+ "infinitier_common",
  "infinitier_datasource",
  "infinitier_test_utils",
  "log",
+ "num_enum",
  "tempfile",
 ]
 
@@ -3876,10 +3881,13 @@ dependencies = [
 name = "infinitier_spl_resource"
 version = "0.0.17"
 dependencies = [
+ "bitflags 2.13.2",
  "encoding_rs",
+ "infinitier_common",
  "infinitier_datasource",
  "infinitier_test_utils",
  "log",
+ "num_enum",
  "tempfile",
 ]
 
