@@ -159,7 +159,12 @@ fn show_edit_table(ui: &AppWindow, table: EditTable) {
                 .map(|header| table::column(header, value_width, Overflow::Elide)),
         )
         .collect();
-    adapter.set_columns(rows_model(columns));
+    // Kept unless they change: each row's cells repeat over the columns, so
+    // a new model rebuilds every cell — the number being dragged too, which
+    // ends the drag after its first step (each step commits and refreshes).
+    if rows_changed(&adapter.get_columns(), &columns) {
+        adapter.set_columns(rows_model(columns));
+    }
     let rows = rows
         .into_iter()
         .map(|row| {
@@ -207,7 +212,11 @@ fn show_grid(
         .zip(widths)
         .map(|(header, width)| table::column(header, *width, overflow))
         .collect();
-    adapter.set_columns(rows_model(columns));
+    // Kept unless they change, which would rebuild every cell (see
+    // `show_edit_table`).
+    if rows_changed(&adapter.get_columns(), &columns) {
+        adapter.set_columns(rows_model(columns));
+    }
     let rows = rows
         .into_iter()
         .map(|cells| cells.into_iter().map(table::text).collect())
