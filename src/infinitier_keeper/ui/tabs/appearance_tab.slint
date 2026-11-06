@@ -1,6 +1,7 @@
-// The Appearance tab: the animation, picked by name; the colour swatches, each
-// opening a grid of the game's gradients to pick from; and, to their right,
-// the character's paperdoll and portrait. In a ScrollArea like the card tabs:
+// The Appearance tab: the colour swatches, each opening a grid of the game's
+// gradients to pick from; and, to their right, the character's paperdoll and
+// its two portraits, each over a dropdown to pick it by name (the doll's picks
+// the animation). In a ScrollArea like the card tabs:
 // the fixed-width swatch rows would otherwise cap the panel's (and so the
 // window's) width.
 
@@ -31,9 +32,18 @@ export global AppearanceAdapter {
     // Whether the doll has equipment to show or hide, and whether it shows it.
     in property <bool> doll-has-equipment;
     in property <bool> show-equipment;
-    // Empty when the game has no portrait for this character.
-    in property <image> portrait;
+    // The small and the large portrait: the game's pictures to pick each
+    // from, by name, the character's, and its picture (empty when the game
+    // has none by that name).
+    in property <[string]> small-portraits;
+    in property <int> small-portrait-index;
+    in property <image> small-portrait;
+    in property <[string]> large-portraits;
+    in property <int> large-portrait-index;
+    in property <image> large-portrait;
     callback select-animation(index: int);
+    callback select-small-portrait(index: int);
+    callback select-large-portrait(index: int);
     // Set the colour of swatch row `slot` to gradient `gradient`.
     callback pick-color(slot: int, gradient: int);
     callback toggle-equipment();
@@ -155,19 +165,54 @@ component SwatchButton inherits Rectangle {
     }
 }
 
-export component AppearanceTab inherits ScrollArea {
-    content-spacing: Theme.spacing.sm;
-    HorizontalLayout {
-        alignment: start;
-        spacing: Theme.spacing.md;
-        Label { text: "Appearance"; width: Metrics.appearance-label-width; }
-        Select {
-            width: Metrics.appearance-animation-width;
-            options: AppearanceAdapter.animations;
-            current-index: AppearanceAdapter.animation-index;
-            selected(index) => { AppearanceAdapter.select-animation(index); }
+// One of the character's portraits: the picture in a fixed box, so that the
+// card keeps its size from one character to the next, over the dropdown to
+// pick it from the game's pictures. Every portrait's box is as tall, which
+// lines their dropdowns up. Picking one reports `selected(index)`.
+component PortraitPicker inherits VerticalLayout {
+    in property <string> label;
+    in property <[string]> names;
+    in property <int> current-index;
+    in property <image> picture;
+    in property <length> box-width;
+    callback selected(index: int);
+
+    alignment: start;
+    spacing: Theme.spacing.sm;
+    Label { text: root.label; role: TextRole.caption; tone: Tone.muted; }
+    // A picture larger than the box shrinks to fit it; a smaller one (the
+    // original games' are) keeps its size, which shows how the two compare,
+    // and isn't blurred. Its top is the box's, level with the other's.
+    Rectangle {
+        width: root.box-width;
+        height: Metrics.appearance-portrait-height;
+        if root.picture.width == 0: Label {
+            width: parent.width;
+            text: "Image not available";
+            tone: Tone.muted;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        if root.picture.width > 0: Image {
+            property <float> scale: min(1,
+                parent.width / (self.source.width * Metrics.appearance-art-pixel),
+                parent.height / (self.source.height * Metrics.appearance-art-pixel));
+            y: 0;
+            source: root.picture;
+            width: self.source.width * self.scale * Metrics.appearance-art-pixel;
+            height: self.source.height * self.scale * Metrics.appearance-art-pixel;
         }
     }
+    Select {
+        width: root.box-width;
+        options: root.names;
+        current-index: root.current-index;
+        selected(index) => { root.selected(index); }
+    }
+}
+
+export component AppearanceTab inherits ScrollArea {
+    content-spacing: Theme.spacing.sm;
     HorizontalLayout {
         alignment: start;
         spacing: Theme.spacing.md;
@@ -208,13 +253,21 @@ export component AppearanceTab inherits ScrollArea {
                     }
                     if AppearanceAdapter.doll.width > 0: Image {
                         property <float> scale: max(1, floor(min(
-                            parent.width / (self.source.width * Metrics.appearance-doll-pixel),
-                            parent.height / (self.source.height * Metrics.appearance-doll-pixel))));
+                            parent.width / (self.source.width * Metrics.appearance-art-pixel),
+                            parent.height / (self.source.height * Metrics.appearance-art-pixel))));
                         source: AppearanceAdapter.doll;
-                        width: self.source.width * self.scale * Metrics.appearance-doll-pixel;
-                        height: self.source.height * self.scale * Metrics.appearance-doll-pixel;
+                        width: self.source.width * self.scale * Metrics.appearance-art-pixel;
+                        height: self.source.height * self.scale * Metrics.appearance-art-pixel;
                         image-rendering: pixelated;
                     }
+                }
+                // The animation, by name: the doll above is its art.
+                Select {
+                    width: Metrics.appearance-doll-width;
+                    accessible-label: "Appearance";
+                    options: AppearanceAdapter.animations;
+                    current-index: AppearanceAdapter.animation-index;
+                    selected(index) => { AppearanceAdapter.select-animation(index); }
                 }
                 if AppearanceAdapter.doll-has-equipment: Checkbox {
                     text: "Show equipment";
@@ -225,17 +278,30 @@ export component AppearanceTab inherits ScrollArea {
                 }
             }
         }
-        if AppearanceAdapter.portrait.width > 0: Card {
+        Card {
             VerticalLayout {
                 alignment: start;
                 spacing: Theme.spacing.sm;
-                Label { text: "Portrait"; role: TextRole.heading; }
-                // Portraits' sizes and shapes vary by game (PST's are
-                // landscape), so the height follows the image.
-                Image {
-                    source: AppearanceAdapter.portrait;
-                    width: Metrics.appearance-portrait-width;
-                    height: self.width * self.source.height / self.source.width;
+                Label { text: "Portraits"; role: TextRole.heading; }
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: Theme.spacing.md;
+                    PortraitPicker {
+                        label: "Large";
+                        names: AppearanceAdapter.large-portraits;
+                        current-index: AppearanceAdapter.large-portrait-index;
+                        picture: AppearanceAdapter.large-portrait;
+                        box-width: Metrics.appearance-portrait-width;
+                        selected(index) => { AppearanceAdapter.select-large-portrait(index); }
+                    }
+                    PortraitPicker {
+                        label: "Small";
+                        names: AppearanceAdapter.small-portraits;
+                        current-index: AppearanceAdapter.small-portrait-index;
+                        picture: AppearanceAdapter.small-portrait;
+                        box-width: Metrics.appearance-small-portrait-width;
+                        selected(index) => { AppearanceAdapter.select-small-portrait(index); }
+                    }
                 }
             }
         }

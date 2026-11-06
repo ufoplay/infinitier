@@ -219,7 +219,7 @@ fn show_grid(
     show(ui, CharacterContent::Grid);
 }
 
-/// The animation name, the colour swatches, the paperdoll and the portrait.
+/// The animation name, the colour swatches, the paperdoll and the portraits.
 fn show_appearance(ui: &AppWindow, page: appearance::Page) {
     let appearance::Page {
         animations,
@@ -229,7 +229,8 @@ fn show_appearance(ui: &AppWindow, page: appearance::Page) {
         doll,
         doll_has_equipment,
         equipment,
-        portrait,
+        small_portrait,
+        large_portrait,
     } = page;
     let adapter = ui.global::<AppearanceAdapter>();
     // Long lists, the same from one character to the next: kept unless
@@ -245,7 +246,16 @@ fn show_appearance(ui: &AppWindow, page: appearance::Page) {
     adapter.set_doll(doll);
     adapter.set_doll_has_equipment(doll_has_equipment);
     adapter.set_show_equipment(equipment == Equipment::Shown);
-    adapter.set_portrait(portrait);
+    if rows_changed(&adapter.get_small_portraits(), &small_portrait.names) {
+        adapter.set_small_portraits(rows_model(small_portrait.names));
+    }
+    adapter.set_small_portrait_index(small_portrait.index);
+    adapter.set_small_portrait(small_portrait.image);
+    if rows_changed(&adapter.get_large_portraits(), &large_portrait.names) {
+        adapter.set_large_portraits(rows_model(large_portrait.names));
+    }
+    adapter.set_large_portrait_index(large_portrait.index);
+    adapter.set_large_portrait(large_portrait.image);
     show(ui, CharacterContent::Appearance);
 }
 

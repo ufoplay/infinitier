@@ -3024,6 +3024,30 @@ impl Cre {
         }
     }
 
+    /// Set the small portrait to resource `name` (at most 8 characters are
+    /// written).
+    pub fn set_small_portrait_name(&mut self, name: &str) {
+        let field = match &mut self.header {
+            CreHeader::V10(h) => &mut h.small_portrait_bmp,
+            CreHeader::V12(h) => &mut h.small_portrait_bmp,
+            CreHeader::V90(h) => &mut h.small_portrait,
+            CreHeader::V22(h) => &mut h.small_portrait_bmp,
+        };
+        name.clone_into(field);
+    }
+
+    /// Set the large portrait to resource `name` (at most 8 characters are
+    /// written).
+    pub fn set_large_portrait_name(&mut self, name: &str) {
+        let field = match &mut self.header {
+            CreHeader::V10(h) => &mut h.large_portrait_pstee_bam_other_games,
+            CreHeader::V12(h) => &mut h.large_portrait_bmp,
+            CreHeader::V90(h) => &mut h.large_portrait,
+            CreHeader::V22(h) => &mut h.large_portrait_bmp,
+        };
+        name.clone_into(field);
+    }
+
     /// The creature's animation, an `ANIMATE.IDS` value.
     pub fn animation_id(&self) -> u32 {
         match &self.header {
@@ -3571,10 +3595,15 @@ mod tests {
             let name = cre.long_name_strref();
             cre.set_colors(colors);
             cre.set_animation_id(0x6012);
+            // Short names: no byte of a longer old one may be left behind.
+            cre.set_small_portrait_name("MAN2S");
+            cre.set_large_portrait_name("MAN2L");
 
             let rt = round_trip(&cre);
             assert_eq!(rt.colors(), colors, "{fixture}");
             assert_eq!(rt.animation_id(), 0x6012, "{fixture}");
+            assert_eq!(rt.small_portrait_name(), "MAN2S", "{fixture}");
+            assert_eq!(rt.large_portrait_name(), "MAN2L", "{fixture}");
             assert_eq!(rt.long_name_strref(), name, "{fixture}");
         }
     }

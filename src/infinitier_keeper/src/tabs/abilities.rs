@@ -231,10 +231,10 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
     [
         vec![
             card("Ability scores", 0, ability_rows),
-            card("Combat & status", 0, combat_rows),
+            card("Experience & levels", 0, xp_rows),
         ],
         vec![
-            card("Experience & levels", 1, xp_rows),
+            card("Combat & status", 1, combat_rows),
             card("Morale", 1, morale_rows),
         ],
         vec![skills_card],

@@ -5,6 +5,7 @@ pub mod fs;
 pub mod game;
 pub mod game_detect;
 pub mod imported_resource;
+pub mod portraits;
 pub mod resource;
 pub mod save_games;
 pub mod unhardcoded;

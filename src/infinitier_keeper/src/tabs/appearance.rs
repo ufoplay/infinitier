@@ -4,7 +4,10 @@
 //! its seven colours (hair/skin/clothing×2/armour/leather/metal) as beveled
 //! swatches (see [`swatch`]), each picked from the game's gradients; the
 //! paperdoll painted in them, with its equipment or without
-//! ([`ImportedPlt`]); and the portrait.
+//! ([`ImportedPlt`]); and its small and large portraits, each picked from
+//! the game's pictures for that portrait ([`portrait_names`]).
+//!
+//! [`portrait_names`]: infinitier_core::portraits::portrait_names
 
 mod swatch;
 
@@ -12,6 +15,7 @@ use std::collections::HashSet;
 
 use infinitier_core::game::GameData;
 use infinitier_core::imported_resource::plt::{Equipment, Gradients, ImportedPlt};
+use infinitier_core::portraits::PortraitSlot;
 use infinitier_core::resource::cre::{Colors, Cre};
 use infinitier_core::resource::ids::Ids;
 use slint::{Image, SharedString};
@@ -48,8 +52,27 @@ pub struct Page {
     pub doll_has_equipment: bool,
     /// Whether the doll shows it.
     pub equipment: Equipment,
-    /// Empty when the game has no portrait for the creature.
-    pub portrait: Image,
+    pub small_portrait: Portrait,
+    pub large_portrait: Portrait,
+}
+
+/// One of the creature's portraits.
+pub struct Portrait {
+    /// The pictures to pick it from, by name, and the creature's.
+    pub names: Vec<SharedString>,
+    pub index: i32,
+    /// Empty when the game has no picture by that name.
+    pub image: Image,
+}
+
+impl Default for Portrait {
+    fn default() -> Self {
+        Self {
+            names: Vec::new(),
+            index: -1,
+            image: Image::default(),
+        }
+    }
 }
 
 /// The animations to pick from, as `(ANIMATE.IDS value, name)`: each value
@@ -93,17 +116,62 @@ fn title_case(symbol: &str) -> String {
         .join(" ")
 }
 
-/// The creature's large (then small) portrait, empty when the game has
-/// neither. A BMP, except for the BAM that PST and PSTEE keep in the large
-/// slot.
-fn portrait(game_data: &GameData, cre: &Cre) -> Image {
-    [cre.large_portrait_name(), cre.small_portrait_name()]
-        .into_iter()
-        .filter(|name| !name.is_empty())
-        .find_map(|name| {
-            icons::bmp_image(game_data, name).or_else(|| icons::bam_icon(game_data, name))
-        })
+/// The name of the creature's portrait in `slot`.
+fn portrait_name(cre: &Cre, slot: PortraitSlot) -> &str {
+    match slot {
+        PortraitSlot::Small => cre.small_portrait_name(),
+        PortraitSlot::Large => cre.large_portrait_name(),
+    }
+}
+
+/// The pictures to pick a portrait from, the game's `names`, with `current`
+/// first when it isn't one of them (a picture of another size, one the game
+/// lacks, or none); and `current`'s place in them.
+fn portrait_choices(names: &[String], current: &str) -> (Vec<String>, usize) {
+    match names
+        .iter()
+        .position(|name| name.eq_ignore_ascii_case(current))
+    {
+        Some(index) => (names.to_vec(), index),
+        None => (
+            std::iter::once(current.to_owned())
+                .chain(names.iter().cloned())
+                .collect(),
+            0,
+        ),
+    }
+}
+
+/// How the dropdown names picture `name`.
+fn portrait_label(name: &str) -> SharedString {
+    if name.is_empty() {
+        "None".into()
+    } else {
+        name.into()
+    }
+}
+
+/// The picture `name`, empty when the game has none: a BMP, or the BAM that
+/// PST keeps as a large portrait.
+fn picture(game_data: &GameData, name: &str) -> Image {
+    if name.is_empty() {
+        return Image::default();
+    }
+    icons::bmp_image(game_data, name)
+        .or_else(|| icons::bam_icon(game_data, name))
         .unwrap_or_default()
+}
+
+/// The creature's portrait in `slot`, and the game's pictures to pick it
+/// from.
+fn portrait(model: &Model, cre: &Cre, slot: PortraitSlot) -> Portrait {
+    let current = portrait_name(cre, slot);
+    let (choices, index) = portrait_choices(model.portrait_names(slot), current);
+    Portrait {
+        names: choices.iter().map(|name| portrait_label(name)).collect(),
+        index: i32::try_from(index).unwrap_or(-1),
+        image: picture(&model.game_data, current),
+    }
 }
 
 /// One swatch per colour slot, labelled.
@@ -144,7 +212,8 @@ pub fn build(model: &Model) -> Page {
             doll: Image::default(),
             doll_has_equipment: false,
             equipment: model.doll_equipment,
-            portrait: Image::default(),
+            small_portrait: Portrait::default(),
+            large_portrait: Portrait::default(),
         };
     };
     let animation = cre.animation_id();
@@ -166,7 +235,8 @@ pub fn build(model: &Model) -> Page {
             .unwrap_or_default(),
         doll_has_equipment: doll.as_ref().is_some_and(ImportedPlt::has_equipment),
         equipment: model.doll_equipment,
-        portrait: portrait(game_data, cre),
+        small_portrait: portrait(model, cre, PortraitSlot::Small),
+        large_portrait: portrait(model, cre, PortraitSlot::Large),
     }
 }
 
@@ -185,6 +255,30 @@ pub fn select_animation(model: &mut Model, index: i32) {
     };
     if let Some(cre) = model.selected_cre_mut() {
         cre.set_animation_id(animation);
+    }
+}
+
+/// Set the selected creature's portrait in `slot` to the `index`th of its
+/// dropdown's choices.
+pub fn select_portrait(model: &mut Model, slot: PortraitSlot, index: i32) {
+    let Some(current) = model
+        .selected_cre()
+        .map(|cre| portrait_name(cre, slot).to_owned())
+    else {
+        return;
+    };
+    let (choices, _) = portrait_choices(model.portrait_names(slot), &current);
+    let Some(name) = usize::try_from(index)
+        .ok()
+        .and_then(|index| choices.into_iter().nth(index))
+    else {
+        return;
+    };
+    if let Some(cre) = model.selected_cre_mut() {
+        match slot {
+            PortraitSlot::Small => cre.set_small_portrait_name(&name),
+            PortraitSlot::Large => cre.set_large_portrait_name(&name),
+        }
     }
 }
 
@@ -251,6 +345,25 @@ mod tests {
             animation_choices(None, 0x6000),
             [(0x6000, "0x6000".to_owned())]
         );
+    }
+
+    #[test]
+    fn a_listed_portrait_is_picked_where_it_is() {
+        let names = ["AJANTISM".to_owned(), "NMINSCM".to_owned()];
+        assert_eq!(portrait_choices(&names, "nminscm"), (names.to_vec(), 1));
+    }
+
+    #[test]
+    fn an_unlisted_or_missing_portrait_comes_first() {
+        let names = ["NMINSCM".to_owned()];
+        assert_eq!(
+            portrait_choices(&names, "CUSTOMS"),
+            (vec!["CUSTOMS".to_owned(), "NMINSCM".to_owned()], 0)
+        );
+        let (choices, index) = portrait_choices(&names, "");
+        assert_eq!((choices[index].as_str(), choices.len()), ("", 2));
+        assert_eq!(portrait_label(""), "None");
+        assert_eq!(portrait_label("NMINSCM"), "NMINSCM");
     }
 
     #[test]

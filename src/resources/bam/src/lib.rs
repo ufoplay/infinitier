@@ -3,11 +3,13 @@
 pub mod common;
 mod exporter;
 mod importer;
+mod size;
 
 pub use exporter::BamExporter;
 pub use importer::v1::{BamV1, BamV1Cycle, BamV1Frame, SharedRect};
 pub use importer::v2::{BamV2, BamV2Cycle, BamV2DataBlock, BamV2Frame};
 pub use importer::{BamImporter, detect_bam_type};
+pub use size::first_frame_size;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {

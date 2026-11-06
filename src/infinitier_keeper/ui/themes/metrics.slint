@@ -4,8 +4,8 @@
 
 export global Metrics {
     // The main window.
-    out property <length> window-width: 1100px;
-    out property <length> window-height: 760px;
+    out property <length> window-width: 1280px;
+    out property <length> window-height: 880px;
     out property <length> window-min-width: 820px;
     out property <length> window-min-height: 520px;
 
@@ -39,19 +39,20 @@ export global Metrics {
     // input / value column.
     out property <length> field-label-min-width: 40px;
     out property <length> field-input-width: 96px;
-    // Appearance: the labels' column, the animation dropdown, the colour
-    // swatches and the picker's grid of them, the paperdoll's box and the size
-    // of one of the art's pixels in it (scaled up to fit), and the portrait's
-    // width (its height follows the image).
+    // Appearance: the colours' labels column, the colour swatches and the
+    // picker's grid of them, the paperdoll's box (the animation dropdown under
+    // it is as wide), the large and the small portrait's box widths and their
+    // shared height, and the size of one of the art's pixels in them.
     out property <length> appearance-label-width: 130px;
-    out property <length> appearance-animation-width: 300px;
     out property <length> swatch-size: 24px;
     out property <length> palette-swatch-size: 20px;
     out property <int> palette-columns: 16;
     out property <length> appearance-doll-width: 256px;
     out property <length> appearance-doll-height: 320px;
-    out property <length> appearance-doll-pixel: 1px;
-    out property <length> appearance-portrait-width: 169px;
+    out property <length> appearance-portrait-width: 150px;
+    out property <length> appearance-portrait-height: 236px;
+    out property <length> appearance-small-portrait-width: 128px;
+    out property <length> appearance-art-pixel: 1px;
     // Local / Global Variables: the names' column.
     out property <length> variable-name-width: 300px;
     // Memorization / Proficiencies: the table's widest, and its value

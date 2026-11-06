@@ -2,6 +2,7 @@
 //! editable content.
 
 use infinitier_core::imported_resource::plt::Equipment;
+use infinitier_core::portraits::PortraitSlot;
 use slint::ComponentHandle;
 
 use super::{AppRc, on_model};
@@ -26,7 +27,7 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_spells(ui, app);
 }
 
-/// Appearance: pick the animation or a colour, show or hide the
+/// Appearance: pick the animation, a colour or a portrait, show or hide the
 /// paperdoll's equipment.
 fn wire_appearance(ui: &AppWindow, app: &AppRc) {
     let adapter = ui.global::<AppearanceAdapter>();
@@ -44,6 +45,15 @@ fn wire_appearance(ui: &AppWindow, app: &AppRc) {
             on_model(&ui, &app, |m| appearance::pick_color(m, slot, gradient));
         });
     }
+    let select_portrait = |slot| {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        move |index| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| appearance::select_portrait(m, slot, index));
+        }
+    };
+    adapter.on_select_small_portrait(select_portrait(PortraitSlot::Small));
+    adapter.on_select_large_portrait(select_portrait(PortraitSlot::Large));
     {
         let (app, weak) = (app.clone(), ui.as_weak());
         adapter.on_toggle_equipment(move || {

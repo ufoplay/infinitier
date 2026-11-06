@@ -68,6 +68,45 @@ fn decode_bmp(bytes: &[u8], name: &str) -> std::io::Result<Bmp> {
     ))
 }
 
+/// The width and height the BMP's header declares, read without decoding
+/// its pixels.
+pub fn dimensions(source: &DataSource) -> std::io::Result<(u32, u32)> {
+    let mut header = [0; 26];
+    source.reader()?.read_exact(&mut header)?;
+    header_dimensions(&header)
+}
+
+/// [`dimensions`] from the file header and the start of the DIB header: an
+/// OS/2 `BITMAPCOREHEADER` (12 bytes) has u16 sizes, every later one i32
+/// sizes, the height negative when the rows run top-down.
+fn header_dimensions(header: &[u8; 26]) -> std::io::Result<(u32, u32)> {
+    if &header[..2] != b"BM" {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "not a BMP",
+        ));
+    }
+    let at = |offset: usize| -> [u8; 4] {
+        [
+            header[offset],
+            header[offset + 1],
+            header[offset + 2],
+            header[offset + 3],
+        ]
+    };
+    Ok(if u32::from_le_bytes(at(14)) == 12 {
+        (
+            u32::from(u16::from_le_bytes([header[18], header[19]])),
+            u32::from(u16::from_le_bytes([header[20], header[21]])),
+        )
+    } else {
+        (
+            i32::from_le_bytes(at(18)).unsigned_abs(),
+            i32::from_le_bytes(at(22)).unsigned_abs(),
+        )
+    })
+}
+
 /// Returns `(bit_count, compression)` from a BITMAPINFOHEADER-style DIB header,
 /// or sentinel values when the header is too short to read.
 fn parse_bmp_header(bytes: &[u8]) -> (u16, BmpCompression) {
@@ -156,6 +195,38 @@ mod tests {
         let bmp = BmpImporter { name: "bmp_name" }.import(&data).unwrap();
 
         assert_images_are_equal(&bmp.image.clone().into(), &original, None);
+    }
+
+    #[test]
+    fn dimensions_are_those_it_decodes_to() {
+        for name in ["BMP/CCHAN05.BMP", "BMP/MINSCM.BMP"] {
+            let data = DataSource::new(get_assets_path().join(name));
+            let bmp = BmpImporter { name }.import(&data).unwrap();
+            assert_eq!(
+                dimensions(&data).unwrap(),
+                (bmp.image.width(), bmp.image.height()),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn dimensions_of_core_and_top_down_headers() {
+        let mut core = [0; 26];
+        core[..2].copy_from_slice(b"BM");
+        core[14] = 12;
+        core[18..20].copy_from_slice(&38u16.to_le_bytes());
+        core[20..22].copy_from_slice(&60u16.to_le_bytes());
+        assert_eq!(header_dimensions(&core).unwrap(), (38, 60));
+
+        let mut top_down = [0; 26];
+        top_down[..2].copy_from_slice(b"BM");
+        top_down[14] = 40;
+        top_down[18..22].copy_from_slice(&210i32.to_le_bytes());
+        top_down[22..26].copy_from_slice(&(-330i32).to_le_bytes());
+        assert_eq!(header_dimensions(&top_down).unwrap(), (210, 330));
+
+        assert!(header_dimensions(&[0; 26]).is_err());
     }
 
     #[test]

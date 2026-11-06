@@ -6,12 +6,14 @@
 //! parked) so every tab module can read them flat.
 
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use infinitier_core::engine_caps::EngineCaps;
 use infinitier_core::game::{GameData, GameDataBuilder};
 use infinitier_core::imported_resource::cre::ImportedCre;
 use infinitier_core::imported_resource::gam::{ImportedGam, ImportedGamNpc, NpcCre};
 use infinitier_core::imported_resource::plt::Equipment;
+use infinitier_core::portraits::{self, PortraitSlot};
 use infinitier_core::resource::Game;
 use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, SpellType};
 use infinitier_core::save_games::SaveGame;
@@ -90,6 +92,10 @@ pub struct Model {
     /// Appearance tab: whether the paperdoll shows the equipment. A way of
     /// looking, kept from one character and save to the next.
     pub doll_equipment: Equipment,
+    /// Appearance tab: the game's pictures for the small and the large
+    /// portrait, listed the first time the tab needs them (see
+    /// [`Self::portrait_names`]).
+    portrait_names: [OnceLock<Vec<String>>; 2],
 }
 
 /// The per-save state parked when a save isn't the active tab (mirrors the
@@ -121,7 +127,19 @@ impl Model {
             parked: vec![None],
             active_tab: 0,
             doll_equipment: Equipment::default(),
+            portrait_names: Default::default(),
         }
+    }
+
+    /// The game's pictures for portrait `slot` (see
+    /// [`portraits::portrait_names`]): listed once, as every save of the
+    /// game shares them.
+    pub fn portrait_names(&self, slot: PortraitSlot) -> &[String] {
+        let index = match slot {
+            PortraitSlot::Small => 0,
+            PortraitSlot::Large => 1,
+        };
+        self.portrait_names[index].get_or_init(|| portraits::portrait_names(&self.game_data, slot))
     }
 
     /// Close every save, keeping the game loaded.

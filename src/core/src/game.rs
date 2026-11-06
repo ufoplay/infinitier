@@ -774,6 +774,16 @@ impl GameDataBuilder {
             )?;
         }
 
+        // The player's own portraits (an EE game's is in the user's documents,
+        // an overlay root): the engines load a character's portrait from
+        // here by name, like any resource.
+        self.add_resources_from_dir(
+            &mut game_data,
+            "portraits",
+            ResourceType::Bmp.get_extension(),
+            false,
+        )?;
+
         self.add_resources_from_dir(&mut game_data, "override", None, false)?;
 
         self.preload_resources(&mut game_data);
