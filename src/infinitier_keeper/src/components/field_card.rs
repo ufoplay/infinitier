@@ -80,3 +80,50 @@ pub fn card(title: &str, column: i32, rows: Vec<FieldRow>) -> FieldCard {
         tooltip: SharedString::new(),
     }
 }
+
+/// The longest line of a [`tooltip`], in characters.
+const TOOLTIP_LINE: usize = 64;
+
+/// `text` as a row's or card's tooltip: broken into lines of at most
+/// [`TOOLTIP_LINE`] characters, as themekit's tooltip doesn't wrap. Its own
+/// line breaks stay.
+pub fn tooltip(text: &str) -> SharedString {
+    let mut out = String::with_capacity(text.len() + text.len() / TOOLTIP_LINE);
+    for (index, paragraph) in text.split('\n').enumerate() {
+        if index > 0 {
+            out.push('\n');
+        }
+        let mut line = 0;
+        for word in paragraph.split_whitespace() {
+            let len = word.chars().count();
+            if line > 0 && line + 1 + len > TOOLTIP_LINE {
+                out.push('\n');
+                line = 0;
+            } else if line > 0 {
+                out.push(' ');
+                line += 1;
+            }
+            out.push_str(word);
+            line += len;
+        }
+    }
+    out.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_tooltip_wraps_between_words() {
+        let text = "word ".repeat(40);
+        let wrapped = tooltip(&text);
+        assert!(
+            wrapped
+                .lines()
+                .all(|line| line.chars().count() <= TOOLTIP_LINE)
+        );
+        assert_eq!(wrapped.split_whitespace().count(), 40);
+        assert_eq!(tooltip("one\ntwo").as_str(), "one\ntwo");
+    }
+}

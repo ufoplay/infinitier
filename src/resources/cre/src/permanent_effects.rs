@@ -1,21 +1,40 @@
 //! Permanent effects an editor keeps on a creature for what its CRE has no
-//! field for: a bonus to the movement rate (opcode 126, EEKeeper's
-//! "Movement") and "Can Use Any Item" (opcode 302). Each is an effect on
-//! the creature itself, permanent and not dispelled ([`Effect::permanent`]),
-//! added first in the effect list, where EEKeeper adds the movement bonus.
+//! field for (a bonus to the movement rate, an immunity, infravision…): an
+//! effect on the creature itself, permanent and not dispelled
+//! ([`Effect::permanent`]), added first in the effect list, where EEKeeper
+//! adds its movement bonus. Which effects mean what is the editor's to say,
+//! as a [`PermanentEffect`].
 
 use crate::{Cre, Effect, EffectList, EffectV1, EffectV1Body, EffectV2, TimingMode};
 
-/// Opcode of the effect that changes the movement rate.
-const MOVEMENT_RATE_OPCODE: u16 = 126;
+/// Which effects of its opcode count as a [`PermanentEffect`], by their
+/// parameters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Matches {
+    /// The same parameter 2: a "protection from opcode" is one opcode's.
+    SameParameter2,
+    /// The same parameters 1 and 2: a weapon immunity by enchantment is one
+    /// level's (parameter 2 = 0, parameter 1 the level).
+    SameParameters,
+    /// Any parameter 2 but 0: an effect setting a stat to its parameter 2
+    /// does nothing with 0.
+    NonZeroParameter2,
+    /// Any: an effect that ignores them, or several that do one thing.
+    Any,
+}
 
-/// Opcode of "Can Use Any Item" in BG2 and the Enhanced Editions (IWD2 has
-/// another effect under this number; the classic BG, IWD and PST, none).
-/// With parameter 2 set, the creature ignores the class, race, alignment
-/// and kit restrictions of the items it uses. The bard's and thief's
-/// high-level ability Use Any Item (`SPCL915`) applies it permanently, with
-/// parameter 2 = 1.
-const CAN_USE_ANY_ITEM_OPCODE: u16 = 302;
+/// A permanent effect an editor keeps on a creature: its opcode, and the
+/// parameters it's added with. The creature has it when it has a permanent
+/// (timing 1 or 9) effect of that opcode whose parameters `matches`. One
+/// from an equipped item (timing 2) comes and goes with the item, so it
+/// doesn't count, and stays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PermanentEffect {
+    pub opcode: u16,
+    pub param1: u32,
+    pub param2: u32,
+    pub matches: Matches,
+}
 
 /// What an effect is recognised by, read from either record format.
 struct Key {
@@ -28,7 +47,7 @@ struct Key {
 /// An effect record, of either format.
 trait Record: Sized {
     /// Its [`Key`]; `None` for a record kept as raw bytes, or a
-    /// proficiency / local variable (never one of these effects).
+    /// proficiency / local variable (their own tabs edit those).
     fn key(&self) -> Option<Key>;
     fn param1_mut(&mut self) -> Option<&mut u32>;
     /// [`Effect::permanent`] in this format.
@@ -85,109 +104,94 @@ impl Record for EffectV2 {
     }
 }
 
-/// The movement bonus: a permanent (timing 9) opcode-126 effect that adds
-/// to the rate (parameter 2 = 0).
-fn is_movement_bonus(key: &Key) -> bool {
-    key.opcode == u32::from(MOVEMENT_RATE_OPCODE)
-        && key.timing == TimingMode::PermanentAfterDeath
-        && key.param2 == 0
-}
-
-/// Can Use Any Item, the creature's own: a permanent (timing 1 or 9)
-/// opcode-302 effect with parameter 2 set. One from an equipped item
-/// (timing 2) comes and goes with the item.
-fn is_use_any_item(key: &Key) -> bool {
-    key.opcode == u32::from(CAN_USE_ANY_ITEM_OPCODE)
-        && matches!(
-            key.timing,
-            TimingMode::InstantPermanent | TimingMode::PermanentAfterDeath
-        )
-        && key.param2 != 0
-}
-
-/// Whether `is` recognises `effect`.
-fn recognised<T: Record>(effect: &T, is: fn(&Key) -> bool) -> bool {
-    effect.key().is_some_and(|key| is(&key))
-}
-
-/// The key of the first effect of `list` that `is` recognises.
-fn first<T: Record>(list: &[T], is: fn(&Key) -> bool) -> Option<Key> {
-    list.iter().filter_map(Record::key).find(is)
-}
-
-/// Remove every effect of `list` that `is` recognises.
-fn remove_all<T: Record>(list: &mut Vec<T>, is: fn(&Key) -> bool) {
-    list.retain(|effect| !recognised(effect, is));
-}
-
-fn set_movement_bonus<T: Record>(list: &mut Vec<T>, value: u32) {
-    if value == 0 {
-        remove_all(list, is_movement_bonus);
-        return;
+impl PermanentEffect {
+    /// Whether `key` is this effect, the creature's own.
+    fn is(&self, key: &Key) -> bool {
+        let parameters = match self.matches {
+            Matches::SameParameter2 => key.param2 == self.param2,
+            Matches::SameParameters => key.param1 == self.param1 && key.param2 == self.param2,
+            Matches::NonZeroParameter2 => key.param2 != 0,
+            Matches::Any => true,
+        };
+        key.opcode == u32::from(self.opcode)
+            && matches!(
+                key.timing,
+                TimingMode::InstantPermanent | TimingMode::PermanentAfterDeath
+            )
+            && parameters
     }
-    let existing = list
-        .iter_mut()
-        .find(|effect| recognised(*effect, is_movement_bonus))
-        .and_then(Record::param1_mut);
-    match existing {
-        Some(param1) => *param1 = value,
-        None => list.insert(0, T::permanent(MOVEMENT_RATE_OPCODE, value, 0)),
-    }
-}
 
-fn set_can_use_any_item<T: Record>(list: &mut Vec<T>, on: bool) {
-    if !on {
-        remove_all(list, is_use_any_item);
-    } else if first(list, is_use_any_item).is_none() {
-        list.insert(0, T::permanent(CAN_USE_ANY_ITEM_OPCODE, 0, 1));
+    fn recognises<T: Record>(&self, effect: &T) -> bool {
+        effect.key().is_some_and(|key| self.is(&key))
+    }
+
+    /// The key of the first effect of `list` that is this one.
+    fn first<T: Record>(&self, list: &[T]) -> Option<Key> {
+        list.iter().filter_map(Record::key).find(|key| self.is(key))
+    }
+
+    fn new_record<T: Record>(&self, param1: u32) -> T {
+        T::permanent(self.opcode, param1, self.param2)
+    }
+
+    fn set<T: Record>(&self, list: &mut Vec<T>, on: bool) {
+        if !on {
+            list.retain(|effect| !self.recognises(effect));
+        } else if self.first(list).is_none() {
+            list.insert(0, self.new_record(self.param1));
+        }
+    }
+
+    fn set_param1<T: Record>(&self, list: &mut Vec<T>, value: u32) {
+        if value == 0 {
+            self.set(list, false);
+            return;
+        }
+        let existing = list
+            .iter_mut()
+            .find(|effect| self.recognises(*effect))
+            .and_then(Record::param1_mut);
+        match existing {
+            Some(param1) => *param1 = value,
+            None => list.insert(0, self.new_record(value)),
+        }
     }
 }
 
 impl Cre {
-    /// The key of the creature's first effect `is` recognises.
-    fn first_effect(&self, is: fn(&Key) -> bool) -> Option<Key> {
+    /// Whether the creature has `effect` of its own (see
+    /// [`PermanentEffect`]).
+    pub fn has_permanent_effect(&self, effect: &PermanentEffect) -> bool {
+        self.permanent_param1(effect).is_some()
+    }
+
+    /// Give the creature `effect`, adding it first in the effect list when
+    /// it has none; or take it away, removing every one it has (whatever
+    /// added it).
+    pub fn set_permanent_effect(&mut self, effect: &PermanentEffect, on: bool) {
+        match self.effect_list_mut() {
+            EffectList::V1(list) => effect.set(list, on),
+            EffectList::V2(list) => effect.set(list, on),
+        }
+    }
+
+    /// Parameter 1 of the creature's first `effect`, the value an effect
+    /// like a bonus carries; `None` without one.
+    pub fn permanent_param1(&self, effect: &PermanentEffect) -> Option<u32> {
         match self.effect_list() {
-            EffectList::V1(list) => first(list, is),
-            EffectList::V2(list) => first(list, is),
+            EffectList::V1(list) => effect.first(list),
+            EffectList::V2(list) => effect.first(list),
         }
+        .map(|key| key.param1)
     }
 
-    /// The bonus to the creature's movement rate an editor keeps on it
-    /// (EEKeeper's "Movement"): parameter 1 of its first permanent
-    /// (timing 9) opcode-126 effect that adds to the rate (parameter 2 =
-    /// 0). 0 without one. The engines take the base rate from the
-    /// creature's animation, not its CRE, so an effect is where it lives.
-    pub fn movement_bonus(&self) -> u32 {
-        self.first_effect(is_movement_bonus)
-            .map_or(0, |key| key.param1)
-    }
-
-    /// Set the movement bonus (see [`Self::movement_bonus`]): its effect is
-    /// updated in place, or added first in the list (where EEKeeper adds
-    /// it) when there's none; 0 removes it.
-    pub fn set_movement_bonus(&mut self, value: u32) {
+    /// Keep `effect` on the creature with parameter 1 `value`: the first
+    /// one is updated in place, or one added first in the list when there's
+    /// none; 0 removes every one.
+    pub fn set_permanent_param1(&mut self, effect: &PermanentEffect, value: u32) {
         match self.effect_list_mut() {
-            EffectList::V1(list) => set_movement_bonus(list, value),
-            EffectList::V2(list) => set_movement_bonus(list, value),
-        }
-    }
-
-    /// Whether the creature can use any item, ignoring the class, race,
-    /// alignment and kit restrictions of items, by an effect of its own: a
-    /// permanent "Can Use Any Item" (opcode 302, BG2 and the Enhanced
-    /// Editions) with parameter 2 set, as the high-level ability Use Any
-    /// Item leaves, or an editor adds.
-    pub fn can_use_any_item(&self) -> bool {
-        self.first_effect(is_use_any_item).is_some()
-    }
-
-    /// Give the creature Can Use Any Item, adding the effect first in the
-    /// list when it has none; or take it away, removing every such effect
-    /// (the high-level ability's too). One from an equipped item stays.
-    pub fn set_can_use_any_item(&mut self, on: bool) {
-        match self.effect_list_mut() {
-            EffectList::V1(list) => set_can_use_any_item(list, on),
-            EffectList::V2(list) => set_can_use_any_item(list, on),
+            EffectList::V1(list) => effect.set_param1(list, value),
+            EffectList::V2(list) => effect.set_param1(list, value),
         }
     }
 }
@@ -206,6 +210,31 @@ mod tests {
         "v2_2/52SERSA.cre",
     ];
 
+    /// A bonus to the movement rate (opcode 126, added: parameter 2 = 0).
+    const MOVEMENT: PermanentEffect = PermanentEffect {
+        opcode: 126,
+        param1: 0,
+        param2: 0,
+        matches: Matches::SameParameter2,
+    };
+
+    /// Can Use Any Item (opcode 302), a stat set to parameter 2.
+    const USE_ANY_ITEM: PermanentEffect = PermanentEffect {
+        opcode: 302,
+        param1: 0,
+        param2: 1,
+        matches: Matches::NonZeroParameter2,
+    };
+
+    fn protection(opcode: u32) -> PermanentEffect {
+        PermanentEffect {
+            opcode: 101,
+            param1: 0,
+            param2: opcode,
+            matches: Matches::SameParameter2,
+        }
+    }
+
     fn first_opcode(cre: &Cre) -> Option<u32> {
         match cre.effect_list() {
             EffectList::V1(list) => list.first().map(EffectV1::opcode),
@@ -213,103 +242,124 @@ mod tests {
         }
     }
 
+    /// `effect`, applied with `timing` and parameter 2 `param2`.
+    fn applied(effect: &PermanentEffect, timing: TimingMode, param2: u32) -> EffectV2 {
+        let mut record = EffectV2::permanent(effect.opcode, effect.param1, param2);
+        if let EffectV2::Effect(e) = &mut record {
+            e.timing_mode = timing;
+        }
+        record
+    }
+
+    fn counts(effect: &PermanentEffect, record: &EffectV2) -> bool {
+        effect.recognises(record)
+    }
+
     #[test]
-    fn the_movement_bonus_is_added_first_updated_and_removed_in_every_version() {
+    fn a_value_is_added_first_updated_and_removed_in_every_version() {
         for fixture in FIXTURES {
             let mut cre = import_fixture(fixture);
             let count = cre.effect_list().len();
-            assert_eq!(cre.movement_bonus(), 0, "{fixture}");
+            assert_eq!(cre.permanent_param1(&MOVEMENT), None, "{fixture}");
 
-            cre.set_movement_bonus(12);
+            cre.set_permanent_param1(&MOVEMENT, 12);
             let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 12, "{fixture}");
+            assert_eq!(rt.permanent_param1(&MOVEMENT), Some(12), "{fixture}");
             assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
             assert_eq!(first_opcode(&rt), Some(126), "{fixture}");
 
             // The same effect, updated.
-            cre.set_movement_bonus(50);
+            cre.set_permanent_param1(&MOVEMENT, 50);
             let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 50, "{fixture}");
+            assert_eq!(rt.permanent_param1(&MOVEMENT), Some(50), "{fixture}");
             assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
 
-            cre.set_movement_bonus(0);
+            cre.set_permanent_param1(&MOVEMENT, 0);
             let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 0, "{fixture}");
+            assert_eq!(rt.permanent_param1(&MOVEMENT), None, "{fixture}");
             assert_eq!(rt.effect_list().len(), count, "{fixture}");
         }
     }
 
     #[test]
-    fn only_a_permanent_increment_is_the_movement_bonus() {
-        let bonus = || EffectV2::permanent(MOVEMENT_RATE_OPCODE, 3, 0);
-        let mut haste = bonus();
-        let mut set = bonus();
-        if let (EffectV2::Effect(haste), EffectV2::Effect(set)) = (&mut haste, &mut set) {
-            haste.timing_mode = TimingMode::InstantLimited;
-            set.param2 = 1;
-        }
-        assert!(!recognised(&haste, is_movement_bonus));
-        assert!(!recognised(&set, is_movement_bonus));
-        assert!(recognised(&bonus(), is_movement_bonus));
-    }
-
-    #[test]
-    fn use_any_item_is_added_first_once_and_removed_in_every_version() {
+    fn an_effect_is_added_first_once_and_removed_in_every_version() {
         for fixture in FIXTURES {
             let mut cre = import_fixture(fixture);
             let count = cre.effect_list().len();
-            assert!(!cre.can_use_any_item(), "{fixture}");
+            assert!(!cre.has_permanent_effect(&USE_ANY_ITEM), "{fixture}");
 
-            cre.set_can_use_any_item(true);
+            cre.set_permanent_effect(&USE_ANY_ITEM, true);
             // Already on: nothing more.
-            cre.set_can_use_any_item(true);
+            cre.set_permanent_effect(&USE_ANY_ITEM, true);
             let rt = round_trip(&cre);
-            assert!(rt.can_use_any_item(), "{fixture}");
+            assert!(rt.has_permanent_effect(&USE_ANY_ITEM), "{fixture}");
             assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
             assert_eq!(first_opcode(&rt), Some(302), "{fixture}");
 
-            cre.set_can_use_any_item(false);
+            cre.set_permanent_effect(&USE_ANY_ITEM, false);
             let rt = round_trip(&cre);
-            assert!(!rt.can_use_any_item(), "{fixture}");
+            assert!(!rt.has_permanent_effect(&USE_ANY_ITEM), "{fixture}");
             assert_eq!(rt.effect_list().len(), count, "{fixture}");
         }
     }
 
     #[test]
-    fn use_any_item_is_the_creatures_own_and_on() {
-        let with = |timing, param2| {
-            let mut effect = EffectV2::permanent(CAN_USE_ANY_ITEM_OPCODE, 0, param2);
-            if let EffectV2::Effect(e) = &mut effect {
-                e.timing_mode = timing;
-            }
-            effect
-        };
-        // The high-level ability's, and one applied "permanent until death".
-        assert!(recognised(
-            &with(TimingMode::PermanentAfterDeath, 1),
-            is_use_any_item
-        ));
-        assert!(recognised(
-            &with(TimingMode::InstantPermanent, 1),
-            is_use_any_item
-        ));
-        // An equipped item's; and one with parameter 2 unset, which does nothing.
-        assert!(!recognised(
-            &with(TimingMode::InstantWhileEquipped, 1),
-            is_use_any_item
-        ));
-        assert!(!recognised(
-            &with(TimingMode::PermanentAfterDeath, 0),
-            is_use_any_item
-        ));
+    fn only_a_permanent_effect_counts() {
+        let permanent = applied(&USE_ANY_ITEM, TimingMode::PermanentAfterDeath, 1);
+        let until_death = applied(&USE_ANY_ITEM, TimingMode::InstantPermanent, 1);
+        let equipped = applied(&USE_ANY_ITEM, TimingMode::InstantWhileEquipped, 1);
+        let for_a_while = applied(&MOVEMENT, TimingMode::InstantLimited, 0);
+        assert!(counts(&USE_ANY_ITEM, &permanent));
+        assert!(counts(&USE_ANY_ITEM, &until_death));
+        assert!(!counts(&USE_ANY_ITEM, &equipped));
+        assert!(!counts(&MOVEMENT, &for_a_while));
+    }
 
-        // Turning it off leaves the item's.
+    #[test]
+    fn parameter_2_counts_as_the_effect_says() {
+        let permanent = TimingMode::PermanentAfterDeath;
+        // A stat set to 0 does nothing.
+        assert!(!counts(
+            &USE_ANY_ITEM,
+            &applied(&USE_ANY_ITEM, permanent, 0)
+        ));
+        assert!(counts(&USE_ANY_ITEM, &applied(&USE_ANY_ITEM, permanent, 2)));
+        // A protection is from one opcode; a movement effect that sets the
+        // rate isn't a bonus added to it.
+        let poison = protection(25);
+        assert!(!counts(&poison, &applied(&poison, permanent, 78)));
+        assert!(counts(&poison, &applied(&poison, permanent, 25)));
+        assert!(!counts(&MOVEMENT, &applied(&MOVEMENT, permanent, 1)));
+    }
+
+    #[test]
+    fn a_weapon_immunity_is_one_enchantment_levels() {
+        let plus = |level| PermanentEffect {
+            opcode: 120,
+            param1: level,
+            param2: 0,
+            matches: Matches::SameParameters,
+        };
+        let permanent = TimingMode::PermanentAfterDeath;
+        let plus_one = applied(&plus(1), permanent, 0);
+        assert!(counts(&plus(1), &plus_one));
+        assert!(!counts(&plus(2), &plus_one));
+        let mut list = vec![plus_one];
+        plus(2).set(&mut list, true);
+        assert_eq!(list.len(), 2);
+        plus(1).set(&mut list, false);
+        assert!(plus(1).first(&list).is_none());
+        assert!(plus(2).first(&list).is_some());
+    }
+
+    #[test]
+    fn turning_an_effect_off_leaves_an_items() {
         let mut list = vec![
-            with(TimingMode::InstantWhileEquipped, 1),
-            with(TimingMode::PermanentAfterDeath, 1),
+            applied(&USE_ANY_ITEM, TimingMode::InstantWhileEquipped, 1),
+            applied(&USE_ANY_ITEM, TimingMode::PermanentAfterDeath, 1),
         ];
-        set_can_use_any_item(&mut list, false);
+        USE_ANY_ITEM.set(&mut list, false);
         assert_eq!(list.len(), 1);
-        assert!(first(&list, is_use_any_item).is_none());
+        assert!(USE_ANY_ITEM.first(&list).is_none());
     }
 }

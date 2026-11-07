@@ -21,7 +21,8 @@ use slint::SharedString;
 use crate::state::Model;
 use editor::{EffectEditor, Mode};
 use fields::{Draft, EffectRef, Field, listed};
-use labels::{target_text, timing_text, type_text};
+pub use labels::type_text;
+use labels::{target_text, timing_text};
 
 /// Column headers, in display order (parallel to [`WIDTHS`]). The Edit,
 /// Clone and Delete buttons' follow.

@@ -8,9 +8,7 @@
 //! lost. A commit names the option by its index, resolved against the same
 //! choices, rebuilt: the creature hasn't changed since they were shown.
 //!
-//! Fallen is a creature flag, a checkbox. Movement is a number, a bonus to
-//! the movement rate kept as an effect (see [`Cre::movement_bonus`]), from 0
-//! to 50 as EEKeeper allows. Dual Class follows Original Class. IWD2's class
+//! Fallen is a creature flag, a checkbox. Dual Class follows Original Class. IWD2's class
 //! follows its levels (the Levels tab), and it has no kit, racial enemy or
 //! dual-classing; those rows stay read-only there.
 
@@ -23,9 +21,7 @@ use infinitier_core::resource::cre::{Cre, CreHeader, CreHeaderV22, CreatureFlags
 
 use super::resolve_strref;
 use crate::FieldRow;
-use crate::components::field_card::{
-    check_row, editable_check_row, number_row, readonly_row, select_row,
-};
+use crate::components::field_card::{check_row, editable_check_row, readonly_row, select_row};
 use crate::state::Model;
 
 /// An Identity field the player edits. Its place in [`Field::ALL`] is its
@@ -45,11 +41,10 @@ enum Field {
     RacialEnemy,
     EnemyAlly,
     State,
-    Movement,
 }
 
 impl Field {
-    const ALL: [Self; 14] = [
+    const ALL: [Self; 13] = [
         Self::Gender,
         Self::Race,
         Self::SubRace,
@@ -63,7 +58,6 @@ impl Field {
         Self::RacialEnemy,
         Self::EnemyAlly,
         Self::State,
-        Self::Movement,
     ];
 
     fn id(self) -> i32 {
@@ -96,16 +90,12 @@ impl Field {
             Self::RacialEnemy => "Racial",
             Self::EnemyAlly => "Enemy/Ally",
             Self::State => "State",
-            Self::Movement => "Movement",
         }
     }
 }
 
 /// A dropdown's choices: each value a field can take, and its name.
 type Choices = Vec<(u32, String)>;
-
-/// The largest movement bonus, as EEKeeper allows.
-const MOVEMENT_MAX: i32 = 50;
 
 /// The kit dword of a character without a kit, its class's own:
 /// `KITLIST.2DA`'s first row.
@@ -136,13 +126,6 @@ pub fn rows(game_data: &GameData, cre: &Cre) -> Vec<FieldRow> {
     rows.push(row(Field::RacialEnemy, ""));
     rows.push(row(Field::EnemyAlly, ""));
     rows.push(row(Field::State, ""));
-    rows.push(number_row(
-        Field::Movement.id(),
-        Field::Movement.label(),
-        cre.movement_bonus().into(),
-        0,
-        MOVEMENT_MAX,
-    ));
     rows
 }
 
@@ -216,7 +199,7 @@ enum Edit {
 }
 
 /// Apply an edit of the Identity row `id`: `value` is the index picked in
-/// its dropdown, Fallen's `"1"` / `"0"`, or Movement's number.
+/// its dropdown, or Fallen's `"1"` / `"0"`.
 pub fn commit(model: &mut Model, id: i32, value: &str) {
     let Some(field) = Field::from_id(id) else {
         return;
@@ -232,14 +215,6 @@ pub fn commit(model: &mut Model, id: i32, value: &str) {
             flags.insert(fallen_flags(game_data, cre));
         }
         Edit::Flags(flags)
-    } else if field == Field::Movement {
-        let Ok(number) = value.trim().parse::<f64>() else {
-            return;
-        };
-        // In range, so a whole number from 0 to 50.
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let bonus = number.round().clamp(0.0, f64::from(MOVEMENT_MAX)) as u32;
-        Edit::Value(bonus)
     } else {
         let Some((choices, _)) = choices(game_data, cre, field) else {
             return;
@@ -302,7 +277,6 @@ fn value(game: Game, cre: &Cre, field: Field) -> Option<u32> {
         Field::RacialEnemy => cre.racial_enemy()?.into(),
         Field::EnemyAlly => cre.enemy_ally().into(),
         Field::State => cre.state_flags(),
-        Field::Movement => cre.movement_bonus(),
         Field::Class | Field::OriginalClass | Field::Kit | Field::Deity | Field::MageType => {
             return None;
         }
@@ -332,7 +306,6 @@ fn set_value(cre: &mut Cre, field: Field, value: u32) {
             }
         }
         (Field::State, _) => cre.set_state_flags(value),
-        (Field::Movement, _) => cre.set_movement_bonus(value),
         // A checkbox (see `commit`), or too large for its byte.
         (Field::Fallen, _) | (_, None) => {}
     }
@@ -390,8 +363,8 @@ fn game_choices(game_data: &GameData, cre: &Cre, field: Field) -> Choices {
         Field::Alignment if matches!(cre.header, CreHeader::V22(_)) => aligns_choices(game_data),
         Field::Alignment => ids_choices(game_data, "alignmen", " ", BYTE),
         Field::Class => ids_choices(game_data, "class", " / ", BYTE),
-        // A checkbox and a number.
-        Field::Fallen | Field::Movement => Vec::new(),
+        // A checkbox.
+        Field::Fallen => Vec::new(),
         Field::OriginalClass => with_none(
             OriginalClass::ALL
                 .iter()

@@ -70,9 +70,7 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             card("Kill Stats", 1, kill_rows),
             card("Miscellaneous", 1, misc_rows),
         ],
-        special::card_for(game_data.game(), cre, 2)
-            .into_iter()
-            .collect(),
+        vec![special::card_for(game_data.game(), cre, 2)],
     ]
 }
 

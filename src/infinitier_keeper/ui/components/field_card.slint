@@ -12,8 +12,8 @@ import { Metrics } from "../themes/metrics.slint";
 // current one, which commits the index picked; `is-check` renders a
 // checkbox (label + `checked`); `numeric` edits the value with a number
 // field (drag or type) from `minimum` to `maximum`, committing each change.
-// A checkbox row with a `tooltip` explains itself on hover, and shows an
-// info icon that says so.
+// A row with a `tooltip` explains itself on hover (its checkbox, or its
+// label), and shows an info icon that says so.
 export struct FieldRow {
     id: int,
     label: string,
@@ -110,11 +110,24 @@ export component FieldCardView inherits Card {
             spacing: Theme.spacing.sm;
             // The label flexes and elides, so the editor on the right is never
             // pushed off the column edge.
-            Label {
+            if row.tooltip == "": Label {
                 text: row.label;
                 horizontal-stretch: 1;
                 min-width: Metrics.field-label-min-width;
                 overflow: elide;
+            }
+            // With its info icon after it, which stays in view.
+            if row.tooltip != "": HorizontalLayout {
+                horizontal-stretch: 1;
+                alignment: start;
+                spacing: Theme.spacing.xs;
+                Label {
+                    text: row.label;
+                    min-width: Metrics.field-label-min-width;
+                    overflow: elide;
+                    Tooltip { TooltipText { text: row.tooltip; } }
+                }
+                InfoIcon { tooltip: row.tooltip; }
             }
 
             if row.bonus != "": Label {
