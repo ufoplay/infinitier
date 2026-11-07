@@ -1,5 +1,6 @@
 #![doc = include_str!("../readme.md")]
 
+pub mod class_abilities;
 pub mod engine_caps;
 pub mod fs;
 pub mod game;

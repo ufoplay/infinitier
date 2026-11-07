@@ -6,6 +6,7 @@
 mod browsers;
 mod character;
 mod dialogs;
+mod kit_features;
 mod shell;
 
 use slint::{Model as _, ModelRc, VecModel};
@@ -20,8 +21,14 @@ pub fn refresh(ui: &AppWindow, app: &mut App) {
     shell::refresh(ui, app);
     dialogs::refresh(ui, app);
     match &mut app.session {
-        Session::Saves(model) => character::refresh(ui, model),
-        Session::NoGame | Session::Game(_) => character::clear(ui),
+        Session::Saves(model) => {
+            kit_features::refresh(ui, model);
+            character::refresh(ui, model);
+        }
+        Session::NoGame | Session::Game(_) => {
+            kit_features::clear(ui);
+            character::clear(ui);
+        }
     }
     refresh_browsers(ui, app);
 }

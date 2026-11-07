@@ -5,6 +5,7 @@
 mod browsers;
 mod character;
 mod dialogs;
+mod kit_features;
 mod shell;
 
 use std::cell::RefCell;
@@ -23,6 +24,7 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     shell::wire(ui, app);
     dialogs::wire(ui, app);
     character::wire(ui, app);
+    kit_features::wire(ui, app);
     browsers::wire(ui, app);
 }
 

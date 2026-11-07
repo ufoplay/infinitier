@@ -7,7 +7,8 @@
 use infinitier_core::resource::cre::{Cre, Matches, PermanentEffect};
 use infinitier_core::resource::{Engine, Game};
 
-use crate::components::field_card::{card, editable_check_row, number_row, tooltip};
+use super::kit_features;
+use crate::components::field_card::{button_row, card, editable_check_row, number_row, tooltip};
 use crate::state::Model;
 use crate::tabs::effects::type_text;
 use crate::{FieldCard, FieldRow};
@@ -54,6 +55,13 @@ const WEAPONS: &str = "\"Protection from Weapons\"";
 /// What the weapon immunities share, in their tooltips.
 const EACH_LEVEL: &str = "Each is its own effect, and covers its own weapons only: the \
 game's creatures that only +3 weapons can hurt have all three.";
+
+/// The Kit Features button's row id, after the fields'.
+const KIT_FEATURES_ID: i32 = ID_BASE + 100;
+
+const KIT_FEATURES_TOOLTIP: &str = "Add or remove what a class or kit gives a character \
+from one level to another, as the game does when it levels up: the effects of the spells it \
+applies, and its innate abilities.";
 
 /// The largest movement bonus, as EEKeeper allows.
 const MOVEMENT_MAX: i32 = 50;
@@ -341,11 +349,19 @@ impl Field {
 /// under some of those numbers; the classic BG, IWD and PST, none).
 pub fn card_for(game: Game, cre: &Cre, column: i32) -> FieldCard {
     let bg2_effects = matches!(game.engine(), Engine::Bg2 | Engine::Ee);
-    let rows = Field::ALL
+    let mut rows: Vec<FieldRow> = Field::ALL
         .iter()
         .filter(|&&field| field == Field::Movement || bg2_effects)
         .map(|field| field.row(cre))
         .collect();
+    // The games with kits whose tables give spells (BG2's and the Enhanced
+    // Editions').
+    if bg2_effects && kit_features::supports(cre) {
+        rows.push(FieldRow {
+            tooltip: tooltip(KIT_FEATURES_TOOLTIP),
+            ..button_row(KIT_FEATURES_ID, "Add/Remove Kit Features…")
+        });
+    }
     FieldCard {
         tooltip: tooltip(TOOLTIP),
         ..card(TITLE, column, rows)
@@ -353,8 +369,13 @@ pub fn card_for(game: Game, cre: &Cre, column: i32) -> FieldCard {
 }
 
 /// Apply an edit of the card's row `id`: Movement's number, or a
-/// checkbox's `"1"` / `"0"`. Returns whether `id` is one of the card's.
+/// checkbox's `"1"` / `"0"`; or open the Kit Features dialog. Returns
+/// whether `id` is one of the card's.
 pub fn commit(model: &mut Model, id: i32, value: &str) -> bool {
+    if id == KIT_FEATURES_ID {
+        kit_features::open(model);
+        return true;
+    }
     let Some(field) = Field::from_id(id) else {
         return false;
     };

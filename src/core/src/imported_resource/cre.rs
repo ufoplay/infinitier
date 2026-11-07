@@ -171,6 +171,9 @@ pub struct Kit {
     pub symbol: String,
     /// Its display name's strref (`MIXED`, else `LOWER`), when it has one.
     pub name_strref: Option<u32>,
+    /// Its `ABILITIES` column: the CLAB table of what it gives per level,
+    /// when it has one (`RESERVE`, the true class, has none).
+    pub abilities: Option<String>,
 }
 
 /// The game's kits, in `KITLIST.2DA` row order. Row `i` is selected by the
@@ -183,6 +186,7 @@ pub fn kits(game_data: &GameData) -> Vec<Kit> {
         return Vec::new();
     };
     let symbol_col = two_da_col(&kitlist, "ROWNAME");
+    let abilities_col = two_da_col(&kitlist, "ABILITIES");
     let mut rows: Vec<(u32, &Vec<String>)> = kitlist
         .rows
         .iter()
@@ -198,6 +202,10 @@ pub fn kits(game_data: &GameData) -> Vec<Kit> {
                 .cloned()
                 .unwrap_or_default(),
             name_strref: kit_strref_from_2da(&kitlist, 0x4000 | index),
+            abilities: abilities_col
+                .and_then(|col| cells.get(col))
+                .filter(|table| !table.starts_with('*'))
+                .map(|table| table.to_ascii_uppercase()),
         })
         .collect()
 }

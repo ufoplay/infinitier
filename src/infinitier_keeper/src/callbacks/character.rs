@@ -81,6 +81,7 @@ fn wire_party(ui: &AppWindow, app: &AppRc) {
                 m.inventory_selected = None; // selection is per-creature
                 m.spell_tab = state::SPELL_TAB_AUTO; // re-default the spellbook
                 m.effect_editor = None; // edits the previous one's effects
+                m.kit_features = None; // and so does this
             });
         });
     }

@@ -2,7 +2,7 @@
 // (Abilities, Characteristics, Resistances, …): each row a label, an
 // optional "(effective: …)" hint, and an editor or a read-only value.
 
-import { Card, Checkbox, ControlSize, Icons, Label, NumberField, Select, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
+import { Button, ButtonKind, Card, Checkbox, ControlSize, Icons, Label, NumberField, Select, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 // One editable / read-only row inside a card. `id` is the index into the
@@ -12,8 +12,9 @@ import { Metrics } from "../themes/metrics.slint";
 // current one, which commits the index picked; `is-check` renders a
 // checkbox (label + `checked`); `numeric` edits the value with a number
 // field (drag or type) from `minimum` to `maximum`, committing each change.
-// A row with a `tooltip` explains itself on hover (its checkbox, or its
-// label), and shows an info icon that says so.
+// `is-button` renders a button labelled `label`, which commits `id` with
+// "" when clicked. A row with a `tooltip` explains itself on hover (its
+// checkbox or button, or its label), and shows an info icon that says so.
 export struct FieldRow {
     id: int,
     label: string,
@@ -26,6 +27,7 @@ export struct FieldRow {
     option-index: int,
     is-check: bool,
     checked: bool,
+    is-button: bool,
     numeric: bool,
     minimum: int,
     maximum: int,
@@ -104,8 +106,21 @@ export component FieldCardView inherits Card {
             if row.tooltip != "": InfoIcon { tooltip: row.tooltip; }
         }
 
+        // Button row: an action the card offers.
+        if row.is-button: HorizontalLayout {
+            alignment: start;
+            spacing: Theme.spacing.xs;
+            Button {
+                text: row.label;
+                kind: ButtonKind.secondary;
+                clicked => { root.commit-field(row.id, ""); }
+                if row.tooltip != "": Tooltip { TooltipText { text: row.tooltip; } }
+            }
+            if row.tooltip != "": InfoIcon { tooltip: row.tooltip; }
+        }
+
         // Everything else: label + optional bonus + editor / value.
-        if !row.is-check: HorizontalLayout {
+        if !row.is-check && !row.is-button: HorizontalLayout {
             horizontal-stretch: 1;
             spacing: Theme.spacing.sm;
             // The label flexes and elides, so the editor on the right is never

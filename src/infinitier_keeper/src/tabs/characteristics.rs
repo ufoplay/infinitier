@@ -9,6 +9,7 @@
 //! needed.
 
 mod identity;
+pub mod kit_features;
 mod special;
 
 use infinitier_core::game::GameData;
@@ -18,6 +19,8 @@ use infinitier_core::resource::cre::CreatureFlags;
 use crate::FieldCard;
 use crate::components::field_card::{card, check_row, readonly_row};
 use crate::state::Model;
+
+pub use kit_features::KitFeatures;
 
 /// The text of `strref` in `dialog.tlk`; empty for none.
 fn resolve_strref(game_data: &GameData, strref: u32) -> String {

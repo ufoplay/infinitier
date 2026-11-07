@@ -71,6 +71,16 @@ pub fn editable_check_row(id: i32, label: &str, checked: bool) -> FieldRow {
     }
 }
 
+/// A button row labelled `label`: clicking it commits `id` with `""`.
+pub fn button_row(id: i32, label: &str) -> FieldRow {
+    FieldRow {
+        id,
+        label: label.into(),
+        is_button: true,
+        ..FieldRow::default()
+    }
+}
+
 /// A titled card in display `column` (0..2); no tooltip.
 pub fn card(title: &str, column: i32, rows: Vec<FieldRow>) -> FieldCard {
     FieldCard {

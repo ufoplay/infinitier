@@ -1,0 +1,129 @@
+// The Kit Features dialog: pick a base class or kit, what of it (effects,
+// innates or both) and a range of levels; the table previews what those
+// levels give; Add gives it to the character, Remove takes it away. It
+// stays open, so one can be done after the other, until Close.
+
+import { Button, ButtonKind, ControlSize, Dialog, Label, NumberField, Select, Table, TableCell, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+
+export global KitFeaturesAdapter {
+    in property <bool> open;
+    // The base classes, then the kits.
+    in property <[string]> tables;
+    in property <int> table-index;
+    in property <[string]> parts;
+    in property <int> part-index;
+    in property <int> from-level;
+    in property <int> to-level;
+    in property <int> max-level;
+    // What the levels give: level, effects or innate, spell.
+    in property <[[TableCell]]> rows;
+    // What the last Add or Remove did.
+    in property <string> message;
+    callback select-table(int);
+    callback select-part(int);
+    callback set-from(float);
+    callback set-to(float);
+    callback add();
+    callback remove();
+    callback close();
+}
+
+// A field's caption above it.
+component Captioned inherits VerticalLayout {
+    in property <string> caption;
+    spacing: Theme.spacing.xs;
+    Label {
+        text: root.caption;
+        role: TextRole.caption;
+        tone: Tone.muted;
+    }
+    @children
+}
+
+export component KitFeaturesDialog inherits Dialog {
+    title: "Kit Features";
+    panel-width: Metrics.kit-features-dialog-width;
+
+    Label {
+        text: "Add gives the character what the class or kit gives in these levels: the effects of the spells it applies (once for each level that applies one, as levelling up does) and one more use of each innate ability for each level that grants it. Remove takes away every effect of those spells and every one of those innate abilities, however many times they were added, and whatever added them.";
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing.md;
+        Captioned {
+            caption: "Class or kit";
+            horizontal-stretch: 1;
+            Select {
+                options: KitFeaturesAdapter.tables;
+                current-index: KitFeaturesAdapter.table-index;
+                selected(index) => { KitFeaturesAdapter.select-table(index); }
+            }
+        }
+        Captioned {
+            caption: "Features";
+            width: Metrics.kit-features-part-width;
+            Select {
+                options: KitFeaturesAdapter.parts;
+                current-index: KitFeaturesAdapter.part-index;
+                selected(index) => { KitFeaturesAdapter.select-part(index); }
+            }
+        }
+        Captioned {
+            caption: "From level";
+            width: Metrics.kit-features-level-width;
+            NumberField {
+                value: KitFeaturesAdapter.from-level;
+                minimum: 1;
+                maximum: KitFeaturesAdapter.max-level;
+                changed(value) => { KitFeaturesAdapter.set-from(value); }
+            }
+        }
+        Captioned {
+            caption: "To level";
+            width: Metrics.kit-features-level-width;
+            NumberField {
+                value: KitFeaturesAdapter.to-level;
+                minimum: 1;
+                maximum: KitFeaturesAdapter.max-level;
+                changed(value) => { KitFeaturesAdapter.set-to(value); }
+            }
+        }
+    }
+    if KitFeaturesAdapter.rows.length == 0: Label {
+        text: "Nothing in these levels.";
+        tone: Tone.muted;
+    }
+    Table {
+        height: Metrics.kit-features-preview-height;
+        columns: [
+            { title: "Level", width: Metrics.kit-features-level-column },
+            { title: "Gives", width: Metrics.kit-features-grant-column },
+            { title: "Spell" },
+        ];
+        rows: KitFeaturesAdapter.rows;
+        size: ControlSize.small;
+    }
+    if KitFeaturesAdapter.message != "": Label {
+        text: KitFeaturesAdapter.message;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Close";
+            kind: ButtonKind.secondary;
+            clicked => { KitFeaturesAdapter.close(); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: "Remove";
+            kind: ButtonKind.danger;
+            clicked => { KitFeaturesAdapter.remove(); }
+        }
+        Button {
+            text: "Add";
+            clicked => { KitFeaturesAdapter.add(); }
+        }
+    }
+}

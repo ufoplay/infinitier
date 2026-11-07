@@ -45,6 +45,8 @@ import {
     EffectDialog,
     EffectDialogAdapter,
     FormFolder,
+    KitFeaturesAdapter,
+    KitFeaturesDialog,
     LoadAdapter,
     LoadDialog,
     LoadingAdapter,
@@ -75,6 +77,7 @@ export {
     SpellsAdapter,
     EffectsAdapter,
     EffectDialogAdapter,
+    KitFeaturesAdapter,
     BrowsersAdapter,
     BrowserKind,
     BrowserState,
@@ -149,6 +152,10 @@ export component AppWindow inherits Window {
         height: root.height;
     }
     if EffectDialogAdapter.open: EffectDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if KitFeaturesAdapter.open: KitFeaturesDialog {
         width: root.width;
         height: root.height;
     }
