@@ -6320,8 +6320,6 @@ dependencies = [
 [[package]]
 name = "slint-themekit"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b56919dba2d27b76f1480c013b4c8d0283ed05a86de3c61f8365f141fb61738d"
 
 [[package]]
 name = "slotmap"

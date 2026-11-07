@@ -1,3 +1,5 @@
+import { ControlSize, Theme } from "@themekit";
+
 // The keeper's own layout values: sizes that belong to this app's layout
 // rather than to the theme's roles. Files under ui/themes/ are the only
 // keeper files allowed to hold literal design values (tests/ui_tokens.rs).
@@ -71,6 +73,9 @@ export global Metrics {
     out property <length> spell-level-column: 60px;
     out property <length> spell-memorized-column: 90px;
     out property <length> spell-resource-column: 96px;
+    // Effects: the Edit, Clone and Delete buttons' columns, like the
+    // Inventory's Delete (read by the Rust side, which builds the columns).
+    out property <length> effect-button-column: Theme.control-height(ControlSize.small);
 
     // The dialogs. Settings and Load have fixed sizes (their lists take the
     // spare room); the others fit their content's height.
@@ -88,5 +93,7 @@ export global Metrics {
     out property <length> load-portrait-height: 46px;
     out property <length> save-dialog-width: 520px;
     out property <length> confirm-dialog-width: 480px;
+    // The effect dialog: three columns of fields.
+    out property <length> effect-dialog-width: 1040px;
     out property <length> loading-dialog-width: 600px;
 }

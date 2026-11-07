@@ -1,0 +1,52 @@
+// The Effects tab: the creature's effects in a wide table (it scrolls
+// sideways, the header following), each row ending with Edit, Clone and
+// Delete, like the Inventory's Delete; the Add button under it. Edit (or a
+// double-click on a row), Clone and Add open the effect dialog
+// (dialogs/effect_dialog.slint).
+
+import { Button, ButtonKind, ControlSize, Icons, Label, Table, TableCell, TableColumn, Theme, Tone } from "@themekit";
+
+export global EffectsAdapter {
+    // The effects' columns, then Edit's, Clone's and Delete's.
+    in property <[TableColumn]> columns;
+    in property <[[TableCell]]> rows;
+    callback add();
+    callback edit(int /* row */);
+    callback duplicate(int /* row */);
+    callback delete(int /* row */);
+}
+
+export component EffectsTab inherits VerticalLayout {
+    spacing: Theme.spacing.sm;
+
+    if EffectsAdapter.rows.length == 0: Label {
+        text: "This creature has no effects.";
+        tone: Tone.muted;
+    }
+    Table {
+        columns: EffectsAdapter.columns;
+        rows: EffectsAdapter.rows;
+        size: ControlSize.small;
+        row-double-clicked(row) => { EffectsAdapter.edit(row); }
+        // The last three columns: Edit, Clone, Delete.
+        button-clicked(row, column) => {
+            if (column == EffectsAdapter.columns.length - 1) {
+                EffectsAdapter.delete(row);
+            } else if (column == EffectsAdapter.columns.length - 2) {
+                EffectsAdapter.duplicate(row);
+            } else {
+                EffectsAdapter.edit(row);
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: start;
+        Button {
+            text: "Add effect";
+            icon: Icons.plus;
+            kind: ButtonKind.secondary;
+            size: ControlSize.small;
+            clicked => { EffectsAdapter.add(); }
+        }
+    }
+}

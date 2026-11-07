@@ -18,13 +18,14 @@ use crate::tabs::{
 };
 use crate::{
     AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent,
-    EditTableAdapter, FieldCard, GridAdapter, Icons, InventoryAdapter, Metrics, SpellsAdapter,
-    TableAdapter,
+    EditTableAdapter, EffectDialogAdapter, EffectsAdapter, FieldCard, GridAdapter, Icons,
+    InventoryAdapter, Metrics, SpellsAdapter, TableAdapter,
 };
 
 /// Repaint the tab strip and the active tab's page. Takes `&mut Model`
 /// because the Spells tab records its rows' spells.
 pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
+    show_effect_dialog(ui, model);
     let adapter = ui.global::<CharacterAdapter>();
     let visible_tabs = model.visible_tabs();
     let tab_names: Vec<SharedString> = visible_tabs.iter().map(|t| t.label().into()).collect();
@@ -69,14 +70,7 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
         }
         CharacterTab::LocalVariables => show_table(ui, variables::local(model)),
         CharacterTab::GlobalVariables => show_table(ui, variables::global(model)),
-        CharacterTab::Effects => show_grid(
-            ui,
-            effects::HEADERS,
-            effects::WIDTHS,
-            effects::build(model),
-            Overflow::Elide,
-            "",
-        ),
+        CharacterTab::Effects => show_effects(ui, effects::build(model)),
         CharacterTab::JournalEntries => show_grid(
             ui,
             journal::HEADERS,
@@ -110,6 +104,7 @@ pub(super) fn clear(ui: &AppWindow) {
     adapter.set_tab_names(rows_model(Vec::new()));
     adapter.set_has_character(false);
     adapter.set_content(CharacterContent::None);
+    ui.global::<EffectDialogAdapter>().set_open(false);
 }
 
 /// The card grid, with the Attacks dropdown's current option (the Abilities
@@ -231,6 +226,62 @@ fn show_grid(
     }
     adapter.set_empty_text(empty_text.into());
     show(ui, CharacterContent::Grid);
+}
+
+/// The Effects table: each effect's row, then its Edit, Clone and Delete
+/// buttons.
+/// Synced in place (see [`sync_table`]), so a double-click registers.
+fn show_effects(ui: &AppWindow, rows: Vec<Vec<SharedString>>) {
+    let adapter = ui.global::<EffectsAdapter>();
+    let metrics = ui.global::<Metrics>();
+    let button_column = table::column("", metrics.get_effect_button_column(), Overflow::Elide);
+    let columns: Vec<_> = effects::HEADERS
+        .iter()
+        .zip(effects::WIDTHS)
+        .map(|(header, width)| table::column(header, *width, Overflow::Elide))
+        .chain(std::iter::repeat_n(button_column, 3))
+        .collect();
+    // Kept unless they change, which would rebuild every cell (see
+    // `show_edit_table`).
+    if rows_changed(&adapter.get_columns(), &columns) {
+        adapter.set_columns(rows_model(columns));
+    }
+    let icons = ui.global::<Icons>();
+    let buttons = [
+        table::button(icons.get_edit(), "Edit"),
+        table::button(icons.get_copy(), "Clone"),
+        table::button(icons.get_trash(), "Delete"),
+    ];
+    let rows = rows
+        .into_iter()
+        .map(|cells| {
+            cells
+                .into_iter()
+                .map(table::text)
+                .chain(buttons.iter().cloned())
+                .collect()
+        })
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
+        adapter.set_rows(rows);
+    }
+    show(ui, CharacterContent::Effects);
+}
+
+/// The effect dialog, when open: its title and its cards, synced in place
+/// (see [`sync_nested`]) so the field being typed in survives the commit
+/// of the one before it.
+fn show_effect_dialog(ui: &AppWindow, model: &Model) {
+    let adapter = ui.global::<EffectDialogAdapter>();
+    let Some(editor) = &model.effect_editor else {
+        adapter.set_open(false);
+        return;
+    };
+    adapter.set_title(editor.title().into());
+    if let Some(cards) = sync_nested(&adapter.get_cards(), editor.cards()) {
+        adapter.set_cards(cards);
+    }
+    adapter.set_open(true);
 }
 
 /// The animation name, the colour swatches, the paperdoll and the portraits.

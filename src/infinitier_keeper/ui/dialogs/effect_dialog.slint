@@ -1,0 +1,49 @@
+// The effect dialog: every field of one effect, in three cards, to edit
+// and Save, or Cancel. The Rust side keeps the draft: each field commits
+// into it like a card tab's (on Enter, on focus loss, at once for a
+// dropdown or a dragged number), so clicking Save commits the field being
+// typed in first.
+
+import { Button, ButtonKind, Dialog, Theme } from "@themekit";
+import { FieldCard, FieldCardView } from "../components/components.slint";
+import { Metrics } from "../themes/metrics.slint";
+
+export global EffectDialogAdapter {
+    in property <bool> open;
+    in property <string> title;
+    // One card per column.
+    in property <[FieldCard]> cards;
+    callback commit-field(int /* field id */, string /* value */);
+    callback save();
+    callback cancel();
+}
+
+export component EffectDialog inherits Dialog {
+    title: EffectDialogAdapter.title;
+    panel-width: Metrics.effect-dialog-width;
+
+    HorizontalLayout {
+        spacing: Theme.spacing.sm;
+        for card in EffectDialogAdapter.cards: VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: start;
+            FieldCardView {
+                card: card;
+                commit-field(id, value) => { EffectDialogAdapter.commit-field(id, value); }
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Cancel";
+            kind: ButtonKind.secondary;
+            clicked => { EffectDialogAdapter.cancel(); }
+        }
+        Button {
+            text: "Save";
+            clicked => { EffectDialogAdapter.save(); }
+        }
+    }
+}

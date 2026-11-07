@@ -1,23 +1,30 @@
-//! Effects tab (read-only).
+//! Effects tab.
 //!
-//! Lists the EE (V2) effect
-//! records on the selected creature, excluding the proficiency (op233) and
-//! local-variable (op187) opcodes that have their own tabs. The opcode →
-//! "Type" name table is `opcode_names`; resource resrefs are resolved to
-//! `SPELL.IDS` symbols, and timing/target ints to EEKeeper's labels.
-//! Rendered as a wide table that scrolls sideways. Display-only — no
-//! `commit`.
+//! Lists the effects on the selected creature, in either record format
+//! ([`fields`]): one row each, ending with Edit, Clone and Delete. Edit (or
+//! a double-click), Clone and the Add button under the table open the
+//! effect dialog ([`editor`]) on a draft. Delete removes the effect at once, like a
+//! deleted item or spell. The opcode → "Type" name table is
+//! `opcode_names`; resource resrefs are resolved to `SPELL.IDS` symbols,
+//! and timing/target ints to EEKeeper's labels ([`labels`]). Rendered as
+//! a wide table that scrolls sideways.
 
+pub mod editor;
+mod fields;
+mod labels;
 mod opcode_names;
 
-use infinitier_core::resource::cre::{Cre, EffectList, EffectV2, SubSections, TimingMode};
+use infinitier_core::resource::cre::{EffectList, TimingMode};
 use infinitier_core::resource::ids::Ids;
 use slint::SharedString;
 
 use crate::state::Model;
-use opcode_names::effect_name;
+use editor::{EffectEditor, Mode};
+use fields::{Draft, EffectRef, Field, listed};
+use labels::{target_text, timing_text, type_text};
 
-/// Column headers, in display order (parallel to [`WIDTHS`]).
+/// Column headers, in display order (parallel to [`WIDTHS`]). The Edit,
+/// Clone and Delete buttons' follow.
 pub const HEADERS: &[&str] = &[
     "Type",
     "Name",
@@ -37,90 +44,7 @@ pub const WIDTHS: &[f32] = &[
     250.0, 70.0, 78.0, 78.0, 160.0, 110.0, 110.0, 160.0, 80.0, 150.0, 140.0,
 ];
 
-// ── Read-only extraction ──────────────────────────────────────────────
-
-struct EffectRow {
-    opcode: u32,
-    name: String,
-    param1: u32,
-    param2: u32,
-    resources: [String; 4],
-    time: u32,
-    timing_mode: TimingMode,
-    target: u32,
-}
-
-fn effect_rows(cre: &Cre) -> Vec<EffectRow> {
-    let SubSections::V1(sub) = &cre.sub_sections else {
-        return Vec::new();
-    };
-    let EffectList::V2(effects) = &sub.effects else {
-        return Vec::new();
-    };
-    effects
-        .iter()
-        .filter_map(|e| {
-            let EffectV2::Effect(e) = e else { return None };
-            Some(EffectRow {
-                opcode: e.opcode,
-                name: e.variable.clone(),
-                param1: e.param1,
-                param2: e.param2,
-                resources: [
-                    e.resource.clone(),
-                    e.resource2.clone(),
-                    e.resource3.clone(),
-                    e.parent_resource.clone(),
-                ],
-                time: e.duration,
-                timing_mode: e.timing_mode,
-                target: e.target,
-            })
-        })
-        .collect()
-}
-
-// ── Name / label resolution ───────────────────────────────────────────
-
-fn type_text(opcode: u32) -> String {
-    effect_name(opcode).map_or_else(|| format!("Unknown [{opcode}]"), str::to_owned)
-}
-
-fn timing_text(mode: TimingMode) -> String {
-    let label = match mode {
-        TimingMode::InstantLimited => "Duration",
-        TimingMode::InstantPermanent => "Permanent",
-        TimingMode::InstantWhileEquipped => "While Equipped",
-        TimingMode::DelayLimited => "Delayed Duration",
-        TimingMode::DelayPermanent => "Delayed",
-        TimingMode::DelayWhileEquipped => "Delayed, Equipped",
-        TimingMode::LimitedAfterDuration => "Delayed, Absolute Duration",
-        TimingMode::PermanentAfterDuration => "Delayed, Permanent",
-        TimingMode::EquippedAfterDuration => "Equipped, Permanent",
-        TimingMode::PermanentAfterDeath => "Instant, Permanent",
-        TimingMode::InstantLimitedTicks => "Duration (Ticks)",
-        TimingMode::AbsoluteDuration => "Absolute Duration",
-        TimingMode::Unknown(other) => return other.to_string(),
-    };
-    label.to_owned()
-}
-
-fn target_text(target: u32) -> String {
-    let label = match target {
-        0 => "None",
-        1 => "Self",
-        2 => "Preset Target",
-        3 => "Party",
-        4 => "Everyone",
-        5 => "Everyone Except Party",
-        6 => "Caster Group",
-        7 => "Target Group",
-        8 => "Everyone Except Self",
-        9 => "Original Caster",
-        other => return other.to_string(),
-    };
-    label.to_owned()
-}
+// ── Resource names ────────────────────────────────────────────────────
 
 /// Render a resource resref the way EEKeeper does: `"Spell Name [RESREF]"`
 /// when the resref maps to a `SPELL.IDS` symbol, otherwise the bare resref
@@ -175,30 +99,93 @@ fn title_case(symbol: &str) -> String {
 
 // ── Build ────────────────────────────────────────────────────────────
 
-/// Build the Effects-tab grid rows for the selected creature.
+/// The row of `effect`, under [`HEADERS`].
+fn row(effect: EffectRef<'_>, spell_ids: Option<&Ids>) -> Vec<SharedString> {
+    let number = |field| effect.number(field).unwrap_or(0);
+    let shown = |field| effect.shown(field).unwrap_or(0).to_string();
+    let text = |field| effect.text(field).unwrap_or_default();
+    let mut cells: Vec<SharedString> = Vec::with_capacity(HEADERS.len());
+    cells.push(type_text(number(Field::Opcode)).into());
+    cells.push(text(Field::Name).into());
+    cells.push(shown(Field::Param1).into());
+    cells.push(shown(Field::Param2).into());
+    for field in [
+        Field::Resource0,
+        Field::Resource1,
+        Field::Resource2,
+        Field::Resource3,
+    ] {
+        cells.push(resource_display(spell_ids, text(field)).into());
+    }
+    cells.push(shown(Field::Duration).into());
+    cells.push(timing_text(TimingMode::from(number(Field::Timing))).into());
+    cells.push(target_text(number(Field::Target)).into());
+    cells
+}
+
+/// Build the Effects-tab rows for the selected creature.
 pub fn build(model: &Model) -> Vec<Vec<SharedString>> {
     let Some(cre) = model.selected_cre() else {
         return Vec::new();
     };
-    let rows = effect_rows(cre);
     // `SPELL.IDS` is loaded once per build; effect lists are short.
     let spell_ids = model.game_data.import_ids_by_name("SPELL").ok();
     let spell_ids = spell_ids.as_deref();
-
-    rows.into_iter()
-        .map(|r| {
-            let mut cells: Vec<SharedString> = Vec::with_capacity(HEADERS.len());
-            cells.push(type_text(r.opcode).into());
-            cells.push(r.name.as_str().into());
-            cells.push(r.param1.to_string().into());
-            cells.push(r.param2.to_string().into());
-            for resref in &r.resources {
-                cells.push(resource_display(spell_ids, resref).into());
-            }
-            cells.push(r.time.to_string().into());
-            cells.push(timing_text(r.timing_mode).into());
-            cells.push(target_text(r.target).into());
-            cells
-        })
+    listed(cre.effect_list())
+        .into_iter()
+        .map(|(_, effect)| row(effect, spell_ids))
         .collect()
+}
+
+// ── Editing ───────────────────────────────────────────────────────────
+
+/// The effect of table row `row`: its index in the creature's effect list,
+/// and a copy of it.
+fn effect_at(model: &Model, row: i32) -> Option<(usize, Draft)> {
+    let cre = model.selected_cre()?;
+    let row = usize::try_from(row).ok()?;
+    listed(cre.effect_list())
+        .get(row)
+        .map(|&(index, effect)| (index, Draft::of(effect)))
+}
+
+/// Edit: open the dialog on a copy of row `row`'s effect.
+pub fn edit(model: &mut Model, row: i32) {
+    if let Some((index, draft)) = effect_at(model, row) {
+        model.effect_editor = Some(EffectEditor::new(Mode::Edit(index), draft));
+    }
+}
+
+/// Clone: open the dialog on a copy of row `row`'s effect, saved as a new
+/// one.
+pub fn duplicate(model: &mut Model, row: i32) {
+    if let Some((_, draft)) = effect_at(model, row) {
+        model.effect_editor = Some(EffectEditor::new(Mode::Clone, draft));
+    }
+}
+
+/// Add: open the dialog on a new effect, in the creature's format.
+pub fn add(model: &mut Model) {
+    if let Some(cre) = model.selected_cre() {
+        let draft = Draft::new_for(cre.effect_list());
+        model.effect_editor = Some(EffectEditor::new(Mode::Add, draft));
+    }
+}
+
+/// Delete row `row`'s effect.
+pub fn delete(model: &mut Model, row: i32) {
+    let Some((index, _)) = effect_at(model, row) else {
+        return;
+    };
+    let Some(cre) = model.selected_cre_mut() else {
+        return;
+    };
+    match cre.effect_list_mut() {
+        EffectList::V1(list) => {
+            list.remove(index);
+        }
+        EffectList::V2(list) => {
+            list.remove(index);
+        }
+    }
 }

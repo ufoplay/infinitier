@@ -1606,77 +1606,81 @@ fn is_movement_bonus_v1(effect: &EffectV1) -> bool {
             && e.param2 == 0)
 }
 
-/// A new V2 movement-bonus effect of `value`: on the creature itself,
-/// permanent, and not dispelled; no source, as the game leaves an effect
-/// nothing cast.
-fn movement_bonus_effect(value: u32) -> Effect {
-    const NOWHERE: u32 = u32::MAX;
-    Effect {
-        header: [0; 8],
-        opcode: MOVEMENT_RATE_OPCODE,
-        target: 2,
-        power: 0,
-        param1: value,
-        param2: 0,
-        timing_mode: TimingMode::PermanentAfterDeath,
-        duration: 0,
-        probability1: 100,
-        probability2: 0,
-        resource: String::new(),
-        dice_thrown: 0,
-        dice_sides: 0,
-        save_type: SaveType::empty(),
-        save_bonus: 0,
-        special: 0,
-        primary_type: 0,
-        unknown_48: 0,
-        parent_lowest_level: 0,
-        parent_highest_level: 0,
-        resistance: Resistance::BypassResistance,
-        param3: 0,
-        param4: 0,
-        param5: 0,
-        time_applied: 0,
-        resource2: String::new(),
-        resource3: String::new(),
-        caster_x: NOWHERE,
-        caster_y: NOWHERE,
-        target_x: NOWHERE,
-        target_y: NOWHERE,
-        parent_resource_type: 0,
-        parent_resource: String::new(),
-        parent_resource_flags: 0,
-        projectile: 0,
-        parent_resource_slot: NOWHERE,
-        variable: String::new(),
-        caster_level: 0,
-        first_apply: 0,
-        secondary_type: 0,
-        unknown_cc: 0,
-        trailing: [0; 56],
+impl Effect {
+    /// A new V2 effect `opcode` with `param1` and `param2`, kept on the
+    /// creature as an editor adds one: on the creature itself, permanent
+    /// (timing 9, kept after death) and not dispelled; no source, as the
+    /// game leaves an effect nothing cast (EEKeeper's template).
+    pub fn permanent(opcode: u32, param1: u32, param2: u32) -> Self {
+        const NOWHERE: u32 = u32::MAX;
+        Effect {
+            header: [0; 8],
+            opcode,
+            target: 2,
+            power: 0,
+            param1,
+            param2,
+            timing_mode: TimingMode::PermanentAfterDeath,
+            duration: 0,
+            probability1: 100,
+            probability2: 0,
+            resource: String::new(),
+            dice_thrown: 0,
+            dice_sides: 0,
+            save_type: SaveType::empty(),
+            save_bonus: 0,
+            special: 0,
+            primary_type: 0,
+            unknown_48: 0,
+            parent_lowest_level: 0,
+            parent_highest_level: 0,
+            resistance: Resistance::BypassResistance,
+            param3: 0,
+            param4: 0,
+            param5: 0,
+            time_applied: 0,
+            resource2: String::new(),
+            resource3: String::new(),
+            caster_x: NOWHERE,
+            caster_y: NOWHERE,
+            target_x: NOWHERE,
+            target_y: NOWHERE,
+            parent_resource_type: 0,
+            parent_resource: String::new(),
+            parent_resource_flags: 0,
+            projectile: 0,
+            parent_resource_slot: NOWHERE,
+            variable: String::new(),
+            caster_level: 0,
+            first_apply: 0,
+            secondary_type: 0,
+            unknown_cc: 0,
+            trailing: [0; 56],
+        }
     }
 }
 
-/// [`movement_bonus_effect`] as a classic V1 effect.
-fn movement_bonus_effect_v1(value: u32) -> EffectV1Body {
-    EffectV1Body {
-        // MOVEMENT_RATE_OPCODE: a word in V1.
-        opcode: 126,
-        target: 2,
-        power: 0,
-        param1: value,
-        param2: 0,
-        timing_mode: TimingMode::PermanentAfterDeath,
-        resistance: Resistance::BypassResistance,
-        duration: 0,
-        probability1: 100,
-        probability2: 0,
-        resource: String::new(),
-        dice_thrown: 0,
-        dice_sides: 0,
-        save_type: SaveType::empty(),
-        save_bonus: 0,
-        special: 0,
+impl EffectV1Body {
+    /// [`Effect::permanent`] as a classic V1 effect.
+    pub fn permanent(opcode: u16, param1: u32, param2: u32) -> Self {
+        EffectV1Body {
+            opcode,
+            target: 2,
+            power: 0,
+            param1,
+            param2,
+            timing_mode: TimingMode::PermanentAfterDeath,
+            resistance: Resistance::BypassResistance,
+            duration: 0,
+            probability1: 100,
+            probability2: 0,
+            resource: String::new(),
+            dice_thrown: 0,
+            dice_sides: 0,
+            save_type: SaveType::empty(),
+            save_bonus: 0,
+            special: 0,
+        }
     }
 }
 
@@ -1705,14 +1709,17 @@ fn set_bonus_effect<T>(
 }
 
 impl Cre {
-    fn effect_list(&self) -> &EffectList {
+    /// The creature's effects, in file order.
+    pub fn effect_list(&self) -> &EffectList {
         match &self.sub_sections {
             SubSections::V1(s) => &s.effects,
             SubSections::V22(s) => &s.effects,
         }
     }
 
-    fn effect_list_mut(&mut self) -> &mut EffectList {
+    /// The creature's effects, to edit. The exporter writes them back in
+    /// this order, and their count and offset with them.
+    pub fn effect_list_mut(&mut self) -> &mut EffectList {
         match &mut self.sub_sections {
             SubSections::V1(s) => &mut s.effects,
             SubSections::V22(s) => &mut s.effects,
@@ -1751,7 +1758,8 @@ impl Cre {
                     EffectV1::Effect(e) => Some(&mut e.param1),
                     _ => None,
                 },
-                |value| EffectV1::Effect(movement_bonus_effect_v1(value)),
+                // A word in V1.
+                |value| EffectV1::Effect(EffectV1Body::permanent(126, value, 0)),
             ),
             EffectList::V2(list) => set_bonus_effect(
                 list,
@@ -1761,7 +1769,9 @@ impl Cre {
                     EffectV2::Effect(e) => Some(&mut e.param1),
                     _ => None,
                 },
-                |value| EffectV2::Effect(Box::new(movement_bonus_effect(value))),
+                |value| {
+                    EffectV2::Effect(Box::new(Effect::permanent(MOVEMENT_RATE_OPCODE, value, 0)))
+                },
             ),
         }
     }
@@ -4028,16 +4038,15 @@ mod tests {
 
     #[test]
     fn only_a_permanent_increment_is_the_movement_bonus() {
-        let mut haste = movement_bonus_effect(3);
+        let bonus = || Effect::permanent(MOVEMENT_RATE_OPCODE, 3, 0);
+        let mut haste = bonus();
         haste.timing_mode = TimingMode::InstantLimited;
-        let mut set = movement_bonus_effect(3);
+        let mut set = bonus();
         set.param2 = 1;
         for effect in [haste, set] {
             assert!(!is_movement_bonus(&EffectV2::Effect(Box::new(effect))));
         }
-        assert!(is_movement_bonus(&EffectV2::Effect(Box::new(
-            movement_bonus_effect(3)
-        ))));
+        assert!(is_movement_bonus(&EffectV2::Effect(Box::new(bonus()))));
     }
 
     #[test]

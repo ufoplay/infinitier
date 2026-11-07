@@ -33,6 +33,7 @@ import {
     CardsAdapter,
     ColorSwatch,
     EditTableAdapter,
+    EffectsAdapter,
     GridAdapter,
     InventoryAdapter,
     SpellsAdapter,
@@ -41,6 +42,8 @@ import {
 import { BrowserKind, BrowserLayer, BrowsersAdapter, BrowserState, TypeFilter } from "browser/browser.slint";
 import {
     DeleteSaveDialog,
+    EffectDialog,
+    EffectDialogAdapter,
     FormFolder,
     LoadAdapter,
     LoadDialog,
@@ -70,6 +73,8 @@ export {
     ColorSwatch,
     InventoryAdapter,
     SpellsAdapter,
+    EffectsAdapter,
+    EffectDialogAdapter,
     BrowsersAdapter,
     BrowserKind,
     BrowserState,
@@ -140,6 +145,10 @@ export component AppWindow inherits Window {
     // Over the editor: the floating browsers, then the modal dialogs, then
     // the loading overlay (covering everything, an open dialog included).
     browsers := BrowserLayer {
+        width: root.width;
+        height: root.height;
+    }
+    if EffectDialogAdapter.open: EffectDialog {
         width: root.width;
         height: root.height;
     }

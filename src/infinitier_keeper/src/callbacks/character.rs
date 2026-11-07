@@ -8,6 +8,7 @@ use slint::ComponentHandle;
 use super::{AppRc, on_model};
 use crate::components::edit_table::EditTable;
 use crate::state::{self, Model};
+use crate::tabs::effects::{self, editor};
 use crate::tabs::{
     CharacterTab, abilities, appearance, characteristics, feats, inventory, levels, memorization,
     proficiencies, resistances, spells,
@@ -15,7 +16,7 @@ use crate::tabs::{
 use crate::view;
 use crate::{
     AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, EditTableAdapter,
-    InventoryAdapter, PartyAdapter, SpellsAdapter,
+    EffectDialogAdapter, EffectsAdapter, InventoryAdapter, PartyAdapter, SpellsAdapter,
 };
 
 pub fn wire(ui: &AppWindow, app: &AppRc) {
@@ -25,6 +26,7 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_appearance(ui, app);
     wire_inventory(ui, app);
     wire_spells(ui, app);
+    wire_effects(ui, app);
 }
 
 /// Appearance: pick the animation, a colour or a portrait, show or hide the
@@ -78,6 +80,7 @@ fn wire_party(ui: &AppWindow, app: &AppRc) {
                 m.selected = usize::try_from(idx).ok();
                 m.inventory_selected = None; // selection is per-creature
                 m.spell_tab = state::SPELL_TAB_AUTO; // re-default the spellbook
+                m.effect_editor = None; // edits the previous one's effects
             });
         });
     }
@@ -233,6 +236,62 @@ fn wire_spells(ui: &AppWindow, app: &AppRc) {
         spells.on_delete(move |row| {
             let Some(ui) = weak.upgrade() else { return };
             on_model(&ui, &app, |m| spells::delete(m, row));
+        });
+    }
+}
+
+/// Effects: add, edit, clone or delete an effect; the effect dialog's
+/// fields, Save and Cancel.
+fn wire_effects(ui: &AppWindow, app: &AppRc) {
+    let tab = ui.global::<EffectsAdapter>();
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        tab.on_add(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, effects::add);
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        tab.on_edit(move |row| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| effects::edit(m, row));
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        tab.on_duplicate(move |row| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| effects::duplicate(m, row));
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        tab.on_delete(move |row| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| effects::delete(m, row));
+        });
+    }
+    let dialog = ui.global::<EffectDialogAdapter>();
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        dialog.on_commit_field(move |id, value| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| editor::commit(m, id, value.as_str()));
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        dialog.on_save(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, editor::save);
+        });
+    }
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        dialog.on_cancel(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, editor::cancel);
         });
     }
 }

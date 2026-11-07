@@ -19,6 +19,7 @@ use infinitier_core::resource::cre::{Cre, Iwd2Spellbook, SpellType};
 use infinitier_core::save_games::SaveGame;
 
 use crate::tabs::CharacterTab;
+use crate::tabs::effects::editor::EffectEditor;
 
 /// Identifies one spell in the Spells tab, regardless of engine — kept on
 /// [`Model`] parallel to the displayed rows so a row's delete / set-memorised
@@ -96,6 +97,10 @@ pub struct Model {
     /// portrait, listed the first time the tab needs them (see
     /// [`Self::portrait_names`]).
     portrait_names: [OnceLock<Vec<String>>; 2],
+    /// Effects tab: the open effect dialog, editing the selected
+    /// character's effects; `None` when closed. Modal, so the selection
+    /// doesn't change under it; dropped all the same when it does.
+    pub effect_editor: Option<EffectEditor>,
 }
 
 /// The per-save state parked when a save isn't the active tab (mirrors the
@@ -128,6 +133,7 @@ impl Model {
             active_tab: 0,
             doll_equipment: Equipment::default(),
             portrait_names: Default::default(),
+            effect_editor: None,
         }
     }
 
@@ -253,6 +259,7 @@ impl Model {
         };
         self.parked[self.active_tab] = Some(outgoing);
         self.active_tab = i;
+        self.effect_editor = None;
     }
 
     /// Open a freshly-loaded save into a new tab and make it active.
