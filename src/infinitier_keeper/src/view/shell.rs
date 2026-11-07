@@ -9,8 +9,8 @@ use slint::{ComponentHandle, Image, SharedString};
 use super::{rows_changed, rows_model, sync_rows};
 use crate::app::App;
 use crate::build_data::build_version;
-use crate::state::Model;
-use crate::{AppWindow, PartyAdapter, PartyMember, SaveTabsAdapter, ShellAdapter, icons};
+use crate::state::{Model, NoticeKind};
+use crate::{AppWindow, Notice, PartyAdapter, PartyMember, SaveTabsAdapter, ShellAdapter, icons};
 
 pub(super) fn refresh(ui: &AppWindow, app: &App) {
     let shell = ui.global::<ShellAdapter>();
@@ -25,6 +25,22 @@ pub(super) fn refresh(ui: &AppWindow, app: &App) {
     shell.set_has_save(app.model().is_some());
     shell.set_dark_theme(app.settings.theme() == ThemeSetting::Dark);
     shell.set_status(app.status.as_str().into());
+    let notices: Vec<Notice> = app
+        .model()
+        .and_then(|model| model.notice.as_ref())
+        .map(|notice| Notice {
+            id: notice.id,
+            title: notice.title.as_str().into(),
+            text: notice.text.as_str().into(),
+            warning: notice.kind == NoticeKind::Warning,
+        })
+        .into_iter()
+        .collect();
+    // Kept while the notice is the same, so its toast keeps its time: a new
+    // one is a new toast.
+    if rows_changed(&shell.get_notices(), &notices) {
+        shell.set_notices(rows_model(notices));
+    }
 
     match app.model() {
         Some(model) => refresh_saves(ui, model),

@@ -9,7 +9,8 @@
 //! level that grants it. Remove takes away every effect of the spells the
 //! levels apply and every innate ability they grant, however many times
 //! they were added, and whatever added them (the game, when it levelled
-//! up, or an editor).
+//! up, or an editor). Either closes the dialog and leaves a notice of
+//! what it did (see [`Model::notify`]).
 //!
 //! [`class_abilities`]: infinitier_core::class_abilities
 
@@ -21,7 +22,7 @@ use infinitier_core::class_abilities::{
 use infinitier_core::game::GameData;
 use infinitier_core::resource::cre::{Cre, CreHeader, EffectList};
 
-use crate::state::Model;
+use crate::state::{Model, NoticeKind};
 
 /// The highest level a CLAB table has a column for.
 pub const MAX_LEVEL: u32 = 50;
@@ -75,8 +76,6 @@ pub struct KitFeatures {
     from: u32,
     to: u32,
     preview: Vec<Preview>,
-    /// What the last Add or Remove did.
-    message: String,
 }
 
 impl KitFeatures {
@@ -101,8 +100,30 @@ impl KitFeatures {
         &self.preview
     }
 
-    pub fn message(&self) -> &str {
-        &self.message
+    /// What's selected, in words: "Inquisitor, levels 1 to 25".
+    fn what(&self) -> String {
+        let name = self
+            .tables
+            .get(self.table)
+            .map_or("", |table| table.name.as_str());
+        format!("{name}, levels {} to {}", self.from, self.to)
+    }
+
+    /// That the selection holds nothing, in words.
+    fn nothing(&self) -> String {
+        let name = self
+            .tables
+            .get(self.table)
+            .map_or("", |table| table.name.as_str());
+        let part = match self.part {
+            Part::Both => "effects or innates",
+            Part::Effects => "effects",
+            Part::Innates => "innates",
+        };
+        format!(
+            "{name} gives no {part} in levels {} to {}.",
+            self.from, self.to
+        )
     }
 
     /// What the selected table gives from `from` to `to`, of `part`.
@@ -173,7 +194,6 @@ pub fn open(model: &mut Model) {
         from: 1,
         to,
         preview: Vec::new(),
-        message: String::new(),
     };
     features.select_table(game_data, table);
     model.kit_features = Some(features);
@@ -272,6 +292,8 @@ pub fn add(model: &mut Model) {
             Grant::Innate => innates.push(ability.spell.clone()),
         }
     }
+    let (what, nothing) = (features.what(), features.nothing());
+    let who = model.character_name();
     let Some(cre) = model.selected_cre_mut() else {
         return;
     };
@@ -281,17 +303,29 @@ pub fn add(model: &mut Model) {
         .iter()
         .filter(|spell| cre.add_innate_use(spell))
         .count();
-    let message = if !effects_added {
-        format!(
-            "Added {innate_uses} innate uses. This character's effects are in the classic \
-             format, which has no room for their source: its {effect_count} effects weren't added."
-        )
+    if !effects_added {
+        finish(
+            model,
+            NoticeKind::Warning,
+            "Kit features added",
+            format!(
+                "Added {innate_uses} innate uses to {who} ({what}). Its effects are in the \
+                 classic format, which has no room for their source: its {effect_count} \
+                 effects weren't added."
+            ),
+        );
     } else if effect_count == 0 && innate_uses == 0 {
-        "Nothing to add in these levels.".to_owned()
+        finish(model, NoticeKind::Warning, "Nothing added", nothing);
     } else {
-        format!("Added {effect_count} effects and {innate_uses} innate uses.")
-    };
-    set_message(model, message);
+        finish(
+            model,
+            NoticeKind::Done,
+            "Kit features added",
+            format!(
+                "Added {effect_count} effects and {innate_uses} innate uses to {who} ({what})."
+            ),
+        );
+    }
 }
 
 /// Remove what the selected levels give: every effect of their spells and
@@ -308,6 +342,8 @@ pub fn remove(model: &mut Model) {
             .collect()
     };
     let (sources, innates) = (spells(Grant::Effects), spells(Grant::Innate));
+    let what = features.what();
+    let who = model.character_name();
     let Some(cre) = model.selected_cre_mut() else {
         return;
     };
@@ -320,21 +356,39 @@ pub fn remove(model: &mut Model) {
         .iter()
         .filter(|spell| cre.remove_innate(spell))
         .count();
-    let message = if classic {
-        format!(
-            "Removed {abilities} innate abilities. This character's effects are in the classic \
-             format, which doesn't record their source: none could be removed."
-        )
+    if classic {
+        finish(
+            model,
+            NoticeKind::Warning,
+            "Kit features removed",
+            format!(
+                "Removed {abilities} innate abilities from {who} ({what}). Its effects are in \
+                 the classic format, which doesn't record their source: none could be removed."
+            ),
+        );
+    } else if effects == 0 && abilities == 0 {
+        finish(
+            model,
+            NoticeKind::Warning,
+            "Nothing removed",
+            format!("{who} has none of what {what} gives."),
+        );
     } else {
-        format!("Removed {effects} effects and {abilities} innate abilities.")
-    };
-    set_message(model, message);
+        finish(
+            model,
+            NoticeKind::Done,
+            "Kit features removed",
+            format!(
+                "Removed {effects} effects and {abilities} innate abilities from {who} ({what})."
+            ),
+        );
+    }
 }
 
-fn set_message(model: &mut Model, message: String) {
-    if let Some(features) = model.kit_features.as_mut() {
-        features.message = message;
-    }
+/// Close the dialog, leaving a notice of what it did.
+fn finish(model: &mut Model, kind: NoticeKind, title: &str, text: String) {
+    model.kit_features = None;
+    model.notify(kind, title, text);
 }
 
 pub fn close(model: &mut Model) {
@@ -367,7 +421,6 @@ mod tests {
             from,
             to,
             preview: Vec::new(),
-            message: String::new(),
         }
     }
 

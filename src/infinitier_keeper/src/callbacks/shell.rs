@@ -4,7 +4,7 @@
 use infinitier_gui_common::ThemeSetting;
 use slint::ComponentHandle;
 
-use super::{AppRc, on_app};
+use super::{AppRc, on_app, on_model};
 use crate::app::{App, Session};
 use crate::{AppWindow, SaveAdapter, SaveTabsAdapter, ShellAdapter};
 
@@ -13,9 +13,17 @@ pub fn wire(ui: &AppWindow, app: &AppRc) {
     wire_save_tabs(ui, app);
 }
 
-/// Header: open the Load / Save / Settings dialogs, toggle the theme.
+/// Header: open the Load / Save / Settings dialogs, toggle the theme; and
+/// dismiss the notice toast.
 fn wire_header(ui: &AppWindow, app: &AppRc) {
     let shell = ui.global::<ShellAdapter>();
+    {
+        let (app, weak) = (app.clone(), ui.as_weak());
+        shell.on_dismiss_notice(move |id| {
+            let Some(ui) = weak.upgrade() else { return };
+            on_model(&ui, &app, |m| m.dismiss_notice(id));
+        });
+    }
     {
         let (app, weak) = (app.clone(), ui.as_weak());
         shell.on_load_clicked(move || {

@@ -1,6 +1,16 @@
 // The window-wide state: what's loaded, the theme, the header's status and
 // its actions.
 
+// A notice of what an action did, shown as a toast. Each has its own `id`:
+// a new one is a new toast, with its own time to show.
+export struct Notice {
+    id: int,
+    title: string,
+    text: string,
+    // It didn't happen as asked.
+    warning: bool,
+}
+
 export global ShellAdapter {
     // "Infinitier Keeper {version}", then " - {game}" once one is loaded.
     in property <string> title: "Infinitier Keeper";
@@ -11,6 +21,10 @@ export global ShellAdapter {
     in property <bool> dark-theme;
     // One-line feedback, e.g. where a save was written.
     in property <string> status;
+    // The notice to show, if any (at most one).
+    in property <[Notice]> notices;
+    // Notice `id` timed out or was closed.
+    callback dismiss-notice(int /* id */);
     callback load-clicked();
     callback save-clicked();
     callback settings-clicked();

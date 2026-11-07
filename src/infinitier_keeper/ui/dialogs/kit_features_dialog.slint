@@ -1,7 +1,7 @@
 // The Kit Features dialog: pick a base class or kit, what of it (effects,
 // innates or both) and a range of levels; the table previews what those
-// levels give; Add gives it to the character, Remove takes it away. It
-// stays open, so one can be done after the other, until Close.
+// levels give; Add gives it to the character, Remove takes it away. Either
+// closes it, and a notice (the shell's toast) says what it did.
 
 import { Button, ButtonKind, ControlSize, Dialog, Label, NumberField, Select, Table, TableCell, TextRole, Theme, Tone } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
@@ -18,8 +18,6 @@ export global KitFeaturesAdapter {
     in property <int> max-level;
     // What the levels give: level, effects or innate, spell.
     in property <[[TableCell]]> rows;
-    // What the last Add or Remove did.
-    in property <string> message;
     callback select-table(int);
     callback select-part(int);
     callback set-from(float);
@@ -103,10 +101,6 @@ export component KitFeaturesDialog inherits Dialog {
         ];
         rows: KitFeaturesAdapter.rows;
         size: ControlSize.small;
-    }
-    if KitFeaturesAdapter.message != "": Label {
-        text: KitFeaturesAdapter.message;
-        wrap: word-wrap;
     }
     HorizontalLayout {
         spacing: Theme.spacing.sm;

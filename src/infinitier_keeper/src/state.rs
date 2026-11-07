@@ -106,6 +106,29 @@ pub struct Model {
     /// character; `None` when closed. Modal, and dropped like the effect
     /// dialog when the selection changes.
     pub kit_features: Option<KitFeatures>,
+    /// What the last action that says so did, until the toast showing it
+    /// times out or is dismissed.
+    pub notice: Option<Notice>,
+    /// How many notices there have been: the next one's id.
+    notices: i32,
+}
+
+/// A notice the window shows for a while, as a toast: what an action did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Notice {
+    /// Its own, so a new notice is a new toast (see [`Model::notify`]).
+    pub id: i32,
+    pub kind: NoticeKind,
+    pub title: String,
+    pub text: String,
+}
+
+/// Whether a [`Notice`]'s action went as asked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoticeKind {
+    Done,
+    /// Something didn't happen as asked.
+    Warning,
 }
 
 /// The per-save state parked when a save isn't the active tab (mirrors the
@@ -140,6 +163,27 @@ impl Model {
             portrait_names: Default::default(),
             effect_editor: None,
             kit_features: None,
+            notice: None,
+            notices: 0,
+        }
+    }
+
+    /// Show a notice of what an action did, in place of any other.
+    pub fn notify(&mut self, kind: NoticeKind, title: &str, text: String) {
+        self.notices = self.notices.wrapping_add(1);
+        self.notice = Some(Notice {
+            id: self.notices,
+            kind,
+            title: title.to_owned(),
+            text,
+        });
+    }
+
+    /// Notice `id` timed out or was closed: gone, unless another took its
+    /// place meanwhile.
+    pub fn dismiss_notice(&mut self, id: i32) {
+        if self.notice.as_ref().is_some_and(|notice| notice.id == id) {
+            self.notice = None;
         }
     }
 

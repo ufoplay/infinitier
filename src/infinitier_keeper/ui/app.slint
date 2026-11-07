@@ -12,7 +12,7 @@
 // Each part reads and calls its `*Adapter` global, which the Rust side
 // fills and handles; this file only composes the parts.
 
-import { Divider, Icons, TableCell, TableCellKind, TableColumn, Theme, ThemePresets } from "@themekit";
+import { Divider, Icons, TableCell, TableCellKind, TableColumn, Theme, ThemePresets, Toast, ToastStack, Tone } from "@themekit";
 import { Metrics } from "themes/metrics.slint";
 import { FieldCard, FieldRow } from "components/components.slint";
 import {
@@ -21,6 +21,7 @@ import {
     CharacterPanel,
     EmptyState,
     HeaderBar,
+    Notice,
     PartyAdapter,
     PartyList,
     PartyMember,
@@ -60,6 +61,7 @@ import {
 // For the Rust side.
 export {
     ShellAdapter,
+    Notice,
     SaveTabsAdapter,
     PartyAdapter,
     PartyMember,
@@ -174,6 +176,19 @@ export component AppWindow inherits Window {
     if SettingsAdapter.open: SettingsDialog {
         width: root.width;
         height: root.height;
+    }
+    // A notice of what an action did, over the editor and its dialogs; the
+    // rest of the stack lets clicks through.
+    ToastStack {
+        width: root.width;
+        height: root.height;
+        for notice in ShellAdapter.notices: Toast {
+            tone: notice.warning ? Tone.warning : Tone.success;
+            title: notice.title;
+            text: notice.text;
+            close-label: "Dismiss";
+            close-requested => { ShellAdapter.dismiss-notice(notice.id); }
+        }
     }
     if LoadingAdapter.active: LoadingOverlay {
         width: root.width;

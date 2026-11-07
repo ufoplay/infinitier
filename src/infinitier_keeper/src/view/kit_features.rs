@@ -61,7 +61,6 @@ fn show(adapter: &KitFeaturesAdapter, features: &KitFeatures) {
     if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
         adapter.set_rows(rows);
     }
-    adapter.set_message(features.message().into());
 }
 
 fn index(index: usize) -> i32 {
