@@ -2,7 +2,7 @@
 // (Abilities, Characteristics, Resistances, …): each row a label, an
 // optional "(effective: …)" hint, and an editor or a read-only value.
 
-import { Card, Checkbox, ControlSize, Label, NumberField, Select, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Card, Checkbox, ControlSize, Icons, Label, NumberField, Select, TextField, TextRole, Theme, Tone, TooltipText } from "@themekit";
 import { Metrics } from "../themes/metrics.slint";
 
 // One editable / read-only row inside a card. `id` is the index into the
@@ -12,6 +12,8 @@ import { Metrics } from "../themes/metrics.slint";
 // current one, which commits the index picked; `is-check` renders a
 // checkbox (label + `checked`); `numeric` edits the value with a number
 // field (drag or type) from `minimum` to `maximum`, committing each change.
+// A checkbox row with a `tooltip` explains itself on hover, and shows an
+// info icon that says so.
 export struct FieldRow {
     id: int,
     label: string,
@@ -27,14 +29,34 @@ export struct FieldRow {
     numeric: bool,
     minimum: int,
     maximum: int,
+    tooltip: string,
 }
 
 // One titled card (e.g. "Ability scores") holding a set of rows, assigned
-// to a display column (0..2) of the three-column grid.
+// to a display column (0..2) of the three-column grid. With a `tooltip`,
+// its title explains the card on hover, with an info icon after it.
 export struct FieldCard {
     title: string,
     column: int,
     rows: [FieldRow],
+    tooltip: string,
+}
+
+// The info icon that says a title or a checkbox explains itself on hover;
+// hovering it explains too.
+component InfoIcon inherits VerticalLayout {
+    in property <string> tooltip;
+
+    alignment: center;
+    Image {
+        source: Icons.info;
+        colorize: Theme.palette.text-muted;
+        width: Theme.sizes.icon;
+        height: Theme.sizes.icon;
+        accessible-role: image;
+        accessible-label: root.tooltip;
+        Tooltip { TooltipText { text: root.tooltip; } }
+    }
 }
 
 export component FieldCardView inherits Card {
@@ -49,25 +71,37 @@ export component FieldCardView inherits Card {
     content-padding: Theme.spacing.md;
     content-spacing: Theme.spacing.sm;
 
-    Label {
-        text: root.card.title;
-        role: TextRole.heading;
+    HorizontalLayout {
+        alignment: start;
+        spacing: Theme.spacing.xs;
+        Label {
+            text: root.card.title;
+            role: TextRole.heading;
+            if root.card.tooltip != "": Tooltip { TooltipText { text: root.card.tooltip; } }
+        }
+        if root.card.tooltip != "": InfoIcon { tooltip: root.card.tooltip; }
     }
     for row in root.card.rows: HorizontalLayout {
         spacing: Theme.spacing.sm;
 
         // Checkbox row: the label lives in the box. Editable (commits
         // "1"/"0") when the row carries a real id; read-only (disabled) for
-        // derived rows.
-        if row.is-check: Checkbox {
-            text: row.label;
-            checked: row.checked;
-            enabled: row.id >= 0;
-            toggled => {
-                if (row.id >= 0) {
-                    root.commit-field(row.id, row.checked ? "0" : "1");
+        // derived rows. Its info icon, if any, follows the label.
+        if row.is-check: HorizontalLayout {
+            alignment: start;
+            spacing: Theme.spacing.xs;
+            Checkbox {
+                text: row.label;
+                checked: row.checked;
+                enabled: row.id >= 0;
+                toggled => {
+                    if (row.id >= 0) {
+                        root.commit-field(row.id, row.checked ? "0" : "1");
+                    }
                 }
+                if row.tooltip != "": Tooltip { TooltipText { text: row.tooltip; } }
             }
+            if row.tooltip != "": InfoIcon { tooltip: row.tooltip; }
         }
 
         // Everything else: label + optional bonus + editor / value.

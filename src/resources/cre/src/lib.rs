@@ -22,6 +22,7 @@ use std::io;
 mod exporter;
 mod header;
 mod importer;
+mod permanent_effects;
 
 pub use exporter::CreExporter;
 pub use header::{
@@ -1586,26 +1587,6 @@ fn wr_resref_n(b: &mut [u8], o: usize, n: usize, s: &str) {
     b[o..o + len].copy_from_slice(&encoded[..len]);
 }
 
-/// Opcode of the effect that changes the movement rate.
-const MOVEMENT_RATE_OPCODE: u32 = 126;
-
-/// Whether a V2 effect is the creature's movement bonus: a permanent
-/// (timing 9) opcode-126 effect that adds to the rate (parameter 2 = 0).
-fn is_movement_bonus(effect: &EffectV2) -> bool {
-    matches!(effect, EffectV2::Effect(e)
-        if e.opcode == MOVEMENT_RATE_OPCODE
-            && e.timing_mode == TimingMode::PermanentAfterDeath
-            && e.param2 == 0)
-}
-
-/// [`is_movement_bonus`] for a classic V1 effect.
-fn is_movement_bonus_v1(effect: &EffectV1) -> bool {
-    matches!(effect, EffectV1::Effect(e)
-        if u32::from(e.opcode) == MOVEMENT_RATE_OPCODE
-            && e.timing_mode == TimingMode::PermanentAfterDeath
-            && e.param2 == 0)
-}
-
 impl Effect {
     /// A new V2 effect `opcode` with `param1` and `param2`, kept on the
     /// creature as an editor adds one: on the creature itself, permanent
@@ -1684,30 +1665,6 @@ impl EffectV1Body {
     }
 }
 
-/// Keep the first effect `is_bonus` matches in `list` at `value`: update
-/// its parameter 1, insert `new(value)` first when there's none, or remove
-/// it for 0.
-fn set_bonus_effect<T>(
-    list: &mut Vec<T>,
-    value: u32,
-    is_bonus: impl Fn(&T) -> bool,
-    param1: impl Fn(&mut T) -> Option<&mut u32>,
-    new: impl Fn(u32) -> T,
-) {
-    match (list.iter().position(is_bonus), value) {
-        (Some(index), 0) => {
-            list.remove(index);
-        }
-        (Some(index), _) => {
-            if let Some(param1) = param1(&mut list[index]) {
-                *param1 = value;
-            }
-        }
-        (None, 0) => {}
-        (None, _) => list.insert(0, new(value)),
-    }
-}
-
 impl Cre {
     /// The creature's effects, in file order.
     pub fn effect_list(&self) -> &EffectList {
@@ -1723,56 +1680,6 @@ impl Cre {
         match &mut self.sub_sections {
             SubSections::V1(s) => &mut s.effects,
             SubSections::V22(s) => &mut s.effects,
-        }
-    }
-
-    /// The bonus to the creature's movement rate an editor keeps on it
-    /// (EEKeeper's "Movement"): parameter 1 of its first permanent
-    /// (timing 9) opcode-126 effect that adds to the rate (parameter 2 =
-    /// 0). 0 without one. The engines take the base rate from the
-    /// creature's animation, not its CRE, so an effect is where it lives.
-    pub fn movement_bonus(&self) -> u32 {
-        match self.effect_list() {
-            EffectList::V1(list) => list.iter().find_map(|effect| match effect {
-                EffectV1::Effect(e) if is_movement_bonus_v1(effect) => Some(e.param1),
-                _ => None,
-            }),
-            EffectList::V2(list) => list.iter().find_map(|effect| match effect {
-                EffectV2::Effect(e) if is_movement_bonus(effect) => Some(e.param1),
-                _ => None,
-            }),
-        }
-        .unwrap_or(0)
-    }
-
-    /// Set the movement bonus (see [`Self::movement_bonus`]): its effect is
-    /// updated in place, or added first in the list (where EEKeeper adds
-    /// it) when there's none; 0 removes it.
-    pub fn set_movement_bonus(&mut self, value: u32) {
-        match self.effect_list_mut() {
-            EffectList::V1(list) => set_bonus_effect(
-                list,
-                value,
-                is_movement_bonus_v1,
-                |effect| match effect {
-                    EffectV1::Effect(e) => Some(&mut e.param1),
-                    _ => None,
-                },
-                // A word in V1.
-                |value| EffectV1::Effect(EffectV1Body::permanent(126, value, 0)),
-            ),
-            EffectList::V2(list) => set_bonus_effect(
-                list,
-                value,
-                is_movement_bonus,
-                |effect| match effect {
-                    EffectV2::Effect(e) => Some(&mut e.param1),
-                    _ => None,
-                },
-                |value| {
-                    EffectV2::Effect(Box::new(Effect::permanent(MOVEMENT_RATE_OPCODE, value, 0)))
-                },
-            ),
         }
     }
 
@@ -3689,7 +3596,7 @@ pub(crate) mod test_support {
     use infinitier_datasource::{DataSource, Importer};
     use infinitier_test_utils::get_assets_path;
 
-    use crate::{Cre, CreImporter};
+    use crate::{Cre, CreExporter, CreImporter};
 
     /// Recursively collect every `.cre` file under `assets/cre/`.
     pub fn all_cre_fixtures() -> Vec<PathBuf> {
@@ -3713,6 +3620,18 @@ pub(crate) mod test_support {
         visit(&get_assets_path().join("cre"), &mut out);
         out.sort();
         out
+    }
+
+    /// `cre` written out and read back in.
+    pub fn round_trip(cre: &Cre) -> Cre {
+        let mut bytes = Vec::new();
+        CreExporter.export(cre, &mut bytes).expect("export");
+        CreImporter {
+            name: "round-trip",
+            game: Game::Bgee,
+        }
+        .import(&DataSource::new(bytes))
+        .expect("import")
     }
 
     /// Imports a fixture path relative to `assets/cre/`.
@@ -3745,6 +3664,7 @@ fn recompute_v22_total(h: &mut header::CreHeaderV22) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::round_trip;
 
     /// Build a synthetic 264-byte `op187` ("set local variable")
     /// record with the given name / value.
@@ -3876,19 +3796,6 @@ mod tests {
         }
     }
 
-    fn round_trip(cre: &Cre) -> Cre {
-        use infinitier_common::Game;
-        use infinitier_datasource::{DataSource, Importer};
-        let mut bytes = Vec::new();
-        CreExporter.export(cre, &mut bytes).unwrap();
-        CreImporter {
-            name: "round-trip",
-            game: Game::Bgee,
-        }
-        .import(&DataSource::new(bytes))
-        .unwrap()
-    }
-
     #[test]
     fn resistances_saves_ac_modifiers_set_and_round_trip() {
         let mut cre = crate::test_support::import_fixture("v1_0/IMOEN_DUAL.cre");
@@ -3999,54 +3906,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn the_movement_bonus_is_added_first_updated_and_removed_in_every_version() {
-        for fixture in [
-            "v1_0/IMOEN_DUAL.cre",
-            "v1_2/THIEF3.cre",
-            "v9_0/BARBWAR2.cre",
-            "v2_2/52SERSA.cre",
-        ] {
-            let mut cre = crate::test_support::import_fixture(fixture);
-            let count = cre.effect_list().len();
-            let first_opcode = |cre: &Cre| match cre.effect_list() {
-                EffectList::V1(list) => list.first().map(EffectV1::opcode),
-                EffectList::V2(list) => list.first().map(EffectV2::opcode),
-            };
-            assert_eq!(cre.movement_bonus(), 0, "{fixture}");
-
-            cre.set_movement_bonus(12);
-            let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 12, "{fixture}");
-            assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
-            assert_eq!(first_opcode(&rt), Some(MOVEMENT_RATE_OPCODE), "{fixture}");
-
-            // The same effect, updated.
-            cre.set_movement_bonus(50);
-            let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 50, "{fixture}");
-            assert_eq!(rt.effect_list().len(), count + 1, "{fixture}");
-
-            cre.set_movement_bonus(0);
-            let rt = round_trip(&cre);
-            assert_eq!(rt.movement_bonus(), 0, "{fixture}");
-            assert_eq!(rt.effect_list().len(), count, "{fixture}");
-        }
-    }
-
-    #[test]
-    fn only_a_permanent_increment_is_the_movement_bonus() {
-        let bonus = || Effect::permanent(MOVEMENT_RATE_OPCODE, 3, 0);
-        let mut haste = bonus();
-        haste.timing_mode = TimingMode::InstantLimited;
-        let mut set = bonus();
-        set.param2 = 1;
-        for effect in [haste, set] {
-            assert!(!is_movement_bonus(&EffectV2::Effect(Box::new(effect))));
-        }
-        assert!(is_movement_bonus(&EffectV2::Effect(Box::new(bonus()))));
     }
 
     #[test]

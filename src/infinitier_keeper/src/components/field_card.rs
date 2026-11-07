@@ -71,10 +71,12 @@ pub fn editable_check_row(id: i32, label: &str, checked: bool) -> FieldRow {
     }
 }
 
+/// A titled card in display `column` (0..2); no tooltip.
 pub fn card(title: &str, column: i32, rows: Vec<FieldRow>) -> FieldCard {
     FieldCard {
         title: title.into(),
         column,
         rows: ModelRc::new(VecModel::from(rows)),
+        tooltip: SharedString::new(),
     }
 }

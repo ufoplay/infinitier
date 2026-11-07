@@ -1,13 +1,15 @@
 //! Characteristics tab.
 //!
 //! The Identity card's fields are edited, each picked by name from the
-//! game's own tables ([`identity`]). The kill stats come from the GAM party
+//! game's own tables ([`identity`]). The Special Edits card ([`special`])
+//! holds shortcuts to features the record has no field for. The kill stats come from the GAM party
 //! slot and the Miscellaneous checkboxes from `CreatureFlags::MISC`, both
 //! shown read-only. `dialog.tlk` strrefs are resolved during `build`, which
 //! runs once per refresh (tab switch / selection / commit), so no cache is
 //! needed.
 
 mod identity;
+mod special;
 
 use infinitier_core::game::GameData;
 use infinitier_core::imported_resource::gam::NpcCre;
@@ -16,8 +18,6 @@ use infinitier_core::resource::cre::CreatureFlags;
 use crate::FieldCard;
 use crate::components::field_card::{card, check_row, readonly_row};
 use crate::state::Model;
-
-pub use identity::commit;
 
 /// The text of `strref` in `dialog.tlk`; empty for none.
 fn resolve_strref(game_data: &GameData, strref: u32) -> String {
@@ -70,6 +70,15 @@ pub fn build(model: &Model) -> [Vec<FieldCard>; 3] {
             card("Kill Stats", 1, kill_rows),
             card("Miscellaneous", 1, misc_rows),
         ],
-        Vec::new(),
+        special::card_for(game_data.game(), cre, 2)
+            .into_iter()
+            .collect(),
     ]
+}
+
+/// Apply an edit of row `id`, on whichever card it is.
+pub fn commit(model: &mut Model, id: i32, value: &str) {
+    if !special::commit(model, id, value) {
+        identity::commit(model, id, value);
+    }
 }
