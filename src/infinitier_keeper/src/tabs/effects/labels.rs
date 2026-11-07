@@ -1,14 +1,12 @@
 //! The names an effect's coded fields are shown by, in the table and in the
 //! editor's dropdowns: its type (opcode), timing mode, target, and whether
-//! it can be dispelled and resisted.
+//! it can be dispelled and resisted; and, by its type, what its two
+//! parameters hold and what it does (EEKeeper's, see [`opcodes`]).
 
 use infinitier_core::resource::cre::TimingMode;
 
 use super::fields::{EffectRef, Field};
-use super::opcode_names::effect_name;
-
-/// The highest opcode [`effect_name`] names.
-const LAST_NAMED_OPCODE: u32 = 321;
+use super::opcodes;
 
 /// The timing modes, with EEKeeper's names for them.
 const TIMINGS: [(TimingMode, &str); 12] = [
@@ -43,13 +41,13 @@ const TARGETS: [&str; 10] = [
     "Original Caster",
 ];
 
-/// The dispel / resistance bits 0 and 1, by their four values (DLTCEP's
+/// The dispel / resistance bits 0 and 1, by their four values (EEKeeper's
 /// names). The others (EE flags) are kept as they are.
 const RESISTANCES: [&str; 4] = [
-    "Natural / Nonmagical",
-    "Dispel / Not bypass resistance",
-    "Not dispel / Bypass resistance",
-    "Dispel / Bypass resistance",
+    "Nonmagical",
+    "Can Dispel/Cannot Bypass Resistance",
+    "Cannot Dispel/Can Bypass Resistance",
+    "Can Dispel/Can Bypass Resistance",
 ];
 
 /// The dispel / resistance bits [`RESISTANCES`] names.
@@ -57,7 +55,24 @@ pub const RESISTANCE_BITS: u32 = 0b11;
 
 /// The table's name for an effect's type (EEKeeper's).
 pub fn type_text(opcode: u32) -> String {
-    effect_name(opcode).map_or_else(|| format!("Unknown [{opcode}]"), str::to_owned)
+    opcodes::opcode(opcode).map_or_else(|| format!("Unknown [{opcode}]"), |op| op.name.to_owned())
+}
+
+/// The label of the row of parameter `n` (1 or 2) of an effect `opcode`:
+/// what EEKeeper says it holds, the name its description calls it by; "not
+/// used" where the effect ignores it; just its number where that's unknown.
+pub fn parameter_label(opcode: u32, n: u8) -> String {
+    let held = opcodes::opcode(opcode).map(|op| if n == 1 { op.param1 } else { op.param2 });
+    match held.unwrap_or_default() {
+        "Irrelevant" => format!("Parameter {n} (not used)"),
+        "" | "Unknown" | "Undefined" | "Undetermined" => format!("Parameter {n}"),
+        held => held.to_owned(),
+    }
+}
+
+/// What an effect `opcode` does, by EEKeeper; empty where it doesn't say.
+pub fn description(opcode: u32) -> &'static str {
+    opcodes::opcode(opcode).map_or("", |op| op.description)
 }
 
 pub fn timing_text(mode: TimingMode) -> String {
@@ -83,9 +98,14 @@ pub type Choices = Vec<(u32, String)>;
 pub fn choices(effect: EffectRef<'_>, field: Field) -> Option<(Choices, usize)> {
     let value = effect.number(field)?;
     let mut choices: Choices = match field {
-        Field::Type => (0..=LAST_NAMED_OPCODE)
-            .map(|opcode| (opcode, type_option(opcode)))
-            .collect(),
+        // By name, as EEKeeper lists them: a category's effects together.
+        Field::Type => {
+            let mut types: Choices = opcodes::all()
+                .map(|(opcode, _)| (opcode, type_option(opcode)))
+                .collect();
+            types.sort_by_cached_key(|(_, name)| name.to_lowercase());
+            types
+        }
         Field::Target => (0..)
             .zip(TARGETS)
             .map(|(value, name)| (value, name.to_owned()))
@@ -179,15 +199,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_type_option_names_its_opcode() {
+    fn the_types_are_by_name_and_each_names_its_opcode() {
         let effect = Effect::permanent(0, 0, 0);
         let (options, index) = choices(EffectRef::V2(&effect), Field::Type).expect("a dropdown");
-        assert_eq!(index, 0);
+        assert_eq!(options[index].0, 0);
+        assert_eq!(options.len(), opcodes::all().count());
         assert!(
             options
                 .iter()
                 .all(|(opcode, name)| name.ends_with(&format!("[{opcode}]")))
         );
+        let names: Vec<String> = options
+            .iter()
+            .map(|(_, name)| name.to_lowercase())
+            .collect();
+        assert!(names.is_sorted());
+    }
+
+    #[test]
+    fn a_parameter_is_labelled_by_what_it_holds() {
+        assert_eq!(parameter_label(0, 1), "AC Modifier");
+        assert_eq!(parameter_label(0, 2), "Type");
+        assert_eq!(parameter_label(2, 1), "Parameter 1 (not used)");
+        assert_eq!(parameter_label(318, 2), "Parameter 2");
+        assert_eq!(parameter_label(5000, 1), "Parameter 1");
+        assert!(description(0).starts_with("Applies the modifier value"));
+        assert_eq!(description(5000), "");
     }
 
     #[test]

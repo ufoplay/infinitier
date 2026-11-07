@@ -4,15 +4,15 @@
 //! ([`fields`]): one row each, ending with Edit, Clone and Delete. Edit (or
 //! a double-click), Clone and the Add button under the table open the
 //! effect dialog ([`editor`]) on a draft. Delete removes the effect at once, like a
-//! deleted item or spell. The opcode → "Type" name table is
-//! `opcode_names`; resource resrefs are resolved to `SPELL.IDS` symbols,
+//! deleted item or spell. The opcode → "Type" name table, with what each
+//! type's parameters hold and what it does, is `opcodes` (EEKeeper's); resource resrefs are resolved to `SPELL.IDS` symbols,
 //! and timing/target ints to EEKeeper's labels ([`labels`]). Rendered as
 //! a wide table that scrolls sideways.
 
 pub mod editor;
 mod fields;
 mod labels;
-mod opcode_names;
+mod opcodes;
 
 use infinitier_core::resource::cre::{EffectList, TimingMode};
 use infinitier_core::resource::ids::Ids;

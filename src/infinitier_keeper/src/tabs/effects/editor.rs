@@ -5,7 +5,7 @@
 //! as a new effect (Add, Clone); Cancel drops it.
 
 use super::fields::{Draft, Field, Kind, Number};
-use super::labels::{RESISTANCE_BITS, choices};
+use super::labels::{RESISTANCE_BITS, choices, description, parameter_label};
 use crate::FieldCard;
 use crate::components::field_card::{card, editable_row, number_row, select_row};
 use crate::state::Model;
@@ -65,6 +65,7 @@ const CARDS: [(&str, &[Field]); 3] = [
             Field::DiceSides,
             Field::PrimaryType,
             Field::SecondaryType,
+            Field::CasterLevel,
         ],
     ),
     (
@@ -79,7 +80,6 @@ const CARDS: [(&str, &[Field]); 3] = [
             Field::ParentSlot,
             Field::MinLevel,
             Field::MaxLevel,
-            Field::CasterLevel,
             Field::CasterX,
             Field::CasterY,
             Field::TargetX,
@@ -105,6 +105,14 @@ impl EffectEditor {
         }
     }
 
+    /// What the draft's effect does, by its type (see `labels`).
+    pub fn description(&self) -> &'static str {
+        self.draft
+            .as_ref()
+            .number(Field::Opcode)
+            .map_or("", description)
+    }
+
     /// The dialog's cards, one per column.
     pub fn cards(&self) -> Vec<FieldCard> {
         (0..)
@@ -120,7 +128,18 @@ impl EffectEditor {
     /// `None` where the effect's format has no such field.
     fn row(&self, field: Field) -> Option<crate::FieldRow> {
         let effect = self.draft.as_ref();
-        let (id, label) = (field.id(), field.label());
+        let id = field.id();
+        // The parameters by what the effect's type keeps in them, the names
+        // its description calls them by.
+        let opcode = effect.number(Field::Opcode).unwrap_or(0);
+        let label = if field == Field::Param1 {
+            parameter_label(opcode, 1)
+        } else if field == Field::Param2 {
+            parameter_label(opcode, 2)
+        } else {
+            field.label().to_owned()
+        };
+        let label = label.as_str();
         Some(match effect.kind(field)? {
             Kind::Choice => {
                 let (choices, index) = choices(effect, field)?;
@@ -223,31 +242,62 @@ mod tests {
         EffectEditor::new(Mode::Edit(0), draft)
     }
 
-    fn row_labels(editor: &EffectEditor) -> Vec<Vec<String>> {
+    fn rows(editor: &EffectEditor) -> Vec<Vec<(i32, String)>> {
         use slint::Model as _;
         editor
             .cards()
             .iter()
-            .map(|card| card.rows.iter().map(|row| row.label.to_string()).collect())
+            .map(|card| {
+                card.rows
+                    .iter()
+                    .map(|row| (row.id, row.label.to_string()))
+                    .collect()
+            })
             .collect()
     }
 
     #[test]
-    fn a_v2_effect_shows_every_field_once() {
+    fn a_v2_effect_shows_every_field_once_in_cards_of_13() {
         let editor = editor(Draft::V2(Box::new(Effect::permanent(0, 0, 0))));
-        let labels: Vec<String> = row_labels(&editor).concat();
-        let expected: Vec<String> = Field::ALL.iter().map(|f| f.label().to_owned()).collect();
-        let mut sorted = labels.clone();
-        sorted.sort();
-        let mut expected_sorted = expected;
-        expected_sorted.sort();
-        assert_eq!(sorted, expected_sorted);
+        let cards = rows(&editor);
+        assert!(cards.iter().all(|card| card.len() == 13));
+        let mut ids: Vec<i32> = cards.concat().iter().map(|(id, _)| *id).collect();
+        ids.sort_unstable();
+        let expected: Vec<i32> = Field::ALL.iter().map(|field| field.id()).collect();
+        assert_eq!(ids, expected);
+    }
+
+    #[test]
+    fn the_parameters_are_labelled_by_the_effect_type() {
+        let mut editor = editor(Draft::V2(Box::new(Effect::permanent(0, 0, 0))));
+        let label = |editor: &EffectEditor, field: Field| {
+            rows(editor)
+                .concat()
+                .into_iter()
+                .find(|(id, _)| *id == field.id())
+                .map(|(_, label)| label)
+        };
+        assert_eq!(
+            label(&editor, Field::Param1).as_deref(),
+            Some("AC Modifier")
+        );
+        assert_eq!(label(&editor, Field::Param2).as_deref(), Some("Type"));
+        assert!(editor.description().contains("'AC Modifier'"));
+        editor.commit(Field::Opcode.id(), "126");
+        assert_eq!(
+            label(&editor, Field::Param1).as_deref(),
+            Some("Statistic Modifier")
+        );
+        assert!(editor.description().contains("Movement"));
     }
 
     #[test]
     fn a_v1_effect_shows_its_own_fields() {
         let editor = editor(Draft::V1(EffectV1Body::permanent(0, 0, 0)));
-        let labels = row_labels(&editor);
+        let labels: Vec<Vec<String>> = rows(&editor)
+            .into_iter()
+            .map(|card| card.into_iter().map(|(_, label)| label).collect())
+            .collect();
         assert_eq!(labels[2], ["Resource 0"]);
         assert!(!labels.concat().iter().any(|label| label == "Parameter 3"));
     }
@@ -260,7 +310,10 @@ mod tests {
         editor.commit(Field::Resource0.id(), " spwi112 ");
         // "Instant, Permanent" is the 10th timing (9).
         editor.commit(Field::Timing.id(), "9");
-        editor.commit(Field::Type.id(), "126");
+        // The types are by name: pick opcode 126's.
+        let (types, _) = choices(editor.draft.as_ref(), Field::Type).expect("a dropdown");
+        let movement = types.iter().position(|(opcode, _)| *opcode == 126);
+        editor.commit(Field::Type.id(), &movement.expect("listed").to_string());
         let effect = editor.draft.as_ref();
         assert_eq!(effect.number(Field::Probability1), Some(255));
         assert_eq!(effect.shown(Field::Param1), Some(-2));

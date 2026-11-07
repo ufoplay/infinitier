@@ -278,6 +278,7 @@ fn show_effect_dialog(ui: &AppWindow, model: &Model) {
         return;
     };
     adapter.set_title(editor.title().into());
+    adapter.set_description(editor.description().into());
     if let Some(cards) = sync_nested(&adapter.get_cards(), editor.cards()) {
         adapter.set_cards(cards);
     }

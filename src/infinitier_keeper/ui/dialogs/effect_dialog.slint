@@ -1,10 +1,10 @@
-// The effect dialog: every field of one effect, in three cards, to edit
-// and Save, or Cancel. The Rust side keeps the draft: each field commits
-// into it like a card tab's (on Enter, on focus loss, at once for a
-// dropdown or a dragged number), so clicking Save commits the field being
-// typed in first.
+// The effect dialog: every field of one effect, in three cards, and what
+// its type does under them, to edit and Save, or Cancel. The Rust side
+// keeps the draft: each field commits into it like a card tab's (on Enter,
+// on focus loss, at once for a dropdown or a dragged number), so clicking
+// Save commits the field being typed in first.
 
-import { Button, ButtonKind, Dialog, Theme } from "@themekit";
+import { Button, ButtonKind, Card, Dialog, Label, ScrollArea, TextRole, Theme } from "@themekit";
 import { FieldCard, FieldCardView } from "../components/components.slint";
 import { Metrics } from "../themes/metrics.slint";
 
@@ -13,6 +13,8 @@ export global EffectDialogAdapter {
     in property <string> title;
     // One card per column.
     in property <[FieldCard]> cards;
+    // What the effect's type does, and its parameters' known values.
+    in property <string> description;
     callback commit-field(int /* field id */, string /* value */);
     callback save();
     callback cancel();
@@ -30,6 +32,26 @@ export component EffectDialog inherits Dialog {
             FieldCardView {
                 card: card;
                 commit-field(id, value) => { EffectDialogAdapter.commit-field(id, value); }
+            }
+        }
+    }
+    // As wide as the cards; it scrolls, and gives up height first when the
+    // window is short.
+    if EffectDialogAdapter.description != "": Card {
+        content-padding: Theme.spacing.md;
+        content-spacing: Theme.spacing.xs;
+        min-height: Metrics.effect-description-min-height;
+        preferred-height: Metrics.effect-description-height;
+        vertical-stretch: 1;
+
+        Label {
+            text: "Description";
+            role: TextRole.heading;
+        }
+        ScrollArea {
+            Label {
+                text: EffectDialogAdapter.description;
+                wrap: word-wrap;
             }
         }
     }
