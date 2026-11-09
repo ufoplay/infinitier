@@ -95,7 +95,8 @@ pub struct Browser {
     /// isn't in the index.
     detail: Option<Detail>,
     /// Set when the selection moved programmatically (revealed, or arrow
-    /// keys): the list scrolls to it on the next repaint.
+    /// keys) or the filters changed: on the next repaint the list scrolls to
+    /// the selection, or to its top when the filters hide it.
     scroll_pending: bool,
 }
 
@@ -139,6 +140,7 @@ impl Browser {
 
     pub fn search(&mut self, text: &str) {
         self.text = text.to_owned();
+        self.scroll_pending = true;
     }
 
     /// Select `resref` and resolve its icon and description.
@@ -201,6 +203,7 @@ impl Browser {
     /// The master "Types" checkbox: show or hide every type.
     pub fn set_all_types(&mut self, shown: bool) {
         self.hidden_types = if shown { BTreeSet::new() } else { self.types() };
+        self.scroll_pending = true;
     }
 
     /// One type's checkbox.
@@ -213,6 +216,7 @@ impl Browser {
         } else {
             self.hidden_types.insert(type_name);
         }
+        self.scroll_pending = true;
     }
 
     /// The selected entry, when it's in the index.
@@ -295,9 +299,7 @@ impl Browser {
             book_menu: placements.is_some(),
             placements: ModelRc::new(VecModel::from(placements.unwrap_or_default())),
         };
-        let scroll_to = std::mem::take(&mut self.scroll_pending)
-            .then_some(selected_row)
-            .flatten();
+        let scroll_to = std::mem::take(&mut self.scroll_pending).then(|| selected_row.unwrap_or(0));
         BrowserView {
             state,
             rows,
