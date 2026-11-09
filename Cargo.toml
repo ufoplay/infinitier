@@ -132,7 +132,7 @@ slint = { version = "1.18.1", default-features = false, features = [
 slint-build = "1.18.1"
 
 # Native folder picker (the Settings dialogs' "Browse…" buttons).
-rfd = "0.17"
+rfd = "0.18"
 
 # slint-themekit = { path = "../../../github_ufoscout/slint-themekit/crates/slint-themekit" }
 slint-themekit = "0.5.1"
