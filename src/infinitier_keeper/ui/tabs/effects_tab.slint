@@ -1,8 +1,8 @@
 // The Effects tab: the creature's effects in a wide table (it scrolls
 // sideways, the header following), each row ending with Edit, Clone and
-// Delete, like the Inventory's Delete; the Add button under it. Edit (or a
-// double-click on a row), Clone and Add open the effect dialog
-// (dialogs/effect_dialog.slint).
+// Delete, like the Inventory's Delete, which stay in view however far it's
+// scrolled; the Add button under it. Edit (or a double-click on a row),
+// Clone and Add open the effect dialog (dialogs/effect_dialog.slint).
 
 import { Button, ButtonKind, ControlSize, Icons, Label, Table, TableCell, TableColumn, Theme, Tone } from "@themekit";
 
@@ -27,6 +27,8 @@ export component EffectsTab inherits VerticalLayout {
         columns: EffectsAdapter.columns;
         rows: EffectsAdapter.rows;
         size: ControlSize.small;
+        // Edit, Clone and Delete.
+        pinned-columns: 3;
         row-double-clicked(row) => { EffectsAdapter.edit(row); }
         // The last three columns: Edit, Clone, Delete.
         button-clicked(row, column) => {
