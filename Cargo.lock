@@ -6331,7 +6331,7 @@ dependencies = [
 
 [[package]]
 name = "slint-themekit"
-version = "0.5.1"
+version = "0.6.0"
 
 [[package]]
 name = "slotmap"
