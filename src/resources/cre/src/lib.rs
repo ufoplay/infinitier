@@ -23,6 +23,7 @@ mod exporter;
 mod granted;
 mod header;
 mod importer;
+mod locals;
 mod permanent_effects;
 pub use permanent_effects::{Matches, PermanentEffect};
 

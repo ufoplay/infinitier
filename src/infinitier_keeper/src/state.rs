@@ -21,6 +21,7 @@ use infinitier_core::save_games::SaveGame;
 use crate::tabs::CharacterTab;
 use crate::tabs::characteristics::KitFeatures;
 use crate::tabs::effects::editor::EffectEditor;
+use crate::tabs::variables::editor::VariableEditor;
 
 /// Identifies one spell in the Spells tab, regardless of engine — kept on
 /// [`Model`] parallel to the displayed rows so a row's delete / set-memorised
@@ -106,6 +107,10 @@ pub struct Model {
     /// character; `None` when closed. Modal, and dropped like the effect
     /// dialog when the selection changes.
     pub kit_features: Option<KitFeatures>,
+    /// Variables tabs: the open variable dialog; `None` when closed.
+    /// Modal, and dropped like the effect dialog when the selection
+    /// changes.
+    pub variable_editor: Option<VariableEditor>,
     /// What the last action that says so did, until the toast showing it
     /// times out or is dismissed.
     pub notice: Option<Notice>,
@@ -163,6 +168,7 @@ impl Model {
             portrait_names: Default::default(),
             effect_editor: None,
             kit_features: None,
+            variable_editor: None,
             notice: None,
             notices: 0,
         }
@@ -311,6 +317,7 @@ impl Model {
         self.active_tab = i;
         self.effect_editor = None;
         self.kit_features = None;
+        self.variable_editor = None;
     }
 
     /// Open a freshly-loaded save into a new tab and make it active.

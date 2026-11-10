@@ -19,7 +19,7 @@ use crate::tabs::{
 use crate::{
     AppWindow, AppearanceAdapter, CardsAdapter, CharacterAdapter, CharacterContent,
     EditTableAdapter, EffectDialogAdapter, EffectsAdapter, FieldCard, GridAdapter, Icons,
-    InventoryAdapter, Metrics, SpellsAdapter, TableAdapter,
+    InventoryAdapter, Metrics, SpellsAdapter, VariablesAdapter,
 };
 
 /// Repaint the tab strip and the active tab's page. Takes `&mut Model`
@@ -68,8 +68,12 @@ pub(super) fn refresh(ui: &AppWindow, model: &mut Model) {
             let (books, book, rows) = spells::build(model);
             show_spells(ui, books, book, rows);
         }
-        CharacterTab::LocalVariables => show_table(ui, variables::local(model)),
-        CharacterTab::GlobalVariables => show_table(ui, variables::global(model)),
+        CharacterTab::LocalVariables => {
+            show_variables(ui, variables::page(model, variables::Scope::Local));
+        }
+        CharacterTab::GlobalVariables => {
+            show_variables(ui, variables::page(model, variables::Scope::Global));
+        }
         CharacterTab::Effects => show_effects(ui, effects::build(model)),
         CharacterTab::JournalEntries => show_grid(
             ui,
@@ -187,13 +191,37 @@ fn show_edit_table(ui: &AppWindow, table: EditTable) {
     show(ui, CharacterContent::EditTable);
 }
 
-/// The read-only Name · Value table.
-fn show_table(ui: &AppWindow, rows: Vec<variables::VarRow>) {
-    let adapter = ui.global::<TableAdapter>();
-    if let Some(rows) = sync_table(&adapter.get_rows(), table::text_rows(rows)) {
+/// A variables tab: each variable's name and value, then its Edit and
+/// Delete buttons. Synced in place (see [`sync_table`]), so a double-click
+/// registers.
+fn show_variables(ui: &AppWindow, page: variables::Page) {
+    let variables::Page {
+        rows,
+        empty,
+        can_add,
+    } = page;
+    let adapter = ui.global::<VariablesAdapter>();
+    let icons = ui.global::<Icons>();
+    let buttons = [
+        table::button(icons.get_edit(), "Edit"),
+        table::button(icons.get_trash(), "Delete"),
+    ];
+    let rows = rows
+        .into_iter()
+        .map(|cells| {
+            cells
+                .into_iter()
+                .map(table::text)
+                .chain(buttons.iter().cloned())
+                .collect()
+        })
+        .collect();
+    if let Some(rows) = sync_table(&adapter.get_rows(), rows) {
         adapter.set_rows(rows);
     }
-    show(ui, CharacterContent::Table);
+    adapter.set_empty_text(empty.into());
+    adapter.set_can_add(can_add);
+    show(ui, CharacterContent::Variables);
 }
 
 /// The wide read-only grid: headers, per-column widths and rows, or

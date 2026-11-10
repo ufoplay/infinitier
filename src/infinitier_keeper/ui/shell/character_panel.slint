@@ -1,10 +1,10 @@
 // The selected character: the tab strip and the active tab's page.
 
 import { Label, Tab, TabBar, Theme, Tone } from "@themekit";
-import { AppearanceTab, CardsTab, EditTableTab, EffectsTab, GridTab, InventoryTab, SpellsTab, TableTab } from "../tabs/tabs.slint";
+import { AppearanceTab, CardsTab, EditTableTab, EffectsTab, GridTab, InventoryTab, SpellsTab, VariablesTab } from "../tabs/tabs.slint";
 
 // Which page shows the active tab (see tabs/tabs.slint).
-export enum CharacterContent { none, cards, edit-table, table, grid, appearance, inventory, spells, effects }
+export enum CharacterContent { none, cards, edit-table, variables, grid, appearance, inventory, spells, effects }
 
 export global CharacterAdapter {
     in property <bool> has-character;
@@ -39,7 +39,7 @@ export component CharacterPanel inherits VerticalLayout {
     }
     if CharacterAdapter.content == CharacterContent.cards: CardsTab { vertical-stretch: 1; }
     if CharacterAdapter.content == CharacterContent.edit-table: EditTableTab { vertical-stretch: 1; }
-    if CharacterAdapter.content == CharacterContent.table: TableTab { vertical-stretch: 1; }
+    if CharacterAdapter.content == CharacterContent.variables: VariablesTab { vertical-stretch: 1; }
     if CharacterAdapter.content == CharacterContent.grid: GridTab { vertical-stretch: 1; }
     if CharacterAdapter.content == CharacterContent.appearance: AppearanceTab { vertical-stretch: 1; }
     if CharacterAdapter.content == CharacterContent.inventory: InventoryTab { vertical-stretch: 1; }

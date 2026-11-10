@@ -38,7 +38,7 @@ import {
     GridAdapter,
     InventoryAdapter,
     SpellsAdapter,
-    TableAdapter,
+    VariablesAdapter,
 } from "tabs/tabs.slint";
 import { BrowserKind, BrowserLayer, BrowsersAdapter, BrowserState, TypeFilter } from "browser/browser.slint";
 import {
@@ -48,6 +48,8 @@ import {
     FormFolder,
     KitFeaturesAdapter,
     KitFeaturesDialog,
+    VariableDialog,
+    VariableDialogAdapter,
     LoadAdapter,
     LoadDialog,
     LoadingAdapter,
@@ -71,7 +73,7 @@ export {
     FieldCard,
     FieldRow,
     EditTableAdapter,
-    TableAdapter,
+    VariablesAdapter,
     GridAdapter,
     AppearanceAdapter,
     ColorSwatch,
@@ -80,6 +82,7 @@ export {
     EffectsAdapter,
     EffectDialogAdapter,
     KitFeaturesAdapter,
+    VariableDialogAdapter,
     BrowsersAdapter,
     BrowserKind,
     BrowserState,
@@ -158,6 +161,10 @@ export component AppWindow inherits Window {
         height: root.height;
     }
     if KitFeaturesAdapter.open: KitFeaturesDialog {
+        width: root.width;
+        height: root.height;
+    }
+    if VariableDialogAdapter.open: VariableDialog {
         width: root.width;
         height: root.height;
     }

@@ -1,0 +1,61 @@
+// The Local / Global Variables tabs: a Name · Value table, each row ending
+// with Edit and Delete, which stay in view however wide the table; the Add
+// button under it. Edit (or a double-click on a row) and Add open the
+// variable dialog (dialogs/variable_dialog.slint).
+
+import { Button, ButtonKind, ControlSize, Icons, Label, Table, TableCell, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+
+export global VariablesAdapter {
+    // Each variable's name and value, then its Edit and Delete buttons.
+    in property <[[TableCell]]> rows;
+    // Why there are no rows, when there are none.
+    in property <string> empty-text;
+    // Whether a variable can be added.
+    in property <bool> can-add;
+    callback add();
+    callback edit(int /* row */);
+    callback delete(int /* row */);
+}
+
+export component VariablesTab inherits VerticalLayout {
+    spacing: Theme.spacing.sm;
+
+    if VariablesAdapter.rows.length == 0: Label {
+        text: VariablesAdapter.empty-text;
+        tone: Tone.muted;
+        wrap: word-wrap;
+    }
+    Table {
+        columns: [
+            { title: "Name", width: Metrics.variable-name-width },
+            { title: "Value" },
+            { width: Theme.control-height(ControlSize.small) },
+            { width: Theme.control-height(ControlSize.small) },
+        ];
+        rows: VariablesAdapter.rows;
+        size: ControlSize.small;
+        // Edit and Delete.
+        pinned-columns: 2;
+        row-double-clicked(row) => { VariablesAdapter.edit(row); }
+        // The last column is Delete, the one before it Edit.
+        button-clicked(row, column) => {
+            if (column == 3) {
+                VariablesAdapter.delete(row);
+            } else {
+                VariablesAdapter.edit(row);
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: start;
+        Button {
+            text: "Add variable";
+            icon: Icons.plus;
+            kind: ButtonKind.secondary;
+            size: ControlSize.small;
+            enabled: VariablesAdapter.can-add;
+            clicked => { VariablesAdapter.add(); }
+        }
+    }
+}

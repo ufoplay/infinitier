@@ -8,6 +8,7 @@ mod character;
 mod dialogs;
 mod kit_features;
 mod shell;
+mod variables;
 
 use slint::{Model as _, ModelRc, VecModel};
 
@@ -23,10 +24,12 @@ pub fn refresh(ui: &AppWindow, app: &mut App) {
     match &mut app.session {
         Session::Saves(model) => {
             kit_features::refresh(ui, model);
+            variables::refresh(ui, model);
             character::refresh(ui, model);
         }
         Session::NoGame | Session::Game(_) => {
             kit_features::clear(ui);
+            variables::clear(ui);
             character::clear(ui);
         }
     }

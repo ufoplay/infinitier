@@ -1,0 +1,51 @@
+// The variable dialog: a local or global variable's name and value, to add
+// one or edit it. Save hands both, as typed, to the Rust side, which writes
+// them, or keeps the dialog open with `error` saying why it can't.
+
+import { Button, ButtonKind, Dialog, Label, TextField, TextRole, Theme, Tone } from "@themekit";
+import { Metrics } from "../themes/metrics.slint";
+
+export global VariableDialogAdapter {
+    in property <bool> open;
+    in property <string> title;
+    // Filled when the dialog opens; then the user's to edit.
+    in-out property <string> name;
+    in-out property <string> value;
+    in property <string> error;
+    callback save(string /* name */, string /* value */);
+    callback cancel();
+}
+
+export component VariableDialog inherits Dialog {
+    title: VariableDialogAdapter.title;
+    panel-width: Metrics.variable-dialog-width;
+
+    Label { text: "Name"; role: TextRole.caption; tone: Tone.muted; }
+    TextField {
+        text <=> VariableDialogAdapter.name;
+        accepted => { VariableDialogAdapter.save(VariableDialogAdapter.name, VariableDialogAdapter.value); }
+    }
+    Label { text: "Value"; role: TextRole.caption; tone: Tone.muted; }
+    TextField {
+        text <=> VariableDialogAdapter.value;
+        accepted => { VariableDialogAdapter.save(VariableDialogAdapter.name, VariableDialogAdapter.value); }
+    }
+    if VariableDialogAdapter.error != "": Label {
+        text: VariableDialogAdapter.error;
+        tone: Tone.danger;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: Theme.spacing.sm;
+        Button {
+            text: "Cancel";
+            kind: ButtonKind.secondary;
+            clicked => { VariableDialogAdapter.cancel(); }
+        }
+        Button {
+            text: "Save";
+            clicked => { VariableDialogAdapter.save(VariableDialogAdapter.name, VariableDialogAdapter.value); }
+        }
+    }
+}
